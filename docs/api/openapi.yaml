@@ -1,0 +1,193 @@
+openapi: 3.0.3
+info:
+  title: GeoTravel API
+  version: "0.1.0"
+  description: >
+    Contrato REST del backend. Actualizar este archivo en el mismo PR que agregue
+    o cambie un endpoint (ver CONTRIBUTING.md). Base path real: /geotravel/api
+    (definido en backend/src/main/webapp/WEB-INF/web.xml).
+servers:
+  - url: http://localhost:8080/geotravel/api
+
+paths:
+  /health:
+    get:
+      summary: Estado del servicio
+      responses:
+        "200":
+          description: OK
+
+  /zonas:
+    get:
+      summary: Lista de zonas turísticas
+      tags: [zonas]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Zona" }
+    post:
+      summary: "TODO (P3): crear zona"
+      tags: [zonas]
+      responses:
+        "201": { description: Creada }
+
+  /zonas/{id}:
+    put:
+      summary: "TODO (P3): editar zona (valida no-solapamiento)"
+      tags: [zonas]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        "200": { description: OK }
+        "409": { description: Se superpone con otra zona }
+    delete:
+      summary: "TODO (P3): eliminar zona"
+      tags: [zonas]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        "204": { description: Eliminada }
+
+  /atracciones:
+    get:
+      summary: Lista de atracciones turísticas
+      tags: [atracciones]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Atraccion" }
+    post:
+      summary: "TODO (P3): crear atracción (foto opcional)"
+      tags: [atracciones]
+      responses:
+        "201": { description: Creada }
+
+  /recorridos:
+    get:
+      summary: Lista de recorridos, con estado efectivo (estacionalidad resuelta)
+      tags: [recorridos]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Recorrido" }
+    post:
+      summary: "TODO (P4): crear recorrido + itinerario de atracciones"
+      tags: [recorridos]
+      responses:
+        "201": { description: Creado }
+
+  /recorridos/{id}/avanzar:
+    post:
+      summary: Avanza el recorrido al siguiente estado válido (Pendiente -> Disponible -> Cancelado)
+      tags: [recorridos]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        "200": { description: Estado actualizado }
+        "404": { description: No existe }
+        "409": { description: No hay transición válida desde el estado actual }
+
+  /recorridos/{id}/historial:
+    get:
+      summary: "TODO (P4): histórico de estados del recorrido"
+      tags: [recorridos]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        "200": { description: OK }
+
+  /consultas/recorridos-por-zona/{zonaId}:
+    get:
+      summary: Recorridos con al menos una atracción dentro de la zona
+      tags: [consultas]
+      parameters: [{ name: zonaId, in: path, required: true, schema: { type: integer } }]
+      responses:
+        "200": { description: OK }
+
+  /consultas/zonas-mas-activas:
+    get:
+      summary: Zonas ordenadas por cantidad de recorridos "Disponible"
+      tags: [consultas]
+      responses:
+        "200": { description: OK }
+
+  /consultas/puntos-populares:
+    get:
+      summary: Atracciones ordenadas por cantidad de recorridos que las incluyen
+      tags: [consultas]
+      responses:
+        "200": { description: OK }
+
+  /consultas/recorrido-mas-cercano:
+    get:
+      summary: Recorrido cuya atracción más cercana está al punto (x, y) dado
+      tags: [consultas]
+      parameters:
+        - { name: x, in: query, required: true, schema: { type: number }, description: "Este, EPSG:32721" }
+        - { name: y, in: query, required: true, schema: { type: number }, description: "Norte, EPSG:32721" }
+      responses:
+        "200": { description: OK }
+
+  /consultas/zona-por-punto:
+    get:
+      summary: Zona que contiene el punto (x, y) dado -- resolver antes la dirección a coordenada
+      tags: [consultas]
+      parameters:
+        - { name: x, in: query, required: true, schema: { type: number } }
+        - { name: y, in: query, required: true, schema: { type: number } }
+      responses:
+        "200": { description: OK }
+
+  /consultas/reportes/recorridos-por-zona:
+    get:
+      summary: "TODO (P5): reporte, filtrable por estado, agrupado por zona"
+      tags: [consultas]
+      parameters:
+        - { name: estado, in: query, required: false, schema: { type: string } }
+      responses:
+        "200": { description: OK }
+
+components:
+  schemas:
+    Zona:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        descripcion: { type: string }
+        nivelAtractivo: { type: integer, minimum: 1, maximum: 5 }
+        observaciones: { type: string }
+        geom: { type: string, description: "GeoJSON (Polygon) como string" }
+    Atraccion:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        descripcion: { type: string }
+        clasificacion: { type: string }
+        fotoUrl: { type: string }
+        geom: { type: string, description: "GeoJSON (Point) como string" }
+    Recorrido:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        duracionMin: { type: integer }
+        guiaResponsable: { type: string }
+        tipoExperiencia: { type: string }
+        mesInicio: { type: integer }
+        mesFin: { type: integer }
+        estado:
+          type: string
+          enum: [Pendiente, Disponible, "Fuera de estacion", Cancelado]
+        estadoEfectivo:
+          type: string
+          description: estado ya resuelto contra la estacionalidad actual

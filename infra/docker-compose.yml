@@ -1,0 +1,53 @@
+name: geotravel
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-geotravel}
+      POSTGRES_USER: ${POSTGRES_USER:-geotravel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-geotravel}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Aplica las migraciones de db/migrations contra el servicio 'db'.
+  # No arranca solo (profile "tools"): correrlo a mano con
+  #   docker compose --profile tools run --rm flyway migrate
+  flyway:
+    image: flyway/flyway:10
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../db/migrations:/flyway/sql
+    command: >
+      -url=jdbc:postgresql://db:5432/${POSTGRES_DB:-geotravel}
+      -user=${POSTGRES_USER:-geotravel}
+      -password=${POSTGRES_PASSWORD:-geotravel}
+      -connectRetries=10
+      migrate
+
+  geoserver:
+    image: kartoza/geoserver:2.25.2
+    environment:
+      GEOSERVER_ADMIN_USER: ${GEOSERVER_ADMIN_USER:-admin}
+      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD:-geoserver}
+      GEOSERVER_DATA_DIR: /opt/geoserver/data_dir
+    ports:
+      - "${GEOSERVER_PORT:-8082}:8080"
+    volumes:
+      - geoserver_data:/opt/geoserver/data_dir
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
+  geoserver_data:

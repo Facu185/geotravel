@@ -1,0 +1,25 @@
+# Reasigná cada @usuario por el usuario de GitHub real de cada integrante.
+# GitHub va a sugerir automáticamente al dueño como revisor de cada PR que toque su carpeta.
+
+/db/                                   @P1-datos
+/geoserver/                            @P1-datos
+/infra/                                @P1-datos
+
+/backend/src/main/java/**/db/          @P2-backend
+/backend/src/main/java/**/health/      @P2-backend
+/backend/src/main/webapp/              @P2-backend
+/backend/pom.xml                       @P2-backend
+
+/backend/src/main/java/**/zonas/       @P3-zonas
+/backend/src/main/java/**/atracciones/ @P3-zonas
+/frontend/src/modules/zonas/           @P3-zonas
+/frontend/src/modules/atracciones/     @P3-zonas
+
+/backend/src/main/java/**/recorridos/  @P4-recorridos
+/frontend/src/modules/recorridos/      @P4-recorridos
+
+/backend/src/main/java/**/consultas/   @P5-consultas
+/frontend/src/modules/consultas/       @P5-consultas
+/frontend/src/modules/invitado/        @P5-consultas
+
+/docs/                                 @P1-datos @P2-backend @P3-zonas @P4-recorridos @P5-consultas
