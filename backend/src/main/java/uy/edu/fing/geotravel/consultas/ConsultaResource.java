@@ -112,6 +112,58 @@ public class ConsultaResource {
         }
     }
 
+    /**
+      Reporte de recorridos agrupados por zona, filtrable por estado (parametro opcional).
+      Una atraccion "pertenece" a una zona si está geométricamente contenida en ella; un
+      recorrido pertenece a una zona si tiene al menos una atracción adentro (mismo criterio
+      que recorridosPorZona). Las zonas sin recorridos que cumplan el filtro no aparecen.
+     */
+    @GET
+    @Path("/reportes/recorridos-por-zona")
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<Map<String, Object>> reporteRecorridosPorZona(@QueryParam("estado") String estado) throws SQLException {
+        String sql =
+            "SELECT z.id AS zona_id, z.nombre AS zona_nombre, " +
+            "       r.id AS recorrido_id, r.nombre AS recorrido_nombre, r.estado " +
+            "FROM zona_turistica z " +
+            "JOIN atraccion a ON ST_Contains(z.geom, a.geom) " +
+            "JOIN recorrido_atraccion ra ON ra.atraccion_id = a.id " +
+            "JOIN recorrido r ON r.id = ra.recorrido_id " +
+            "WHERE (? IS NULL OR r.estado = ?) " +
+            "GROUP BY z.id, z.nombre, r.id, r.nombre, r.estado " +
+            "ORDER BY z.nombre, r.nombre";
+        try (Connection conn = DataSourceProvider.get().getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, estado);
+            ps.setString(2, estado);
+            try (ResultSet rs = ps.executeQuery()) {
+                Map<Integer, Map<String, Object>> zonas = new LinkedHashMap<>();
+                while (rs.next()) {
+                    int zonaId = rs.getInt("zona_id");
+                    Map<String, Object> zona = zonas.computeIfAbsent(zonaId, id -> {
+                        Map<String, Object> z = new LinkedHashMap<>();
+                        z.put("zonaId", id);
+                        try {
+                            z.put("zonaNombre", rs.getString("zona_nombre"));
+                        } catch (SQLException e) {
+                            throw new RuntimeException(e);
+                        }
+                        z.put("recorridos", new ArrayList<Map<String, Object>>());
+                        return z;
+                    });
+                    Map<String, Object> recorrido = new LinkedHashMap<>();
+                    recorrido.put("id", rs.getInt("recorrido_id"));
+                    recorrido.put("nombre", rs.getString("recorrido_nombre"));
+                    recorrido.put("estado", rs.getString("estado"));
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> recorridos = (List<Map<String, Object>>) zona.get("recorridos");
+                    recorridos.add(recorrido);
+                }
+                return new ArrayList<>(zonas.values());
+            }
+        }
+    }
+
     /** Zona que contiene el punto dado (x, y en EPSG:32721) -- ya geocodificada la dirección. */
     @GET
     @Path("/zona-por-punto")

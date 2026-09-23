@@ -24,7 +24,7 @@ export default function ZonasPage() {
         ))}
       </ul>
       {/* TODO (P3): formulario de alta/edición dibujando el polígono sobre el mapa
-          (ej. react-leaflet-draw) + POST/PUT a /api/zonas. */}
+          (ol/interaction/Draw sobre el map de onMapReady) + POST/PUT a /api/zonas. */}
     </div>
   );
 }

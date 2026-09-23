@@ -148,12 +148,35 @@ paths:
 
   /consultas/reportes/recorridos-por-zona:
     get:
-      summary: "TODO (P5): reporte, filtrable por estado, agrupado por zona"
+      summary: Reporte de recorridos agrupados por zona, filtrable por estado
+      description: >
+        Una atracción pertenece a una zona si está geométricamente contenida en ella
+        (ST_Contains); un recorrido pertenece a la zona si tiene al menos una atracción
+        adentro. Sin el parámetro "estado" trae recorridos en cualquier estado. Las zonas
+        sin recorridos que cumplan el filtro no aparecen en la respuesta.
       tags: [consultas]
       parameters:
-        - { name: estado, in: query, required: false, schema: { type: string } }
+        - { name: estado, in: query, required: false, schema: { type: string, enum: [Pendiente, Disponible, "Fuera de estacion", Cancelado] } }
       responses:
-        "200": { description: OK }
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    zonaId: { type: integer }
+                    zonaNombre: { type: string }
+                    recorridos:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id: { type: integer }
+                          nombre: { type: string }
+                          estado: { type: string }
 
 components:
   schemas:
