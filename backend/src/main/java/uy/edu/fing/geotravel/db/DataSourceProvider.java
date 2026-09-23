@@ -37,6 +37,8 @@ public final class DataSourceProvider {
         String pass = env("DB_PASSWORD", "geotravel");
 
         HikariConfig config = new HikariConfig();
+        // Explícito porque en Tomcat el driver dentro del .war no se autoregistra en DriverManager.
+        config.setDriverClassName("org.postgresql.Driver");
         config.setJdbcUrl("jdbc:postgresql://" + host + ":" + port + "/" + name);
         config.setUsername(user);
         config.setPassword(pass);

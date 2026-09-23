@@ -27,13 +27,44 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ../db/migrations:/flyway/sql
-    command: >
-      -url=jdbc:postgresql://db:5432/${POSTGRES_DB:-geotravel}
-      -user=${POSTGRES_USER:-geotravel}
-      -password=${POSTGRES_PASSWORD:-geotravel}
-      -connectRetries=10
-      migrate
+      - ../db/migrations:/flyway/migrations
+    # La conexión va por variables de entorno (no por 'command'), porque
+    # "docker compose run flyway migrate" reemplaza el command completo.
+    environment:
+      FLYWAY_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-geotravel}
+      FLYWAY_USER: ${POSTGRES_USER:-geotravel}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      FLYWAY_CONNECT_RETRIES: "10"
+      FLYWAY_LOCATIONS: filesystem:/flyway/migrations
+    command: migrate
+
+  # Compila el backend con Maven dentro de Docker (no hace falta instalar Maven).
+  # Genera backend/target/geotravel.war. Correrlo a mano con
+  #   docker compose --profile tools run --rm backend-build
+  backend-build:
+    image: maven:3.9-eclipse-temurin-17
+    profiles: ["tools"]
+    working_dir: /app
+    volumes:
+      - ../backend:/app
+      - m2cache:/root/.m2
+    command: mvn -B -DskipTests clean package
+
+  # Tomcat 9 (javax.*, el namespace que usa el backend). El .war NO va montado como
+  # volumen: se copia con "docker compose cp" y Tomcat lo despliega solo (ver README).
+  backend:
+    image: tomcat:9.0-jdk17-temurin
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-geotravel}
+      DB_USER: ${POSTGRES_USER:-geotravel}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
 
   geoserver:
     image: kartoza/geoserver:2.25.2
@@ -51,3 +82,4 @@ services:
 volumes:
   pgdata:
   geoserver_data:
+  m2cache:
