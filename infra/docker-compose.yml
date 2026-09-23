@@ -27,13 +27,16 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ../db/migrations:/flyway/sql
-    command: >
-      -url=jdbc:postgresql://db:5432/${POSTGRES_DB:-geotravel}
-      -user=${POSTGRES_USER:-geotravel}
-      -password=${POSTGRES_PASSWORD:-geotravel}
-      -connectRetries=10
-      migrate
+      - ../db/migrations:/flyway/migrations
+    # La conexión va por variables de entorno (no por 'command'), porque
+    # "docker compose run flyway migrate" reemplaza el command completo.
+    environment:
+      FLYWAY_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-geotravel}
+      FLYWAY_USER: ${POSTGRES_USER:-geotravel}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      FLYWAY_CONNECT_RETRIES: "10"
+      FLYWAY_LOCATIONS: filesystem:/flyway/migrations
+    command: migrate
 
   geoserver:
     image: kartoza/geoserver:2.25.2
