@@ -1,4 +1,4 @@
-package uy.edu.fing.geotravel.atracciones;
+package uy.edu.fing.geotravel.media;
 
 import org.glassfish.jersey.media.multipart.FormDataParam;
 
@@ -22,14 +22,17 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * Fotos de las atracciones (dueño: P3, opcional "Fotos").
+ * Subida de archivos genérica (imágenes). Construido para el opcional "Fotos" de GeoTravel
+ * (1er semestre); la letra de UrbanSafe no pide fotos en ninguna entidad, así que hoy no lo
+ * usa nadie. Se deja andando -- no depende de ninguna entidad del dominio -- por si en algún
+ * momento se necesita adjuntar una imagen a un incidente o un recurso.
  *
  * POST /api/fotos        (multipart, campo "archivo") -> 201 {"url": "http://.../api/fotos/<uuid>.jpg"}
  * GET  /api/fotos/{name} -> la imagen
  *
  * El flujo es de dos pasos: primero se sube el archivo y se obtiene una URL; después esa URL se
- * guarda en el campo fotoUrl de la atracción (POST/PUT /api/atracciones). Se hace así porque al
- * CREAR una atracción todavía no existe su id.
+ * guarda donde corresponda (p. ej. un campo fotoUrl). Se hace así porque al CREAR la entidad
+ * dueña de la foto todavía no existe su id.
  *
  * Seguridad:
  *  - El tipo se decide por el CONTENIDO del archivo (bytes iniciales), nunca por el nombre ni por

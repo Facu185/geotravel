@@ -7,7 +7,7 @@ import MapView from "../../components/MapView.jsx";
 import { api } from "../../api/client.js";
 
 /**
- * Módulo Zonas (dueño: P3): ABM de zonas turísticas dibujando sobre el mapa.
+ * Módulo Zonas Operativas (dueño: P3): ABM dibujando sobre el mapa.
  *
  * Cómo funciona:
  *  - "geom" siempre es GeoJSON en lon/lat (EPSG:4326). El backend lo convierte al SRID de la base.
@@ -16,9 +16,10 @@ import { api } from "../../api/client.js";
  *  - Sin zona seleccionada = modo "nueva zona". Con zona seleccionada = modo "editar".
  */
 
-const FORM_VACIO = { nombre: "", descripcion: "", nivelAtractivo: 3, observaciones: "" };
+const FORM_VACIO = { nombre: "", descripcion: "", nivelPrioridad: 3, responsable: "", observaciones: "" };
 
-// Más atractivo (1) = más intenso. Mismos colores que geoserver/styles/zonas_atractivo.sld.
+// Más prioridad (1) = más intenso. Mismos colores que geoserver/styles/zonas_atractivo.sld
+// (pendiente de renombrar a zonas_prioridad.sld -- tarea de P1).
 const COLOR_NIVEL = { 1: "#c0392b", 2: "#d9754f", 3: "#e6a95f", 4: "#9db08f", 5: "#c7d0c3" };
 
 export default function ZonasPage() {
@@ -69,7 +70,8 @@ export default function ZonasPage() {
     setForm({
       nombre: zona.nombre,
       descripcion: zona.descripcion ?? "",
-      nivelAtractivo: zona.nivelAtractivo,
+      nivelPrioridad: zona.nivelPrioridad,
+      responsable: zona.responsable ?? "",
       observaciones: zona.observaciones ?? "",
     });
     setGeom(JSON.parse(zona.geom));
@@ -101,7 +103,7 @@ export default function ZonasPage() {
     }
     const cuerpo = {
       ...form,
-      nivelAtractivo: Number(form.nivelAtractivo),
+      nivelPrioridad: Number(form.nivelPrioridad),
       geomGeoJson: JSON.stringify(geom), // el backend espera la geometría como texto
     };
     try {
@@ -114,7 +116,7 @@ export default function ZonasPage() {
       nueva();
       cargar();
     } catch (e) {
-      setError(e.message); // p. ej. La zona se superpone con "Ciudad Vieja"
+      setError(e.message); // p. ej. La zona se superpone con "Centro"
     }
   };
 
@@ -142,14 +144,14 @@ export default function ZonasPage() {
       .filter((z) => z.id !== seleccionada?.id)
       .map((z) => ({
         type: "Feature",
-        properties: { id: z.id, nombre: z.nombre, nivel: z.nivelAtractivo },
+        properties: { id: z.id, nombre: z.nombre, nivel: z.nivelPrioridad },
         geometry: JSON.parse(z.geom),
       })),
   };
 
   return (
     <div>
-      <h2>Zonas turísticas</h2>
+      <h2>Zonas operativas</h2>
 
       <MapView>
         <GeoJSON
@@ -194,14 +196,17 @@ export default function ZonasPage() {
           Descripción <textarea rows={2} {...campo("descripcion")} />
         </label>
         <label>
-          Nivel de atractivo (1 = máximo, 5 = mínimo)
-          <select {...campo("nivelAtractivo")}>
+          Nivel de prioridad (1 = máxima, 5 = mínima)
+          <select {...campo("nivelPrioridad")}>
             {[1, 2, 3, 4, 5].map((n) => (
               <option key={n} value={n}>
                 {n}
               </option>
             ))}
           </select>
+        </label>
+        <label>
+          Responsable <input {...campo("responsable")} />
         </label>
         <label>
           Observaciones <textarea rows={2} {...campo("observaciones")} />
@@ -236,7 +241,7 @@ export default function ZonasPage() {
             <button type="button" onClick={() => seleccionar(z)}>
               {z.nombre}
             </button>{" "}
-            — nivel {z.nivelAtractivo}
+            — prioridad {z.nivelPrioridad}
           </li>
         ))}
       </ul>

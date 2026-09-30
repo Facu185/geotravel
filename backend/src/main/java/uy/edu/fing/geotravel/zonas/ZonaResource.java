@@ -23,7 +23,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Módulo Zonas (dueño: P3): ABM de zonas turísticas.
+ * Módulo Zonas Operativas (dueño: P3): ABM de las zonas que usa UrbanSafe para organizar
+ * la atención de incidentes.
  *
  * SRID: la base guarda todo en EPSG:32721 (metros) pero Leaflet dibuja y envía
  * lon/lat (EPSG:4326). Por eso:
@@ -42,15 +43,16 @@ public class ZonaResource {
             "ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326), 32721)";
 
     private static final String SELECT_ALL =
-            "SELECT id, nombre, descripcion, nivel_atractivo, observaciones, "
+            "SELECT id, nombre, descripcion, nivel_prioridad, responsable, observaciones, "
           + "       ST_AsGeoJSON(ST_Transform(geom, 4326)) AS geom_json "
-          + "FROM zona_turistica ORDER BY id";
+          + "FROM zona_operativa ORDER BY id";
 
     /** Cuerpo JSON de POST/PUT. geomGeoJson es la geometría como texto GeoJSON (JSON.stringify en el frontend). */
     public static class ZonaInput {
         public String nombre;
         public String descripcion;
-        public int nivelAtractivo;
+        public int nivelPrioridad;
+        public String responsable;
         public String observaciones;
         public String geomGeoJson;
     }
@@ -68,7 +70,8 @@ public class ZonaResource {
                 zona.put("id", rs.getInt("id"));
                 zona.put("nombre", rs.getString("nombre"));
                 zona.put("descripcion", rs.getString("descripcion"));
-                zona.put("nivelAtractivo", rs.getInt("nivel_atractivo"));
+                zona.put("nivelPrioridad", rs.getInt("nivel_prioridad"));
+                zona.put("responsable", rs.getString("responsable"));
                 zona.put("observaciones", rs.getString("observaciones"));
                 zona.put("geom", rs.getString("geom_json")); // texto GeoJSON: el frontend hace JSON.parse
                 zonas.add(zona);
@@ -86,14 +89,15 @@ public class ZonaResource {
             if (invalida != null) {
                 return invalida;
             }
-            String sql = "INSERT INTO zona_turistica (nombre, descripcion, nivel_atractivo, observaciones, geom) "
-                       + "VALUES (?, ?, ?, ?, " + GEOM_IN + ") RETURNING id";
+            String sql = "INSERT INTO zona_operativa (nombre, descripcion, nivel_prioridad, responsable, observaciones, geom) "
+                       + "VALUES (?, ?, ?, ?, ?, " + GEOM_IN + ") RETURNING id";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, in.nombre.trim());
                 ps.setString(2, in.descripcion);
-                ps.setInt(3, in.nivelAtractivo);
-                ps.setString(4, in.observaciones);
-                ps.setString(5, in.geomGeoJson);
+                ps.setInt(3, in.nivelPrioridad);
+                ps.setString(4, in.responsable);
+                ps.setString(5, in.observaciones);
+                ps.setString(6, in.geomGeoJson);
                 try (ResultSet rs = ps.executeQuery()) {
                     rs.next();
                     return Response.status(Response.Status.CREATED).entity(Map.of("id", rs.getInt("id"))).build();
@@ -112,15 +116,16 @@ public class ZonaResource {
             if (invalida != null) {
                 return invalida;
             }
-            String sql = "UPDATE zona_turistica SET nombre = ?, descripcion = ?, nivel_atractivo = ?, "
-                       + "observaciones = ?, geom = " + GEOM_IN + " WHERE id = ?";
+            String sql = "UPDATE zona_operativa SET nombre = ?, descripcion = ?, nivel_prioridad = ?, "
+                       + "responsable = ?, observaciones = ?, geom = " + GEOM_IN + " WHERE id = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, in.nombre.trim());
                 ps.setString(2, in.descripcion);
-                ps.setInt(3, in.nivelAtractivo);
-                ps.setString(4, in.observaciones);
-                ps.setString(5, in.geomGeoJson);
-                ps.setInt(6, id);
+                ps.setInt(3, in.nivelPrioridad);
+                ps.setString(4, in.responsable);
+                ps.setString(5, in.observaciones);
+                ps.setString(6, in.geomGeoJson);
+                ps.setInt(7, id);
                 return ps.executeUpdate() == 0
                         ? error(Response.Status.NOT_FOUND.getStatusCode(), "La zona no existe")
                         : Response.ok(Map.of("id", id)).build();
@@ -132,7 +137,7 @@ public class ZonaResource {
     @Path("/{id}")
     public Response eliminar(@PathParam("id") int id) throws SQLException {
         try (Connection conn = DataSourceProvider.get().getConnection();
-             PreparedStatement ps = conn.prepareStatement("DELETE FROM zona_turistica WHERE id = ?")) {
+             PreparedStatement ps = conn.prepareStatement("DELETE FROM zona_operativa WHERE id = ?")) {
             ps.setInt(1, id);
             return ps.executeUpdate() == 0
                     ? error(Response.Status.NOT_FOUND.getStatusCode(), "La zona no existe")
@@ -147,8 +152,8 @@ public class ZonaResource {
         if (in == null || in.nombre == null || in.nombre.trim().isEmpty()) {
             return error(400, "El nombre es obligatorio");
         }
-        if (in.nivelAtractivo < 1 || in.nivelAtractivo > 5) {
-            return error(400, "El nivel de atractivo debe estar entre 1 y 5");
+        if (in.nivelPrioridad < 1 || in.nivelPrioridad > 5) {
+            return error(400, "El nivel de prioridad debe estar entre 1 y 5");
         }
         if (in.geomGeoJson == null || !esPoligonoValido(conn, in.geomGeoJson)) {
             return error(400, "La geometría no es un polígono válido");
@@ -176,7 +181,7 @@ public class ZonaResource {
     /** @return el nombre de una zona existente que se superpone con la geometría dada, o null si no hay ninguna. */
     private static String zonaQueSeSuperpone(Connection conn, String geojson, int idActual) throws SQLException {
         String sql = "WITH nueva AS (SELECT " + GEOM_IN + " AS g) "
-                   + "SELECT z.nombre FROM zona_turistica z, nueva n "
+                   + "SELECT z.nombre FROM zona_operativa z, nueva n "
                    + "WHERE z.id <> ? AND z.geom && n.g "
                    + "  AND ST_Intersects(z.geom, n.g) AND NOT ST_Touches(z.geom, n.g) "
                    + "LIMIT 1";

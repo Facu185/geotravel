@@ -5,7 +5,7 @@
 - `main` está protegida: nadie pushea directo, todo entra por Pull Request.
 - Nombrá la rama por módulo y tarea: `feat/<modulo>-<descripcion>`, `fix/<modulo>-<descripcion>`.
   - Ejemplos: `feat/zonas-abm`, `feat/recorridos-estados`, `fix/geoserver-sld-color`.
-- Módulos: `datos`, `backend`, `zonas`, `atracciones`, `recorridos`, `consultas`, `invitado`, `infra`, `docs`.
+- Módulos: `datos`, `backend`, `zonas`, `recursos`, `incidentes`, `consultas`, `invitado`, `infra`, `docs`.
 
 ## Pull Requests
 
@@ -38,8 +38,8 @@ docs: agrega diagrama de arquitectura
 |---|---|---|
 | `db/`, `geoserver/` | Datos & GeoServer | P1 |
 | `backend/.../health`, `backend/.../db` | Backend base & reglas | P2 |
-| `backend/.../zonas`, `.../atracciones`, `frontend/.../zonas`, `.../atracciones` | Zonas + Atracciones | P3 |
-| `backend/.../recorridos`, `frontend/.../recorridos` | Recorridos | P4 |
+| `backend/.../zonas`, `.../recursos`, `frontend/.../zonas`, `.../recursos` | Zonas Operativas + Recursos | P3 |
+| `backend/.../incidentes`, `frontend/.../incidentes` | Incidentes | P4 |
 | `backend/.../consultas`, `frontend/.../consultas`, `.../invitado` | Consultas, reportes, vista invitado | P5 |
 
 Actualizá esta tabla con los nombres/usuarios reales del equipo y reflejalos también en `.github/CODEOWNERS`.
