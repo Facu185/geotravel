@@ -19,7 +19,7 @@ paths:
 
   /zonas:
     get:
-      summary: Lista de zonas turísticas
+      summary: Lista de zonas turísticas (geom en GeoJSON lon/lat, EPSG:4326)
       tags: [zonas]
       responses:
         "200":
@@ -30,29 +30,44 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Zona" }
     post:
-      summary: "TODO (P3): crear zona"
+      summary: Crear zona (valida datos y que no se superponga con otra)
       tags: [zonas]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ZonaInput" }
       responses:
-        "201": { description: Creada }
+        "201": { description: Creada, content: { application/json: { schema: { $ref: "#/components/schemas/IdCreado" } } } }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
+        "409": { $ref: "#/components/responses/ZonaSuperpuesta" }
 
   /zonas/{id}:
     put:
-      summary: "TODO (P3): editar zona (valida no-solapamiento)"
+      summary: Editar zona (misma validación; la zona no cuenta como superpuesta consigo misma)
       tags: [zonas]
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ZonaInput" }
       responses:
-        "200": { description: OK }
-        "409": { description: Se superpone con otra zona }
+        "200": { description: Actualizada }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
+        "404": { $ref: "#/components/responses/NoExiste" }
+        "409": { $ref: "#/components/responses/ZonaSuperpuesta" }
     delete:
-      summary: "TODO (P3): eliminar zona"
+      summary: Eliminar zona
       tags: [zonas]
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       responses:
         "204": { description: Eliminada }
+        "404": { $ref: "#/components/responses/NoExiste" }
 
   /atracciones:
     get:
-      summary: Lista de atracciones turísticas
+      summary: Lista de atracciones turísticas (geom en GeoJSON lon/lat, EPSG:4326)
       tags: [atracciones]
       responses:
         "200":
@@ -63,10 +78,72 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Atraccion" }
     post:
-      summary: "TODO (P3): crear atracción (foto opcional)"
+      summary: Crear atracción
       tags: [atracciones]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AtraccionInput" }
       responses:
-        "201": { description: Creada }
+        "201": { description: Creada, content: { application/json: { schema: { $ref: "#/components/schemas/IdCreado" } } } }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
+
+  /atracciones/{id}:
+    put:
+      summary: Editar atracción
+      tags: [atracciones]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AtraccionInput" }
+      responses:
+        "200": { description: Actualizada }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
+        "404": { $ref: "#/components/responses/NoExiste" }
+    delete:
+      summary: Eliminar atracción (se quita también de los itinerarios de recorridos)
+      tags: [atracciones]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        "204": { description: Eliminada }
+        "404": { $ref: "#/components/responses/NoExiste" }
+
+  /fotos:
+    post:
+      summary: Subir la foto de una atracción. Devuelve una URL para usar en fotoUrl (POST/PUT /atracciones).
+      tags: [atracciones]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [archivo]
+              properties:
+                archivo: { type: string, format: binary, description: "JPG, PNG, GIF o WEBP, máx. 5 MB. El tipo se valida por el contenido." }
+      responses:
+        "201":
+          description: Subida
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, example: "http://localhost:8080/geotravel/api/fotos/3f2a...c1.jpg" }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
+        "413": { description: La imagen supera 5 MB }
+
+  /fotos/{nombre}:
+    get:
+      summary: Descargar una foto subida
+      tags: [atracciones]
+      parameters: [{ name: nombre, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: La imagen }
+        "404": { $ref: "#/components/responses/NoExiste" }
 
   /recorridos:
     get:
@@ -156,7 +233,49 @@ paths:
         "200": { description: OK }
 
 components:
+  responses:
+    DatosInvalidos:
+      description: Datos inválidos (nombre vacío, nivel fuera de 1-5, clasificación desconocida, geometría o URL inválida)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ZonaSuperpuesta:
+      description: 'La zona se superpone con otra existente; el mensaje indica con cuál (ej. La zona se superpone con "Pocitos")'
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NoExiste:
+      description: No existe
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
   schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+    IdCreado:
+      type: object
+      properties:
+        id: { type: integer }
+    ZonaInput:
+      type: object
+      required: [nombre, nivelAtractivo, geomGeoJson]
+      properties:
+        nombre: { type: string }
+        descripcion: { type: string }
+        nivelAtractivo: { type: integer, minimum: 1, maximum: 5, description: "1 = mayor atractivo" }
+        observaciones: { type: string }
+        geomGeoJson: { type: string, description: 'GeoJSON Polygon en lon/lat (EPSG:4326) como TEXTO (JSON.stringify)' }
+    AtraccionInput:
+      type: object
+      required: [nombre, clasificacion, geomGeoJson]
+      properties:
+        nombre: { type: string }
+        descripcion: { type: string }
+        clasificacion: { type: string, enum: [cultural, gastronomica, natural, historica] }
+        fotoUrl: { type: string, description: "Opcional. URL http(s), p. ej. la devuelta por POST /fotos" }
+        geomGeoJson: { type: string, description: 'GeoJSON Point en lon/lat (EPSG:4326) como TEXTO (JSON.stringify)' }
     Zona:
       type: object
       properties:
@@ -165,7 +284,7 @@ components:
         descripcion: { type: string }
         nivelAtractivo: { type: integer, minimum: 1, maximum: 5 }
         observaciones: { type: string }
-        geom: { type: string, description: "GeoJSON (Polygon) como string" }
+        geom: { type: string, description: "GeoJSON Polygon en lon/lat (EPSG:4326), como texto: hacer JSON.parse" }
     Atraccion:
       type: object
       properties:
@@ -174,7 +293,7 @@ components:
         descripcion: { type: string }
         clasificacion: { type: string }
         fotoUrl: { type: string }
-        geom: { type: string, description: "GeoJSON (Point) como string" }
+        geom: { type: string, description: "GeoJSON Point en lon/lat (EPSG:4326), como texto: hacer JSON.parse" }
     Recorrido:
       type: object
       properties:
