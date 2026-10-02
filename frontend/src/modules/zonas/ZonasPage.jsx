@@ -18,8 +18,7 @@ import { api } from "../../api/client.js";
 
 const FORM_VACIO = { nombre: "", descripcion: "", nivelPrioridad: 3, responsable: "", observaciones: "" };
 
-// Más prioridad (1) = más intenso. Mismos colores que geoserver/styles/zonas_atractivo.sld
-// (pendiente de renombrar a zonas_prioridad.sld -- tarea de P1).
+// Más prioridad (1) = más intenso. Mismos colores que geoserver/styles/zonas_nivel_prioridad.sld
 const COLOR_NIVEL = { 1: "#c0392b", 2: "#d9754f", 3: "#e6a95f", 4: "#9db08f", 5: "#c7d0c3" };
 
 export default function ZonasPage() {
