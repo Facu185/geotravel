@@ -63,8 +63,11 @@ services:
       DB_NAME: ${POSTGRES_DB:-geotravel}
       DB_USER: ${POSTGRES_USER:-geotravel}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      FOTOS_DIR: /data/fotos
     ports:
       - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - fotos_data:/data/fotos   # fotos de atracciones: sobreviven a los redespliegues del .war
 
   geoserver:
     image: kartoza/geoserver:2.25.2
@@ -83,3 +86,4 @@ volumes:
   pgdata:
   geoserver_data:
   m2cache:
+  fotos_data:

@@ -3,29 +3,35 @@ import MapView from "../../components/MapView.jsx";
 
 /** Módulo Invitado (dueño: P5). Sin login: mapa público con filtros. */
 export default function InvitadoPage() {
-  const [verRecorridos, setVerRecorridos] = useState(true);
-  const [verAtracciones, setVerAtracciones] = useState(true);
+  const [verIncidentes, setVerIncidentes] = useState(true);
+  const [verRecursos, setVerRecursos] = useState(true);
+  const [verZonas, setVerZonas] = useState(true);
 
   const layers = [
-    ...(verRecorridos ? ["geotravel:v_recorrido_geom"] : []),
-    ...(verAtracciones ? ["geotravel:atraccion"] : []),
+    ...(verZonas ? ["geotravel:zona_operativa"] : []),
+    ...(verIncidentes ? ["geotravel:incidente"] : []),
+    ...(verRecursos ? ["geotravel:recurso"] : []),
   ];
 
   return (
     <div>
       <h2>Mapa público</h2>
       <label>
-        <input type="checkbox" checked={verRecorridos} onChange={(e) => setVerRecorridos(e.target.checked)} />
-        {" "}Recorridos
+        <input type="checkbox" checked={verZonas} onChange={(e) => setVerZonas(e.target.checked)} />
+        {" "}Zonas operativas
       </label>{" "}
       <label>
-        <input type="checkbox" checked={verAtracciones} onChange={(e) => setVerAtracciones(e.target.checked)} />
-        {" "}Atracciones
+        <input type="checkbox" checked={verIncidentes} onChange={(e) => setVerIncidentes(e.target.checked)} />
+        {" "}Incidentes
+      </label>{" "}
+      <label>
+        <input type="checkbox" checked={verRecursos} onChange={(e) => setVerRecursos(e.target.checked)} />
+        {" "}Recursos
       </label>
       <MapView layers={layers} />
-      {/* TODO (P5): filtro por estado/estacionalidad de recorridos y por
-          clasificación de atracciones (vía CQL_FILTER en la WMSTileLayer, o
-          consumiendo /api/recorridos y /api/atracciones y filtrando en frontend). */}
+      {/* TODO (P5): filtro por tipo/estado/prioridad/fecha de incidentes y por tipo de
+          recurso (vía CQL_FILTER en la WMSTileLayer, o consumiendo /api/incidentes y
+          /api/recursos y filtrando en frontend). */}
     </div>
   );
 }

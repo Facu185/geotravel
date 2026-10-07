@@ -1,87 +1,106 @@
--- V1__init.sql
--- Esquema inicial de GeoTravel. Ver docs/diagramas/arquitectura.md para el modelo completo.
+-- V1__init.sql — Sistema de Gestión Geográfica de Emergencias Urbanas (UrbanSafe).
+-- Ver docs/diagramas/arquitectura.md para el modelo completo.
 -- Aplicar con Flyway, o a mano: psql -d geotravel -f V1__init.sql
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 
-CREATE TABLE zona_turistica (
-    id               serial PRIMARY KEY,
-    nombre           text NOT NULL,
-    descripcion      text,
-    nivel_atractivo  smallint NOT NULL CHECK (nivel_atractivo BETWEEN 1 AND 5), -- 1 = mayor atractivo
-    observaciones    text,
-    geom             geometry(Polygon, 32721) NOT NULL
-);
-CREATE INDEX idx_zona_turistica_geom ON zona_turistica USING GIST (geom);
-
-CREATE TABLE atraccion (
+-- ============================================================ zona_operativa
+CREATE TABLE zona_operativa (
     id              serial PRIMARY KEY,
     nombre          text NOT NULL,
     descripcion     text,
-    clasificacion   text NOT NULL,
-    foto_url        text,
-    geom            geometry(Point, 32721) NOT NULL
+    nivel_prioridad smallint NOT NULL CHECK (nivel_prioridad BETWEEN 1 AND 5), -- 1 = máxima prioridad
+    responsable     text,
+    observaciones   text,
+    geom            geometry(Polygon, 32721) NOT NULL
 );
-CREATE INDEX idx_atraccion_geom ON atraccion USING GIST (geom);
+CREATE INDEX idx_zona_operativa_geom ON zona_operativa USING GIST (geom);
 
-CREATE TABLE recorrido (
-    id               serial PRIMARY KEY,
-    nombre           text NOT NULL,
-    descripcion      text,
-    duracion_min     integer,
-    guia_responsable text,
-    tipo_experiencia text NOT NULL, -- cultural | gastronomica | natural | historica
-    mes_inicio       smallint NOT NULL CHECK (mes_inicio BETWEEN 1 AND 12),
-    mes_fin          smallint NOT NULL CHECK (mes_fin BETWEEN 1 AND 12),
-    estado           text NOT NULL DEFAULT 'Pendiente'
-                       CHECK (estado IN ('Pendiente', 'Disponible', 'Fuera de estacion', 'Cancelado'))
-);
-
-CREATE TABLE recorrido_atraccion (
-    recorrido_id  integer NOT NULL REFERENCES recorrido(id) ON DELETE CASCADE,
-    atraccion_id  integer NOT NULL REFERENCES atraccion(id) ON DELETE CASCADE,
-    orden         smallint NOT NULL,
-    PRIMARY KEY (recorrido_id, orden),
-    UNIQUE (recorrido_id, atraccion_id)
-);
-
-CREATE TABLE historial_estado (
-    id            serial PRIMARY KEY,
-    recorrido_id  integer NOT NULL REFERENCES recorrido(id) ON DELETE CASCADE,
-    estado        text NOT NULL,
-    fecha_desde   timestamp NOT NULL DEFAULT now()
-);
-
--- Deja un primer registro de historial cuando se crea un recorrido.
-CREATE OR REPLACE FUNCTION fn_recorrido_historial_inicial() RETURNS trigger AS $$
-BEGIN
-    INSERT INTO historial_estado (recorrido_id, estado) VALUES (NEW.id, NEW.estado);
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_recorrido_historial_inicial
-    AFTER INSERT ON recorrido
-    FOR EACH ROW EXECUTE FUNCTION fn_recorrido_historial_inicial();
-
--- Opcional "control de solapamiento de zonas" (dueño: P1, junto con P3):
--- descomentar cuando el ABM de zonas esté listo para depender de esta validación en DB
--- además de (o en lugar de) validarlo en el backend.
---
+-- Opcional "Control de superposición entre zonas operativas" (comentado, ver nota
+-- al final del archivo: la validación equivalente ya se hace en el backend).
 -- CREATE OR REPLACE FUNCTION fn_zona_sin_solapamiento() RETURNS trigger AS $$
 -- BEGIN
 --     IF EXISTS (
---         SELECT 1 FROM zona_turistica
+--         SELECT 1 FROM zona_operativa
 --         WHERE id <> COALESCE(NEW.id, -1)
 --           AND geom && NEW.geom
---           AND ST_Overlaps(geom, NEW.geom)
+--           AND ST_Intersects(geom, NEW.geom) AND NOT ST_Touches(geom, NEW.geom)
 --     ) THEN
 --         RAISE EXCEPTION 'La zona se superpone con una zona existente';
 --     END IF;
 --     RETURN NEW;
 -- END;
 -- $$ LANGUAGE plpgsql;
---
 -- CREATE TRIGGER trg_zona_sin_solapamiento
---     BEFORE INSERT OR UPDATE ON zona_turistica
+--     BEFORE INSERT OR UPDATE ON zona_operativa
 --     FOR EACH ROW EXECUTE FUNCTION fn_zona_sin_solapamiento();
+
+-- =================================================================== recurso
+CREATE TABLE recurso (
+    id               serial PRIMARY KEY,
+    identificacion   text NOT NULL,                 -- ej. "Ambulancia 12", "Patrulla 305"
+    nombre           text,
+    tipo             text NOT NULL,                 -- ambulancia | bomberos | patrulla | centro_atencion | otro
+    estado_operativo text NOT NULL DEFAULT 'Disponible'
+                       CHECK (estado_operativo IN ('Disponible', 'En servicio', 'Fuera de servicio')),
+    descripcion      text,
+    geom             geometry(Point, 32721) NOT NULL
+);
+CREATE INDEX idx_recurso_geom ON recurso USING GIST (geom);
+
+-- ================================================================= incidente
+CREATE TABLE incidente (
+    id                 serial PRIMARY KEY,
+    titulo             text NOT NULL,
+    descripcion        text,
+    tipo_incidente     text NOT NULL,                -- accidente_transito | incendio | corte_servicio | inundacion | otro
+    prioridad          smallint NOT NULL CHECK (prioridad BETWEEN 1 AND 5),
+    estado             text NOT NULL DEFAULT 'Registrado'
+                          CHECK (estado IN ('Registrado', 'En atención', 'Derivado', 'Resuelto', 'Cancelado')),
+    fecha_hora_registro timestamp NOT NULL DEFAULT now(),
+    equipo_responsable text,
+    geom               geometry(Point, 32721) NOT NULL
+);
+CREATE INDEX idx_incidente_geom ON incidente USING GIST (geom);
+CREATE INDEX idx_incidente_estado ON incidente (estado);
+CREATE INDEX idx_incidente_fecha ON incidente (fecha_hora_registro);
+
+-- ====================================================== incidente_recurso
+-- Asignación de recursos a un incidente ("recursos que atendieron/atienden el incidente").
+-- SUPUESTO a confirmar con el tutor: se modela como N a N (un incidente puede tener
+-- varios recursos asignados y un recurso puede haber atendido varios incidentes en
+-- distintos momentos), con la fecha de asignación. Si la letra espera algo más simple
+-- (un único recurso por incidente), cambiar por una columna incidente.recurso_id.
+CREATE TABLE incidente_recurso (
+    incidente_id      integer NOT NULL REFERENCES incidente(id) ON DELETE CASCADE,
+    recurso_id        integer NOT NULL REFERENCES recurso(id)   ON DELETE CASCADE,
+    fecha_asignacion  timestamp NOT NULL DEFAULT now(),
+    PRIMARY KEY (incidente_id, recurso_id)
+);
+
+-- ============================================================ historial_estado
+CREATE TABLE historial_estado (
+    id            serial PRIMARY KEY,
+    incidente_id  integer NOT NULL REFERENCES incidente(id) ON DELETE CASCADE,
+    estado        text NOT NULL,
+    fecha_hora    timestamp NOT NULL DEFAULT now(),
+    usuario       text                              -- quién hizo el cambio (no hay login real: texto libre)
+);
+
+-- Deja un primer registro de historial cuando se crea un incidente.
+CREATE OR REPLACE FUNCTION fn_incidente_historial_inicial() RETURNS trigger AS $$
+BEGIN
+    INSERT INTO historial_estado (incidente_id, estado, usuario) VALUES (NEW.id, NEW.estado, 'sistema');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_incidente_historial_inicial
+    AFTER INSERT ON incidente
+    FOR EACH ROW EXECUTE FUNCTION fn_incidente_historial_inicial();
+
+-- Nota sobre "no deben superponerse" (zonas operativas): la validación real se hace
+-- en el backend (ZonaResource.java) con ST_Intersects + NOT ST_Touches, no con
+-- ST_Overlaps -- ST_Overlaps no detecta una zona idéntica a otra ni una contenida
+-- dentro de otra. El trigger de arriba (comentado) es la misma regla, por si se
+-- prefiere reforzarla también a nivel de base de datos.

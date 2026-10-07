@@ -7,19 +7,21 @@
 
 /backend/src/main/java/**/db/          @P2-backend
 /backend/src/main/java/**/health/      @P2-backend
+/backend/src/main/java/**/config/      @P2-backend
 /backend/src/main/webapp/              @P2-backend
 /backend/pom.xml                       @P2-backend
 
 /backend/src/main/java/**/zonas/       @P3-zonas
-/backend/src/main/java/**/atracciones/ @P3-zonas
+/backend/src/main/java/**/recursos/    @P3-zonas
+/backend/src/main/java/**/media/       @P3-zonas
 /frontend/src/modules/zonas/           @P3-zonas
-/frontend/src/modules/atracciones/     @P3-zonas
+/frontend/src/modules/recursos/        @P3-zonas
 
-/backend/src/main/java/**/recorridos/  @P4-recorridos
-/frontend/src/modules/recorridos/      @P4-recorridos
+/backend/src/main/java/**/incidentes/  @P4-incidentes
+/frontend/src/modules/incidentes/      @P4-incidentes
 
 /backend/src/main/java/**/consultas/   @P5-consultas
 /frontend/src/modules/consultas/       @P5-consultas
 /frontend/src/modules/invitado/        @P5-consultas
 
-/docs/                                 @P1-datos @P2-backend @P3-zonas @P4-recorridos @P5-consultas
+/docs/                                 @P1-datos @P2-backend @P3-zonas @P4-incidentes @P5-consultas
