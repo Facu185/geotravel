@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { CircleMarker, Tooltip, useMapEvents } from "react-leaflet";
-import MapView from "../../components/MapView.jsx";
+import PaginaMapa from "../../components/PaginaMapa.jsx";
+import { Aviso, BotonVolver, IconoFlecha, IconoMas, Segmentado } from "../../components/ui.jsx";
+import { COLOR_ESTADO_RECURSO, TIPOS_RECURSO } from "../../components/colores.js";
 import { api } from "../../api/client.js";
 
 /**
@@ -9,14 +11,21 @@ import { api } from "../../api/client.js";
  * Reemplaza al módulo "Atracciones" de GeoTravel: mismo patrón (clic en el mapa para
  * ubicar un punto), pero sin foto -- UrbanSafe no la pide -- y con "tipo" como texto
  * libre (la letra da ejemplos sin cerrar la lista; si el tutor confirma que debe ser
- * una lista fija, cambiar el <input> de tipo por un <select>).
+ * una lista fija, cambiar el <input> de tipo por un <select>). Los tipos que conoce el
+ * estilo de GeoServer se sugieren al escribir, pero no se obligan.
  *
  * Igual que en Atracciones: Leaflet trabaja con [lat, lng] pero GeoJSON exige [lng, lat];
  * la conversión está aislada en "geometria" (al guardar) y "posicionDe" (al leer).
+ *
+ * El panel tiene dos vistas: la lista de recursos y el formulario (nuevo o en edición).
+ * El mapa solo acepta clics de ubicación cuando el formulario está abierto.
  */
 
-const ESTADOS_OPERATIVOS = ["Disponible", "En servicio", "Fuera de servicio"];
-const COLOR_ESTADO = { Disponible: "#1f7a5c", "En servicio": "#9a5a12", "Fuera de servicio": "#a8392b" };
+const ESTADOS_OPERATIVOS = Object.keys(COLOR_ESTADO_RECURSO).map((estado) => ({
+  valor: estado,
+  etiqueta: estado,
+  color: COLOR_ESTADO_RECURSO[estado],
+}));
 
 const FORM_VACIO = { identificacion: "", nombre: "", tipo: "", estadoOperativo: "Disponible", descripcion: "" };
 
@@ -34,6 +43,7 @@ function ClickEnMapa({ alClick }) {
 
 export default function RecursosPage() {
   const [recursos, setRecursos] = useState([]);
+  const [vista, setVista] = useState("lista"); // "lista" | "form"
   const [seleccionado, setSeleccionado] = useState(null);
   const [form, setForm] = useState(FORM_VACIO);
   const [punto, setPunto] = useState(null); // { lat, lng } del recurso que se está creando/editando
@@ -46,11 +56,22 @@ export default function RecursosPage() {
     cargar();
   }, []);
 
-  const nuevo = () => {
+  const reiniciar = () => {
     setSeleccionado(null);
     setForm(FORM_VACIO);
     setPunto(null);
     setError(null);
+  };
+
+  const volverALista = () => {
+    reiniciar();
+    setVista("lista");
+  };
+
+  const abrirNuevo = () => {
+    reiniciar();
+    setMensaje(null);
+    setVista("form");
   };
 
   const seleccionar = (r) => {
@@ -65,6 +86,7 @@ export default function RecursosPage() {
     setPunto(posicionDe(r));
     setError(null);
     setMensaje(null);
+    setVista("form");
   };
 
   const guardar = async (ev) => {
@@ -82,8 +104,9 @@ export default function RecursosPage() {
       } else {
         await api.post("/recursos", cuerpo);
       }
-      setMensaje(seleccionado ? "Recurso actualizado." : "Recurso creado.");
-      nuevo();
+      const texto = seleccionado ? "Recurso actualizado." : "Recurso creado.";
+      volverALista();
+      setMensaje(texto);
       cargar();
     } catch (e) {
       setError(e.message);
@@ -94,8 +117,8 @@ export default function RecursosPage() {
     if (!window.confirm(`¿Eliminar "${seleccionado.identificacion}"?`)) return;
     try {
       await api.del(`/recursos/${seleccionado.id}`);
+      volverALista();
       setMensaje("Recurso eliminado.");
-      nuevo();
       cargar();
     } catch (e) {
       setError(e.message);
@@ -107,107 +130,132 @@ export default function RecursosPage() {
     onChange: (e) => setForm({ ...form, [nombre]: e.target.value }),
   });
 
+  const hijosMapa = (
+    <>
+      <ClickEnMapa alClick={(ubicacion) => vista === "form" && setPunto(ubicacion)} />
+
+      {/* Los demás recursos, de fondo. bubblingMouseEvents=false evita que el clic sobre un
+          marcador también cuente como clic en el mapa (y mueva la ubicación en edición). */}
+      {recursos
+        .filter((r) => r.id !== seleccionado?.id)
+        .map((r) => {
+          const { lat, lng } = posicionDe(r);
+          return (
+            <CircleMarker
+              key={r.id}
+              center={[lat, lng]}
+              radius={8}
+              pathOptions={{ color: COLOR_ESTADO_RECURSO[r.estadoOperativo] ?? "#555", fillOpacity: 0.85 }}
+              bubblingMouseEvents={false}
+              eventHandlers={{ click: () => seleccionar(r) }}
+            >
+              <Tooltip>
+                {r.identificacion} — {r.tipo}
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
+
+      {/* La ubicación que se está eligiendo (nueva o en edición). */}
+      {vista === "form" && punto && (
+        <CircleMarker
+          center={[punto.lat, punto.lng]}
+          radius={12}
+          pathOptions={{ color: COLOR_ESTADO_RECURSO[form.estadoOperativo], weight: 4, fillOpacity: 0.3 }}
+        >
+          <Tooltip permanent>{form.identificacion || "Nuevo recurso"}</Tooltip>
+        </CircleMarker>
+      )}
+    </>
+  );
+
   return (
-    <div>
-      <h2>Recursos de emergencia</h2>
-
-      <MapView>
-        <ClickEnMapa alClick={setPunto} />
-
-        {/* Los demás recursos, de fondo. bubblingMouseEvents=false evita que el clic sobre un
-            marcador también cuente como clic en el mapa (y mueva la ubicación en edición). */}
-        {recursos
-          .filter((r) => r.id !== seleccionado?.id)
-          .map((r) => {
-            const { lat, lng } = posicionDe(r);
-            return (
-              <CircleMarker
-                key={r.id}
-                center={[lat, lng]}
-                radius={8}
-                pathOptions={{ color: COLOR_ESTADO[r.estadoOperativo] ?? "#555", fillOpacity: 0.8 }}
-                bubblingMouseEvents={false}
-                eventHandlers={{ click: () => seleccionar(r) }}
-              >
-                <Tooltip>{r.identificacion} — {r.tipo}</Tooltip>
-              </CircleMarker>
-            );
-          })}
-
-        {/* La ubicación que se está eligiendo (nueva o en edición). */}
-        {punto && (
-          <CircleMarker
-            center={[punto.lat, punto.lng]}
-            radius={12}
-            pathOptions={{ color: COLOR_ESTADO[form.estadoOperativo], weight: 4, fillOpacity: 0.3 }}
-          >
-            <Tooltip permanent>{form.identificacion || "Nuevo recurso"}</Tooltip>
-          </CircleMarker>
-        )}
-      </MapView>
-
-      <form onSubmit={guardar} style={{ display: "grid", gap: 8, maxWidth: 480, marginTop: 16 }}>
-        <h3>{seleccionado ? `Editando: ${seleccionado.identificacion}` : "Nuevo recurso"}</h3>
-        <p style={{ margin: 0, color: "#555" }}>
-          Hacé clic en el mapa para {seleccionado ? "mover" : "elegir"} la ubicación.
-        </p>
-
-        <label>
-          Identificación (ej. &quot;Ambulancia 12&quot;) <input required {...campo("identificacion")} />
-        </label>
-        <label>
-          Nombre (opcional) <input {...campo("nombre")} />
-        </label>
-        <label>
-          Tipo (ej. ambulancia, bomberos, patrulla, centro_atencion) <input required {...campo("tipo")} />
-        </label>
-        <label>
-          Estado operativo
-          <select {...campo("estadoOperativo")}>
-            {ESTADOS_OPERATIVOS.map((e) => (
-              <option key={e} value={e}>
-                {e}
-              </option>
+    <PaginaMapa etiqueta="Administración" titulo="Recursos de emergencia" etiquetaBoton="Recursos" hijosMapa={hijosMapa}>
+      {vista === "lista" ? (
+        <>
+          <div className="panel__seccion">
+            {mensaje && <Aviso tipo="ok">{mensaje}</Aviso>}
+            {error && <Aviso tipo="error">{error}</Aviso>}
+            <button type="button" className="btn btn--primario btn--ancho" onClick={abrirNuevo}>
+              <IconoMas /> Nuevo recurso
+            </button>
+            <p className="ayuda">También podés tocar un recurso en el mapa para editarlo.</p>
+          </div>
+          <ul className="items">
+            {recursos.map((r) => (
+              <li key={r.id}>
+                <button type="button" className="item" onClick={() => seleccionar(r)}>
+                  <span className="item__marca item__marca--cuadrado" style={{ "--color": COLOR_ESTADO_RECURSO[r.estadoOperativo] }} aria-hidden="true" />
+                  <span className="item__texto">
+                    <span className="item__titulo">{r.identificacion}</span>
+                    <span className="item__detalle">
+                      {r.tipo} · {r.estadoOperativo}
+                    </span>
+                  </span>
+                  <IconoFlecha />
+                </button>
+              </li>
             ))}
-          </select>
-        </label>
-        <label>
-          Descripción <textarea rows={2} {...campo("descripcion")} />
-        </label>
+          </ul>
+          {recursos.length === 0 && <p className="vacio">Todavía no hay recursos.</p>}
+        </>
+      ) : (
+        <form className="panel__seccion formulario" onSubmit={guardar}>
+          <BotonVolver onClick={volverALista}>Recursos</BotonVolver>
+          <h3 className="formulario__titulo">{seleccionado ? seleccionado.identificacion : "Nuevo recurso"}</h3>
 
-        {error && (
-          <p role="alert" style={{ color: "crimson", margin: 0 }}>
-            {error}
+          <p className={punto ? "paso paso--listo" : "paso"}>
+            {punto
+              ? `Ubicación elegida (${punto.lat.toFixed(5)}, ${punto.lng.toFixed(5)}). Tocá otro punto del mapa para moverla.`
+              : "Hacé clic en el mapa para elegir la ubicación."}
           </p>
-        )}
-        {mensaje && <p style={{ color: "seagreen", margin: 0 }}>{mensaje}</p>}
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <button type="submit">{seleccionado ? "Guardar cambios" : "Crear recurso"}</button>
-          {seleccionado && (
-            <>
-              <button type="button" onClick={eliminar}>
+          <label className="campo">
+            <span className="campo__etiqueta">Identificación</span>
+            <input required placeholder="Ej.: Ambulancia 12" {...campo("identificacion")} />
+          </label>
+          <label className="campo">
+            <span className="campo__etiqueta">Nombre (opcional)</span>
+            <input {...campo("nombre")} />
+          </label>
+          <label className="campo">
+            <span className="campo__etiqueta">Tipo</span>
+            <input required list="tipos-recurso" placeholder="Ej.: ambulancia" {...campo("tipo")} />
+            <datalist id="tipos-recurso">
+              {TIPOS_RECURSO.map((t) => (
+                <option key={t} value={t} />
+              ))}
+            </datalist>
+          </label>
+          <Segmentado
+            leyenda="Estado operativo"
+            nombre="estadoOperativo"
+            opciones={ESTADOS_OPERATIVOS}
+            valor={form.estadoOperativo}
+            onChange={(estado) => setForm({ ...form, estadoOperativo: estado })}
+          />
+          <label className="campo">
+            <span className="campo__etiqueta">Descripción</span>
+            <textarea rows={2} {...campo("descripcion")} />
+          </label>
+
+          {error && <Aviso tipo="error">{error}</Aviso>}
+
+          <div className="acciones">
+            <button type="submit" className="btn btn--primario">
+              {seleccionado ? "Guardar cambios" : "Crear recurso"}
+            </button>
+            <button type="button" className="btn btn--secundario" onClick={volverALista}>
+              Cancelar
+            </button>
+            {seleccionado && (
+              <button type="button" className="btn btn--peligro" onClick={eliminar}>
                 Eliminar
               </button>
-              <button type="button" onClick={nuevo}>
-                Cancelar
-              </button>
-            </>
-          )}
-        </div>
-      </form>
-
-      <h3>Recursos existentes</h3>
-      <ul>
-        {recursos.map((r) => (
-          <li key={r.id}>
-            <button type="button" onClick={() => seleccionar(r)}>
-              {r.identificacion}
-            </button>{" "}
-            — {r.tipo} ({r.estadoOperativo})
-          </li>
-        ))}
-      </ul>
-    </div>
+            )}
+          </div>
+        </form>
+      )}
+    </PaginaMapa>
   );
 }
