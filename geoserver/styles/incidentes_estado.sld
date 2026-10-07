@@ -26,7 +26,7 @@
             <Graphic>
               <Mark>
                 <WellKnownName>circle</WellKnownName>
-                <Fill><CssParameter name="fill">#f1c40f</CssParameter></Fill>
+                <Fill><CssParameter name="fill">#2b6b9e</CssParameter></Fill>
                 <Stroke>
                   <CssParameter name="stroke">#ffffff</CssParameter>
                   <CssParameter name="stroke-width">1.5</CssParameter>
@@ -49,7 +49,7 @@
             <Graphic>
               <Mark>
                 <WellKnownName>circle</WellKnownName>
-                <Fill><CssParameter name="fill">#e67e22</CssParameter></Fill>
+                <Fill><CssParameter name="fill">#9a5a12</CssParameter></Fill>
                 <Stroke>
                   <CssParameter name="stroke">#ffffff</CssParameter>
                   <CssParameter name="stroke-width">1.5</CssParameter>
@@ -72,7 +72,7 @@
             <Graphic>
               <Mark>
                 <WellKnownName>circle</WellKnownName>
-                <Fill><CssParameter name="fill">#9b59b6</CssParameter></Fill>
+                <Fill><CssParameter name="fill">#7a3b8f</CssParameter></Fill>
                 <Stroke>
                   <CssParameter name="stroke">#ffffff</CssParameter>
                   <CssParameter name="stroke-width">1.5</CssParameter>
@@ -95,7 +95,7 @@
             <Graphic>
               <Mark>
                 <WellKnownName>circle</WellKnownName>
-                <Fill><CssParameter name="fill">#2ecc71</CssParameter></Fill>
+                <Fill><CssParameter name="fill">#1f7a5c</CssParameter></Fill>
                 <Stroke>
                   <CssParameter name="stroke">#ffffff</CssParameter>
                   <CssParameter name="stroke-width">1.5</CssParameter>
@@ -118,7 +118,7 @@
             <Graphic>
               <Mark>
                 <WellKnownName>circle</WellKnownName>
-                <Fill><CssParameter name="fill">#95a5a6</CssParameter></Fill>
+                <Fill><CssParameter name="fill">#a8392b</CssParameter></Fill>
                 <Stroke>
                   <CssParameter name="stroke">#ffffff</CssParameter>
                   <CssParameter name="stroke-width">1.5</CssParameter>

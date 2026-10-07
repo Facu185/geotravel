@@ -25,7 +25,7 @@
           <PointSymbolizer>
             <Graphic>
               <Mark>
-                <WellKnownName>circle</WellKnownName>
+                <WellKnownName>square</WellKnownName>
                 <Fill><CssParameter name="fill">#c0392b</CssParameter></Fill>
                 <Stroke>
                   <CssParameter name="stroke">#ffffff</CssParameter>
@@ -48,8 +48,8 @@
           <PointSymbolizer>
             <Graphic>
               <Mark>
-                <WellKnownName>circle</WellKnownName>
-                <Fill><CssParameter name="fill">#e67e22</CssParameter></Fill>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#a0522d</CssParameter></Fill>
                 <Stroke>
                   <CssParameter name="stroke">#ffffff</CssParameter>
                   <CssParameter name="stroke-width">1.5</CssParameter>
@@ -71,7 +71,7 @@
           <PointSymbolizer>
             <Graphic>
               <Mark>
-                <WellKnownName>circle</WellKnownName>
+                <WellKnownName>square</WellKnownName>
                 <Fill><CssParameter name="fill">#2980b9</CssParameter></Fill>
                 <Stroke>
                   <CssParameter name="stroke">#ffffff</CssParameter>
@@ -117,7 +117,7 @@
           <PointSymbolizer>
             <Graphic>
               <Mark>
-                <WellKnownName>circle</WellKnownName>
+                <WellKnownName>square</WellKnownName>
                 <Fill><CssParameter name="fill">#7f8c8d</CssParameter></Fill>
                 <Stroke>
                   <CssParameter name="stroke">#ffffff</CssParameter>
