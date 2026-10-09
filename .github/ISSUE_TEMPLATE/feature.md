@@ -6,7 +6,7 @@ labels: ''
 assignees: ''
 ---
 
-**Módulo:** <!-- datos / backend / zonas / atracciones / recorridos / consultas / invitado / infra / docs -->
+**Módulo:** <!-- datos / backend / zonas / recursos / incidentes / consultas / invitado / infra / docs -->
 **Tipo:** <!-- núcleo / opcional -->
 
 ## Descripción

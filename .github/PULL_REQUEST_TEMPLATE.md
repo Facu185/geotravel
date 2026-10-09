@@ -6,9 +6,9 @@
 
 - [ ] datos/GeoServer
 - [ ] backend base
-- [ ] zonas
-- [ ] atracciones
-- [ ] recorridos
+- [ ] zonas operativas
+- [ ] recursos
+- [ ] incidentes
 - [ ] consultas / invitado
 - [ ] infra
 - [ ] docs
