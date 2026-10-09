@@ -13,7 +13,7 @@ const NAV = [
   { to: "/consultas", label: "Consultas", module: "P5" },
 ];
 
-const RUTAS_CON_MAPA = ["/invitado", "/zonas", "/recursos", "/incidentes"];
+const RUTAS_CON_MAPA = ["/invitado", "/zonas", "/recursos", "/incidentes", "/consultas"];
 
 /** Marca: un "ping" de radar, con el punto en el rojo de máxima prioridad. */
 function LogoMarca() {
@@ -27,8 +27,8 @@ function LogoMarca() {
 }
 
 export default function App() {
-  // Las páginas con mapa lo muestran a pantalla completa (con un panel flotante); "Consultas",
-  // que no tiene mapa, va en una columna centrada.
+  // Las páginas con mapa lo muestran a pantalla completa (con un panel flotante); las que no
+  // tienen mapa van en una columna centrada.
   const { pathname } = useLocation();
   const esMapa = RUTAS_CON_MAPA.some((ruta) => pathname.startsWith(ruta));
 
