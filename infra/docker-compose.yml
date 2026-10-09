@@ -17,12 +17,10 @@ services:
       timeout: 5s
       retries: 10
 
-  # Aplica las migraciones de db/migrations contra el servicio 'db'.
-  # No arranca solo (profile "tools"): correrlo a mano con
-  #   docker compose --profile tools run --rm flyway migrate
+  # Aplica las migraciones de db/migrations al levantar (solo las que falten; se puede repetir
+  # sin problema). Corre, termina y queda en "Exited (0)": es lo esperado.
   flyway:
     image: flyway/flyway:10
-    profiles: ["tools"]
     depends_on:
       db:
         condition: service_healthy
@@ -38,8 +36,45 @@ services:
       FLYWAY_LOCATIONS: filesystem:/flyway/migrations
     command: migrate
 
-  # Compila el backend con Maven dentro de Docker (no hace falta instalar Maven).
-  # Genera backend/target/geotravel.war. Correrlo a mano con
+  # Carga la red vial (db/data) y los datos de prueba (db/seed) una sola vez: ver init/seed.sh,
+  # no duplica nada si ya están.
+  seed:
+    image: postgis/postgis:16-3.4
+    depends_on:
+      flyway:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-geotravel}
+      POSTGRES_USER: ${POSTGRES_USER:-geotravel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+    volumes:
+      - ./init/seed.sh:/init/seed.sh:ro
+      - ../db/seed:/seed:ro
+      - ../db/data:/data:ro
+    entrypoint: ["/bin/sh", "/init/seed.sh"]
+
+  # Configura GeoServer por REST: workspace, store PostGIS, capas y estilos SLD
+  # (ver init/geoserver-init.sh). Es repetible: lo que ya existe se deja como está.
+  geoserver-init:
+    image: curlimages/curl:8.10.1
+    depends_on:
+      geoserver:
+        condition: service_started
+      seed:
+        condition: service_completed_successfully
+    environment:
+      GEOSERVER_ADMIN_USER: ${GEOSERVER_ADMIN_USER:-admin}
+      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD:-geoserver}
+      POSTGRES_DB: ${POSTGRES_DB:-geotravel}
+      POSTGRES_USER: ${POSTGRES_USER:-geotravel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+    volumes:
+      - ./init/geoserver-init.sh:/init/geoserver-init.sh:ro
+      - ../geoserver/styles:/styles:ro
+    entrypoint: ["/bin/sh", "/init/geoserver-init.sh"]
+
+  # Opcional: compila el .war en backend/target sin levantar nada (el servicio 'backend' ya
+  # lo compila solo al hacer "up --build"). Útil para revisar errores de compilación:
   #   docker compose --profile tools run --rm backend-build
   backend-build:
     image: maven:3.9-eclipse-temurin-17
@@ -50,13 +85,15 @@ services:
       - m2cache:/root/.m2
     command: mvn -B -DskipTests clean package
 
-  # Tomcat 9 (javax.*, el namespace que usa el backend). El .war NO va montado como
-  # volumen: se copia con "docker compose cp" y Tomcat lo despliega solo (ver README).
+  # Tomcat 9 con el .war ya adentro: se construye desde backend/Dockerfile (compila con Maven).
+  # Tras cambiar código del backend alcanza con: docker compose up -d --build
   backend:
-    image: tomcat:9.0-jdk17-temurin
+    build: ../backend
     depends_on:
       db:
         condition: service_healthy
+      flyway:
+        condition: service_completed_successfully
     environment:
       DB_HOST: db
       DB_PORT: "5432"
@@ -67,7 +104,7 @@ services:
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
-      - fotos_data:/data/fotos   # fotos de atracciones: sobreviven a los redespliegues del .war
+      - fotos_data:/data/fotos   # fotos subidas: sobreviven a los redespliegues del .war
 
   geoserver:
     image: kartoza/geoserver:2.25.2
