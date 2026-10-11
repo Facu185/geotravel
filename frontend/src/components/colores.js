@@ -30,6 +30,18 @@ export const COLOR_ESTADO_RECURSO = {
 // Tipos de recurso que conoce el estilo de GeoServer (recursos_tipo.sld).
 export const TIPOS_RECURSO = ["ambulancia", "bomberos", "patrulla", "centro_atencion", "otro"];
 
+// Cómo se muestra cada tipo en pantalla (el valor guardado es el de arriba, en minúsculas).
+export const ETIQUETA_TIPO_RECURSO = {
+  ambulancia: "Ambulancia",
+  bomberos: "Bomberos",
+  patrulla: "Patrulla",
+  centro_atencion: "Centro de atención",
+  otro: "Otro",
+};
+
+/** Nombre legible de un tipo; si es uno desconocido (datos viejos) se muestra tal cual. */
+export const nombreTipoRecurso = (tipo) => ETIQUETA_TIPO_RECURSO[tipo] ?? tipo;
+
 export const OPCIONES_PRIORIDAD = [1, 2, 3, 4, 5].map((n) => ({
   valor: n,
   etiqueta: String(n),

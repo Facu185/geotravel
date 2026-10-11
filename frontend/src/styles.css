@@ -699,6 +699,7 @@ body {
 }
 
 .campo input,
+.campo select,
 .campo textarea {
   width: 100%;
   padding: 9px 11px;
@@ -720,6 +721,7 @@ body {
 }
 
 .campo input:focus,
+.campo select:focus,
 .campo textarea:focus {
   outline: none;
   border-color: var(--marino);

@@ -365,7 +365,7 @@ components:
         id: { type: integer }
         identificacion: { type: string }
         nombre: { type: string }
-        tipo: { type: string }
+        tipo: { type: string, enum: [ambulancia, bomberos, patrulla, centro_atencion, otro] }
         estadoOperativo: { type: string, enum: [Disponible, "En servicio", "Fuera de servicio"] }
         descripcion: { type: string }
         geom: { type: string, description: "GeoJSON Point en lon/lat (EPSG:4326), como texto" }
@@ -375,7 +375,12 @@ components:
       properties:
         identificacion: { type: string }
         nombre: { type: string }
-        tipo: { type: string }
+        tipo:
+          type: string
+          enum: [ambulancia, bomberos, patrulla, centro_atencion, otro]
+          description: >
+            Lista cerrada: son los tipos que dibuja geoserver/styles/recursos_tipo.sld.
+            Se normaliza a minúsculas; cualquier otro valor responde 400.
         estadoOperativo: { type: string, enum: [Disponible, "En servicio", "Fuera de servicio"] }
         descripcion: { type: string }
         geomGeoJson: { type: string, description: "GeoJSON Point en lon/lat, como TEXTO" }

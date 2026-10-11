@@ -2,17 +2,17 @@ import { useEffect, useState } from "react";
 import { CircleMarker, Tooltip, useMapEvents } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Segmentado } from "../../components/ui.jsx";
-import { COLOR_ESTADO_RECURSO, TIPOS_RECURSO } from "../../components/colores.js";
+import { COLOR_ESTADO_RECURSO, TIPOS_RECURSO, nombreTipoRecurso } from "../../components/colores.js";
 import { api } from "../../api/client.js";
 
 /**
  * Módulo Recursos de emergencia (dueño: P3): ABM de ambulancias, bomberos, patrullas, etc.
  *
  * Reemplaza al módulo "Atracciones" de GeoTravel: mismo patrón (clic en el mapa para
- * ubicar un punto), pero sin foto -- UrbanSafe no la pide -- y con "tipo" como texto
- * libre (la letra da ejemplos sin cerrar la lista; si el tutor confirma que debe ser
- * una lista fija, cambiar el <input> de tipo por un <select>). Los tipos que conoce el
- * estilo de GeoServer se sugieren al escribir, pero no se obligan.
+ * ubicar un punto), pero sin foto -- UrbanSafe no la pide.
+ *
+ * El "tipo" se elige de una lista cerrada (TIPOS_RECURSO): son los únicos que reconoce el
+ * estilo de GeoServer, y el backend rechaza cualquier otro (ver RecursoResource.java).
  *
  * Igual que en Atracciones: Leaflet trabaja con [lat, lng] pero GeoJSON exige [lng, lat];
  * la conversión está aislada en "geometria" (al guardar) y "posicionDe" (al leer).
@@ -150,7 +150,7 @@ export default function RecursosPage() {
               eventHandlers={{ click: () => seleccionar(r) }}
             >
               <Tooltip>
-                {r.identificacion} — {r.tipo}
+                {r.identificacion} — {nombreTipoRecurso(r.tipo)}
               </Tooltip>
             </CircleMarker>
           );
@@ -189,7 +189,7 @@ export default function RecursosPage() {
                   <span className="item__texto">
                     <span className="item__titulo">{r.identificacion}</span>
                     <span className="item__detalle">
-                      {r.tipo} · {r.estadoOperativo}
+                      {nombreTipoRecurso(r.tipo)} · {r.estadoOperativo}
                     </span>
                   </span>
                   <IconoFlecha />
@@ -220,12 +220,21 @@ export default function RecursosPage() {
           </label>
           <label className="campo">
             <span className="campo__etiqueta">Tipo</span>
-            <input required list="tipos-recurso" placeholder="Ej.: ambulancia" {...campo("tipo")} />
-            <datalist id="tipos-recurso">
+            <select required {...campo("tipo")}>
+              <option value="" disabled>
+                Elegí un tipo…
+              </option>
               {TIPOS_RECURSO.map((t) => (
-                <option key={t} value={t} />
+                <option key={t} value={t}>
+                  {nombreTipoRecurso(t)}
+                </option>
               ))}
-            </datalist>
+              {/* Un recurso viejo con un tipo fuera de la lista: se muestra para no cambiarlo en
+                  silencio, y el backend pedirá elegir uno válido al guardar. */}
+              {form.tipo && !TIPOS_RECURSO.includes(form.tipo) && (
+                <option value={form.tipo}>{form.tipo} (no válido)</option>
+              )}
+            </select>
           </label>
           <Segmentado
             leyenda="Estado operativo"

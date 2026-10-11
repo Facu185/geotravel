@@ -28,14 +28,22 @@ import java.util.Map;
  * centros de atención, etc.
  *
  * Reemplaza al antiguo módulo "Atracciones" de GeoTravel: misma forma (ABM de un punto
- * en el mapa), pero sin foto -- la letra de UrbanSafe no la pide -- y con "tipo" como
- * texto libre en vez de una lista cerrada de 4 valores, porque el enunciado da ejemplos
- * ("ambulancias, vehículos de bomberos, patrullas, centros de atención y otros recursos")
- * sin cerrar la lista. Si el tutor confirma que debe ser una lista fija, restringir
- * TIPOS igual que CLASIFICACIONES en la versión anterior.
+ * en el mapa), pero sin foto -- la letra de UrbanSafe no la pide.
+ *
+ * "tipo" es una lista cerrada (TIPOS): son exactamente los valores que reconoce el estilo
+ * de GeoServer (geoserver/styles/recursos_tipo.sld, que no tiene regla "else"). Un tipo
+ * fuera de la lista se guardaría igual pero NO se dibujaría en el mapa público, así que se
+ * rechaza acá con un 400. El enunciado da ejemplos ("ambulancias, vehículos de bomberos,
+ * patrullas, centros de atención y otros recursos") y "otro" cubre lo que no entre en ellos.
+ * Si el tutor pidiera otra lista, hay que cambiarla acá, en el SLD y en
+ * frontend/src/components/colores.js a la vez.
  */
 @Path("/recursos")
 public class RecursoResource {
+
+    /** Únicos tipos de recurso que acepta el sistema (los que dibuja recursos_tipo.sld). */
+    private static final List<String> TIPOS =
+            Arrays.asList("ambulancia", "bomberos", "patrulla", "centro_atencion", "otro");
 
     /** Únicos valores de estado operativo que acepta el sistema. */
     private static final List<String> ESTADOS_OPERATIVOS =
@@ -85,6 +93,7 @@ public class RecursoResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response crear(RecursoInput in) throws SQLException {
+        normalizar(in);
         try (Connection conn = DataSourceProvider.get().getConnection()) {
             Response invalida = validar(conn, in);
             if (invalida != null) {
@@ -112,6 +121,7 @@ public class RecursoResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response editar(@PathParam("id") int id, RecursoInput in) throws SQLException {
+        normalizar(in);
         try (Connection conn = DataSourceProvider.get().getConnection()) {
             Response invalida = validar(conn, in);
             if (invalida != null) {
@@ -149,12 +159,22 @@ public class RecursoResource {
 
     // ------------------------------------------------------------------ validaciones
 
+    /** El tipo se guarda siempre en minúsculas y sin espacios: "Ambulancia " pasa a "ambulancia". */
+    private static void normalizar(RecursoInput in) {
+        if (in != null && in.tipo != null) {
+            in.tipo = in.tipo.trim().toLowerCase();
+        }
+    }
+
     private static Response validar(Connection conn, RecursoInput in) {
         if (in == null || in.identificacion == null || in.identificacion.trim().isEmpty()) {
             return error(400, "La identificación es obligatoria");
         }
-        if (in.tipo == null || in.tipo.trim().isEmpty()) {
+        if (in.tipo == null || in.tipo.isEmpty()) {
             return error(400, "El tipo es obligatorio");
+        }
+        if (!TIPOS.contains(in.tipo)) {
+            return error(400, "El tipo debe ser uno de: " + String.join(", ", TIPOS));
         }
         if (in.estadoOperativo == null || !ESTADOS_OPERATIVOS.contains(in.estadoOperativo)) {
             return error(400, "El estado operativo debe ser uno de: " + String.join(", ", ESTADOS_OPERATIVOS));
