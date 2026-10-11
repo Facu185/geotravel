@@ -5,9 +5,32 @@
  * Si se cambia un color allá, hay que cambiarlo acá para que la leyenda no mienta.
  *
  * El orden importa: la primera capa queda abajo y la última arriba en el mapa
- * (las zonas son áreas grandes, los incidentes y recursos son puntos encima).
+ * (las calles son líneas de referencia, las zonas son áreas, y los incidentes y recursos
+ * son puntos encima). `activaPorDefecto: false` la deja apagada hasta que se prenda.
  */
 export const CAPAS = [
+  {
+    id: "calles",
+    capa: "geotravel:via",
+    nombre: "Calles",
+    descripcion: "Red vial de Montevideo, como referencia",
+    forma: "linea",
+    activaPorDefecto: false,
+    leyenda: [
+      { color: "#5f6f7e", etiqueta: "Avenida, bulevar, rambla" },
+      { color: "#98a5b1", etiqueta: "Calle" },
+      { color: "#b9c3cc", etiqueta: "Peatonal o proyectada" },
+    ],
+  },
+  {
+    id: "puertas",
+    capa: "geotravel:acceso",
+    nombre: "Números de puerta",
+    descripcion: "Se dibujan al acercar mucho el mapa",
+    forma: "circulo",
+    activaPorDefecto: false,
+    leyenda: [{ color: "#5f6f7e", etiqueta: "Puerta con su número" }],
+  },
   {
     id: "zonas",
     capa: "geotravel:zona_operativa",

@@ -1,124 +1,248 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import L from "leaflet";
+import { CircleMarker, FeatureGroup, GeoJSON, Marker, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import { EditControl } from "react-leaflet-draw";
+import "leaflet-draw/dist/leaflet.draw.css";
+import PaginaMapa from "../../components/PaginaMapa.jsx";
 import { Aviso } from "../../components/ui.jsx";
+import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
 import { api } from "../../api/client.js";
+import { CONSULTAS, RESULTADO_VACIO } from "./paneles.jsx";
 
 /**
  * Módulo Consultas geográficas y reportes (dueño: P5).
  *
- * Cada consulta es una tarjeta que se ejecuta sola al abrir la página y se puede volver a
- * correr con "Actualizar". Los cálculos los hace PostGIS en el backend (ver
- * backend/.../consultas/ConsultaResource.java); acá solo se muestran.
+ * Mapa a pantalla completa con un panel: se elige una consulta, se completan sus parámetros y
+ * el resultado aparece como lista y dibujado en el mapa. Los cálculos los hace PostGIS en el
+ * backend (backend/.../consultas/ConsultaResource.java); acá solo se piden y se muestran.
+ * Cada consulta es un panel de paneles.jsx.
  *
- * TODO (P5): faltan en pantalla las consultas que ya existen en la API --
- * incidentes por zona y recursos por zona (con la zona elegida en el mapa), recursos
- * cercanos a un incidente, incidente/zona más cercanos a una dirección o intersección,
- * incidentes por recurso, el reporte filtrable, y el rango de fechas de "zonas con más
- * incidentes" -- ver docs/api/openapi.yaml.
+ * Esta página carga una vez las zonas, incidentes y recursos (con su geometría) para poder
+ * dibujar los resultados, que la API de consultas devuelve solo como ids y datos.
  */
 
-/** Ejecuta una consulta GET y guarda su estado: cargando / ok / error. */
-function useConsulta(ruta) {
-  const [estado, setEstado] = useState({ fase: "cargando", datos: [], error: null });
+const posicion = (geomTexto) => {
+  const [lng, lat] = JSON.parse(geomTexto).coordinates;
+  return [lat, lng];
+};
 
-  const ejecutar = useCallback(() => {
-    setEstado((anterior) => ({ ...anterior, fase: "cargando", error: null }));
-    api
-      .get(ruta)
-      .then((datos) => setEstado({ fase: "ok", datos, error: null }))
-      .catch((e) => setEstado((anterior) => ({ ...anterior, fase: "error", error: e.message })));
-  }, [ruta]);
+function useDatosBase() {
+  const [datos, setDatos] = useState({ zonas: [], incidentes: [], recursos: [] });
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    ejecutar();
-  }, [ejecutar]);
+    Promise.all([api.get("/zonas"), api.get("/incidentes"), api.get("/recursos")])
+      .then(([zonas, incidentes, recursos]) =>
+        setDatos({
+          zonas: zonas.map((z) => ({ ...z, geometria: JSON.parse(z.geom) })),
+          incidentes: incidentes.map((i) => ({ ...i, pos: posicion(i.geom) })),
+          recursos: recursos.map((r) => ({ ...r, pos: posicion(r.geom) })),
+        }),
+      )
+      .catch((e) => setError(e.message));
+  }, []);
 
-  return { ...estado, ejecutar };
+  return { datos, error };
 }
 
-/** Ranking de zonas: una barra por zona, proporcional a su valor, con el mayor primero. */
-function TarjetaRanking({ titulo, descripcion, ruta, campo, unidad, nota }) {
-  const { fase, datos, error, ejecutar } = useConsulta(ruta);
-  const maximo = Math.max(0, ...datos.map((d) => Number(d[campo])));
+/** Los recursos se dibujan como cuadrados (los incidentes, como círculos), igual que en GeoServer. */
+const iconos = {};
+const iconoRecurso = (color) => {
+  if (!iconos[color]) {
+    iconos[color] = L.divIcon({
+      className: "",
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+      html: `<span style="display:block;width:18px;height:18px;box-sizing:border-box;background:${color};border:2px solid #fff;border-radius:4px;box-shadow:0 0 0 1px rgba(19,32,44,.55)"></span>`,
+    });
+  }
+  return iconos[color];
+};
+
+function ClickEnMapa({ alClick }) {
+  useMapEvents({ click: (e) => alClick([e.latlng.lat, e.latlng.lng]) });
+  return null;
+}
+
+/**
+ * Barra de dibujo para la consulta "línea o polígono": una sola figura a la vez, que se puede
+ * editar o borrar. `alCambiar` recibe la geometría en lon/lat (GeoJSON), o null si se borra.
+ */
+function DibujoFigura({ alCambiar }) {
+  const grupo = useRef(null);
+  const estilo = { color: "#13202c", weight: 3 };
+  return (
+    <FeatureGroup ref={grupo}>
+      <EditControl
+        position="topright"
+        onCreated={(e) => {
+          grupo.current.eachLayer((capa) => {
+            if (capa !== e.layer) grupo.current.removeLayer(capa);
+          });
+          alCambiar(e.layer.toGeoJSON().geometry);
+        }}
+        onEdited={(e) => e.layers.eachLayer((capa) => alCambiar(capa.toGeoJSON().geometry))}
+        onDeleted={() => alCambiar(null)}
+        draw={{
+          polyline: { shapeOptions: { ...estilo, weight: 4 } },
+          polygon: { allowIntersection: false, showArea: false, shapeOptions: estilo },
+          rectangle: { shapeOptions: estilo },
+          circle: false,
+          marker: false,
+          circlemarker: false,
+        }}
+      />
+    </FeatureGroup>
+  );
+}
+
+/** Si el punto elegido (p. ej. un cruce de calles) queda fuera de la vista, lleva el mapa hasta él. */
+function CentrarEn({ punto }) {
+  const map = useMap();
+  useEffect(() => {
+    if (punto && !map.getBounds().contains(punto)) map.flyTo(punto, Math.max(map.getZoom(), 15));
+  }, [punto, map]);
+  return null;
+}
+
+/** Zonas (de fondo y resaltadas), contexto, resultado de la consulta y punto elegido. */
+function CapaResultado({ datos, resultado, punto }) {
+  const incidentesResaltados = new Set(resultado.incidentes);
+  const recursosResaltados = new Set(resultado.recursos);
 
   return (
-    <article className="tarjeta">
-      <header className="tarjeta__cabecera">
-        <div>
-          <h3 className="tarjeta__titulo">{titulo}</h3>
-          <p className="tarjeta__descripcion">{descripcion}</p>
-        </div>
-        <button type="button" className="btn btn--secundario" onClick={ejecutar} disabled={fase === "cargando"}>
-          {fase === "cargando" ? "Calculando…" : "Actualizar"}
-        </button>
-      </header>
-
-      {fase === "error" && <Aviso tipo="error">{error}</Aviso>}
-
-      {fase === "cargando" && datos.length === 0 && (
-        <ul className="ranking ranking--cargando" aria-label="Cargando resultados">
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="ranking__fila">
-              <span className="ranking__esqueleto" />
-            </li>
-          ))}
-        </ul>
+    <>
+      {resultado.area && (
+        <GeoJSON
+          key={`area-${JSON.stringify(resultado.area.coordinates).length}-${JSON.stringify(resultado.area.coordinates[0][0])}`}
+          data={resultado.area}
+          interactive={false}
+          style={{ color: "#13202c", weight: 1.5, dashArray: "6 5", fillColor: "#13202c", fillOpacity: 0.07 }}
+        />
       )}
+      {datos.zonas.map((z) => {
+        const intensidad = resultado.zonas[z.id];
+        const resaltada = intensidad !== undefined;
+        return (
+          <GeoJSON
+            key={`${z.id}-${intensidad ?? "fondo"}`}
+            data={z.geometria}
+            interactive={false}
+            style={{
+              color: resaltada ? COLOR_PRIORIDAD[z.nivelPrioridad] : "#8a98a6",
+              weight: resaltada ? 3 : 1,
+              fillColor: COLOR_PRIORIDAD[z.nivelPrioridad],
+              fillOpacity: resaltada ? 0.12 + 0.5 * intensidad : 0.05,
+            }}
+          >
+            {resaltada && (
+              <Tooltip permanent direction="center">
+                {z.nombre}
+              </Tooltip>
+            )}
+          </GeoJSON>
+        );
+      })}
 
-      {datos.length > 0 && (
-        <ol className="ranking">
-          {datos.map((d, i) => {
-            const valor = Number(d[campo]);
-            const porcentaje = maximo > 0 ? Math.max((valor / maximo) * 100, valor > 0 ? 3 : 0) : 0;
-            return (
-              <li key={d.id} className={i === 0 && valor > 0 ? "ranking__fila ranking__fila--primero" : "ranking__fila"}>
-                <span className="ranking__nombre">{d.nombre}</span>
-                <span className="ranking__barra" aria-hidden="true">
-                  <span style={{ width: `${porcentaje}%` }} />
-                </span>
-                <span className="ranking__valor">
-                  {valor}
-                  <small>{Array.isArray(unidad) ? ` ${valor === 1 ? unidad[0] : unidad[1]}` : unidad}</small>
-                </span>
-              </li>
-            );
-          })}
-        </ol>
+      {datos.incidentes
+        .filter((i) => !incidentesResaltados.has(i.id))
+        .map((i) => (
+          <CircleMarker key={`i${i.id}`} center={i.pos} radius={4} interactive={false} pathOptions={{ color: "#7b8794", weight: 1, fillOpacity: 0.35 }} />
+        ))}
+      {datos.recursos
+        .filter((r) => !recursosResaltados.has(r.id))
+        .map((r) => (
+          <CircleMarker key={`r${r.id}`} center={r.pos} radius={4} interactive={false} pathOptions={{ color: "#7b8794", weight: 1, fillOpacity: 0.35 }} />
+        ))}
+
+      {resultado.lineas.map((l, n) => (
+        <Polyline key={`l${n}`} positions={[l.desde, l.hasta]} pathOptions={{ color: "#13202c", weight: 2, dashArray: "6 6" }}>
+          <Tooltip sticky>{l.texto}</Tooltip>
+        </Polyline>
+      ))}
+
+      {datos.incidentes
+        .filter((i) => incidentesResaltados.has(i.id))
+        .map((i) => (
+          <CircleMarker
+            key={`I${i.id}`}
+            center={i.pos}
+            radius={10}
+            bubblingMouseEvents={false}
+            pathOptions={{ color: COLOR_ESTADO_INCIDENTE[i.estado] ?? "#555", weight: 3, fillOpacity: 0.85 }}
+          >
+            <Tooltip>
+              {i.titulo} — {i.estado}
+            </Tooltip>
+          </CircleMarker>
+        ))}
+      {datos.recursos
+        .filter((r) => recursosResaltados.has(r.id))
+        .map((r) => (
+          <Marker key={`R${r.id}`} position={r.pos} icon={iconoRecurso(COLOR_ESTADO_RECURSO[r.estadoOperativo] ?? "#555")} bubblingMouseEvents={false}>
+            <Tooltip>
+              {r.identificacion} — {r.tipo}
+            </Tooltip>
+          </Marker>
+        ))}
+
+      {punto && (
+        <CircleMarker center={punto} radius={12} pathOptions={{ color: "#13202c", weight: 4, fillOpacity: 0.25 }}>
+          <Tooltip permanent>Punto elegido</Tooltip>
+        </CircleMarker>
       )}
-
-      {fase === "ok" && datos.length === 0 && <p className="vacio">No hay datos para mostrar.</p>}
-
-      <p className="tarjeta__nota">{nota}</p>
-    </article>
+    </>
   );
 }
 
 export default function ConsultasPage() {
-  return (
-    <>
-      <header className="pagina__cabecera">
-        <p className="pagina__etiqueta">Análisis espacial</p>
-        <h2 className="pagina__titulo">Consultas geográficas</h2>
-        <p className="pagina__intro">Resultados calculados por PostGIS sobre los datos actuales de la base.</p>
-      </header>
+  const { datos, error } = useDatosBase();
+  const [consultaId, setConsultaId] = useState(CONSULTAS[0].id);
+  const [resultado, setResultado] = useState(RESULTADO_VACIO);
+  const [punto, setPunto] = useState(null);
+  const [figura, setFigura] = useState(null); // línea o polígono dibujado (GeoJSON en lon/lat)
 
-      <div className="tarjetas">
-        <TarjetaRanking
-          titulo="Zonas con más incidentes"
-          descripcion="Cantidad de incidentes que cayeron dentro de cada zona operativa."
-          ruta="/consultas/zonas-mas-incidentes"
-          campo="cantidadIncidentes"
-          unidad={["incidente", "incidentes"]}
-          nota="ST_Contains + COUNT, agrupado por zona"
-        />
-        <TarjetaRanking
-          titulo="Zonas con mayor concentración"
-          descripcion="Incidentes por kilómetro cuadrado: una zona chica con pocos incidentes puede estar más cargada que una grande."
-          ruta="/consultas/zonas-mayor-concentracion"
-          campo="incidentesPorKm2"
-          unidad=" / km²"
-          nota="ST_Contains + ST_Area, normalizado por superficie"
-        />
-      </div>
+  const consulta = CONSULTAS.find((c) => c.id === consultaId);
+  const { Panel } = consulta;
+
+  const elegir = (id) => {
+    setConsultaId(id);
+    setResultado(RESULTADO_VACIO);
+    setPunto(null);
+    setFigura(null);
+  };
+
+  const hijosMapa = (
+    <>
+      {consulta.pideClic && <ClickEnMapa alClick={setPunto} />}
+      {consulta.pideClic && <CentrarEn punto={punto} />}
+      {consulta.dibuja && <DibujoFigura alCambiar={setFigura} />}
+      <CapaResultado datos={datos} resultado={resultado} punto={consulta.pideClic ? punto : null} />
     </>
+  );
+
+  return (
+    <PaginaMapa etiqueta="Análisis espacial" titulo="Consultas geográficas" etiquetaBoton="Consultas" hijosMapa={hijosMapa}>
+      <div className="panel__seccion">
+        {error && <Aviso tipo="error">No se pudieron cargar los datos: {error}</Aviso>}
+        <label className="campo">
+          <span className="campo__etiqueta">Consulta</span>
+          <select value={consultaId} onChange={(e) => elegir(e.target.value)}>
+            {CONSULTAS.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.titulo}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="ayuda">{consulta.descripcion}</p>
+        <p className="ayuda">
+          <strong>PostGIS:</strong> {consulta.postgis}
+        </p>
+      </div>
+      <div className="panel__seccion">
+        <Panel key={consulta.id} datos={datos} punto={punto} setPunto={setPunto} figura={figura} setResultado={setResultado} />
+      </div>
+    </PaginaMapa>
   );
 }

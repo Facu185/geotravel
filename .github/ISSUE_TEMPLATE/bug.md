@@ -17,4 +17,4 @@ assignees: ''
 
 ## Módulo afectado
 
-<!-- datos / backend / zonas / atracciones / recorridos / consultas / invitado / infra -->
+<!-- datos / backend / zonas / recursos / incidentes / consultas / invitado / infra -->

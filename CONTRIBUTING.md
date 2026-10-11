@@ -4,7 +4,7 @@
 
 - `main` está protegida: nadie pushea directo, todo entra por Pull Request.
 - Nombrá la rama por módulo y tarea: `feat/<modulo>-<descripcion>`, `fix/<modulo>-<descripcion>`.
-  - Ejemplos: `feat/zonas-abm`, `feat/recorridos-estados`, `fix/geoserver-sld-color`.
+  - Ejemplos: `feat/zonas-abm`, `feat/incidentes-estados`, `fix/geoserver-sld-color`.
 - Módulos: `datos`, `backend`, `zonas`, `recursos`, `incidentes`, `consultas`, `invitado`, `infra`, `docs`.
 
 ## Pull Requests
@@ -28,7 +28,7 @@ No es obligatorio un formato estricto, pero ayuda mucho para el artículo final 
 
 ```
 zonas: agrega validación de solapamiento al guardar
-recorridos: endpoint para avanzar estado
+incidentes: endpoint para avanzar estado
 docs: agrega diagrama de arquitectura
 ```
 

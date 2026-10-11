@@ -208,14 +208,14 @@ paths:
   # --------------------------------------------------------- Consultas geográficas
   /consultas/incidentes-por-zona/{zonaId}:
     get:
-      summary: Incidentes dentro de la zona dada
+      summary: C1. Incidentes dentro de la zona dada
       tags: [consultas]
       parameters: [{ name: zonaId, in: path, required: true, schema: { type: integer } }]
       responses: { "200": { description: OK } }
 
   /consultas/zonas-mas-incidentes:
     get:
-      summary: Zonas ordenadas por cantidad de incidentes, opcionalmente en un rango de fechas
+      summary: C2. Zonas ordenadas por cantidad de incidentes, opcionalmente en un rango de fechas
       tags: [consultas]
       parameters:
         - { name: desde, in: query, required: false, schema: { type: string, format: date-time } }
@@ -225,49 +225,187 @@ paths:
   /consultas/zonas-mayor-concentracion:
     get:
       summary: >
-        Zonas ordenadas por incidentes/km² (concentración normalizada por área).
+        C8. Zonas ordenadas por incidentes/km² (concentración normalizada por área).
         AMBIGÜEDAD EN LA LETRA: no queda claro si difiere de "zonas-mas-incidentes"
-        -- confirmar con el tutor el criterio esperado.
+        -- confirmar con el tutor el criterio esperado. Opcionalmente en un rango de fechas.
       tags: [consultas]
+      parameters:
+        - { name: desde, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: hasta, in: query, required: false, schema: { type: string, format: date-time } }
       responses: { "200": { description: OK } }
 
   /consultas/recursos-cercanos/{incidenteId}:
     get:
-      summary: Los N recursos más cercanos al incidente dado (por defecto 5)
+      summary: C3. Los N recursos más cercanos al incidente dado (por defecto 5)
       tags: [consultas]
       parameters:
         - { name: incidenteId, in: path, required: true, schema: { type: integer } }
         - { name: limite, in: query, required: false, schema: { type: integer, default: 5 } }
+        - { name: soloDisponibles, in: query, required: false, schema: { type: boolean, default: false }, description: "true: solo recursos en estado Disponible" }
       responses: { "200": { description: OK } }
 
   /consultas/incidente-mas-cercano:
     get:
-      summary: Incidente más cercano al punto (x, y) dado -- resolver antes la dirección/intersección a coordenada
+      summary: >
+        C4. Búsqueda de incidente. Incidente más cercano a un punto. El punto se manda en metros (x, y en EPSG:32721) o
+        en grados (lon, lat en EPSG:4326, p. ej. un clic en el mapa; PostGIS lo convierte).
+        Resolver antes la dirección/intersección a coordenada.
       tags: [consultas]
       parameters:
-        - { name: x, in: query, required: true, schema: { type: number }, description: "Este, EPSG:32721" }
-        - { name: y, in: query, required: true, schema: { type: number }, description: "Norte, EPSG:32721" }
-      responses: { "200": { description: OK } }
+        - { name: x, in: query, required: false, schema: { type: number }, description: "Este, EPSG:32721 (junto con y)" }
+        - { name: y, in: query, required: false, schema: { type: number }, description: "Norte, EPSG:32721 (junto con x)" }
+        - { name: lon, in: query, required: false, schema: { type: number }, description: "Longitud, EPSG:4326 (junto con lat)" }
+        - { name: lat, in: query, required: false, schema: { type: number }, description: "Latitud, EPSG:4326 (junto con lon)" }
+      responses:
+        "200": { description: OK }
+        "400": { description: Falta la coordenada (ni x,y ni lon,lat) }
 
   /consultas/zona-por-punto:
     get:
-      summary: Zona que contiene el punto (x, y) dado -- resolver antes la dirección a coordenada
+      summary: >
+        C5. Búsqueda de zona. Zona que contiene un punto, en metros (x, y en EPSG:32721) o en grados (lon, lat en
+        EPSG:4326). Resolver antes la dirección a coordenada.
       tags: [consultas]
       parameters:
-        - { name: x, in: query, required: true, schema: { type: number }, description: "Este, EPSG:32721" }
-        - { name: y, in: query, required: true, schema: { type: number }, description: "Norte, EPSG:32721" }
-      responses: { "200": { description: OK } }
+        - { name: x, in: query, required: false, schema: { type: number }, description: "Este, EPSG:32721 (junto con y)" }
+        - { name: y, in: query, required: false, schema: { type: number }, description: "Norte, EPSG:32721 (junto con x)" }
+        - { name: lon, in: query, required: false, schema: { type: number }, description: "Longitud, EPSG:4326 (junto con lat)" }
+        - { name: lat, in: query, required: false, schema: { type: number }, description: "Latitud, EPSG:4326 (junto con lon)" }
+      responses:
+        "200": { description: "OK; si el punto no cae en ninguna zona devuelve {\"zona\": null}" }
+        "400": { description: Falta la coordenada (ni x,y ni lon,lat) }
+
+  /consultas/por-figura:
+    post:
+      summary: >
+        Extra. Qué incidentes, recursos y zonas hay dentro de, o a lo largo de, una línea o un polígono
+        dibujado en el mapa. Polígono: distancia 0 por defecto (lo de adentro). Línea: 200 m por
+        defecto (un pasillo a lo largo de ella). Con distancia > 0 se agranda la figura (ST_Buffer)
+        y ese área se devuelve en "area" para dibujarla. Cada lista trae como máximo 200 filas
+        (las más cercanas) y el total real.
+      tags: [consultas]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [geomGeoJson]
+              properties:
+                geomGeoJson: { type: string, description: "LineString o Polygon en lon/lat (EPSG:4326), como texto GeoJSON" }
+                distanciaM: { type: number, minimum: 0, maximum: 10000 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tipo: { type: string, enum: [LineString, Polygon] }
+                  distanciaM: { type: number }
+                  largoM: { type: number, description: "Solo líneas (ST_Length)" }
+                  areaM2: { type: number, description: "Solo polígonos (ST_Area)" }
+                  perimetroM: { type: number, description: "Solo polígonos (ST_Perimeter)" }
+                  area: { type: string, nullable: true, description: "GeoJSON del área buscada; null si la distancia es 0" }
+                  incidentes: { type: object, properties: { total: { type: integer }, filas: { type: array, items: { type: object } } } }
+                  recursos: { type: object, properties: { total: { type: integer }, filas: { type: array, items: { type: object } } } }
+                  zonas: { type: array, items: { type: object } }
+        "400": { description: Figura ausente, GeoJSON inválido, que no es línea ni polígono, no válida (se cruza consigo misma) o distancia fuera de rango }
+
+  /consultas/calles:
+    get:
+      summary: >
+        Auxiliar de C4 y C5. Nombres de calle que contienen el texto dado (mínimo 2 letras; vacío si es menos), con
+        los que empiezan por él primero. Máximo 10. Para el autocompletado de intersecciones.
+      tags: [consultas]
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { type: string } }
+
+  /consultas/interseccion:
+    get:
+      summary: >
+        Auxiliar de C4 y C5. Puntos donde se cruzan dos calles (lon/lat, EPSG:4326), calculados en PostGIS sobre la
+        red vial (tabla via). Lista vacía si no se cruzan o algún nombre no existe; varios
+        elementos si hay nombres repetidos en la ciudad. El resultado se usa como lon/lat en
+        /consultas/incidente-mas-cercano y /consultas/zona-por-punto.
+      tags: [consultas]
+      parameters:
+        - { name: calle1, in: query, required: true, schema: { type: string }, description: "Nombre exacto, sin distinguir mayúsculas (ver /consultas/calles)" }
+        - { name: calle2, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    lon: { type: number }
+                    lat: { type: number }
+        "400": { description: Falta una de las dos calles }
+
+  /consultas/geocodificar:
+    get:
+      summary: >
+        Auxiliar de C4 y C5. Ubica una dirección "calle número" (por ejemplo "Camino Carrasco 4680")
+        y devuelve lon/lat (EPSG:4326). Se busca en la tabla acceso, los números de puerta de
+        Montevideo (capa mdg_accesos de la Intendencia; es también la capa "acceso" de GeoServer),
+        tolerando abreviaturas ("Camino" = CNO, "Avenida" = AV) y errores de tipeo. Si el número no
+        existe se devuelve la puerta más cercana de la calle y se marca "aproximada". Lo que no se
+        resuelve ahí (por ejemplo "calle esquina calle") se pasa al servicio de direcciones de la IDE
+        de Uruguay (requiere internet). El resultado se usa como lon/lat en
+        /consultas/incidente-mas-cercano y /consultas/zona-por-punto.
+      tags: [consultas]
+      parameters:
+        - { name: direccion, in: query, required: true, schema: { type: string }, description: "Por ejemplo: Buenos Aires 451" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  direccion: { type: string, description: Dirección normalizada }
+                  lon: { type: number }
+                  lat: { type: number }
+                  aproximada: { type: boolean }
+                  aviso: { type: string, nullable: true }
+                  fuente: { type: string, description: "Puertas de Montevideo, o IDE si se usó el respaldo" }
+        "400": { description: Falta la dirección }
+        "404": { description: No se encontró la calle (solo con el respaldo de la IDE) }
+        "502": { description: Respaldo de la IDE no disponible (sin internet) }
+
+  /consultas/tipos-incidente:
+    get:
+      summary: Tipos de incidente que existen (valores distintos), para armar filtros
+      tags: [consultas]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { type: string } }
 
   /consultas/recursos-por-zona/{zonaId}:
     get:
-      summary: Recursos ubicados dentro de la zona dada
+      summary: C6. Recursos ubicados dentro de la zona dada
       tags: [consultas]
       parameters: [{ name: zonaId, in: path, required: true, schema: { type: integer } }]
       responses: { "200": { description: OK } }
 
   /consultas/incidentes-por-recurso/{recursoId}:
     get:
-      summary: Incidentes atendidos/asociados a un recurso
+      summary: C7. Incidentes atendidos/asociados a un recurso
       tags: [consultas]
       parameters: [{ name: recursoId, in: path, required: true, schema: { type: integer } }]
       responses: { "200": { description: OK } }
@@ -279,6 +417,7 @@ paths:
         consulta geográfica homónima): filtrable, agrupado por zona.
       tags: [consultas]
       parameters:
+        - { name: zonaId, in: query, required: false, schema: { type: integer } }
         - { name: tipo, in: query, required: false, schema: { type: string } }
         - { name: prioridad, in: query, required: false, schema: { type: integer } }
         - { name: estado, in: query, required: false, schema: { type: string } }

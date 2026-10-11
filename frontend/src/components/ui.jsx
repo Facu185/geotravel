@@ -69,3 +69,23 @@ export function Insignia({ color, children }) {
     </span>
   );
 }
+
+/**
+ * Lista desplegable con una etiqueta. `opciones`: [{ valor, texto }]; `vacio` es el texto de
+ * la opción sin valor (p. ej. "Todos"). onChange recibe el valor elegido, como texto.
+ */
+export function Selector({ etiqueta, valor, onChange, opciones, vacio }) {
+  return (
+    <label className="campo">
+      <span className="campo__etiqueta">{etiqueta}</span>
+      <select value={valor} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{vacio}</option>
+        {opciones.map((o) => (
+          <option key={o.valor} value={o.valor}>
+            {o.texto}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
