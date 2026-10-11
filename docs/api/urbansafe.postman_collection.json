@@ -1,0 +1,1049 @@
+{
+  "info": {
+    "name": "UrbanSafe - API y GeoServer",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Orden sugerido: 1) Zonas, 2) Recursos (crear antes de asignar), 3) Incidentes, 4) Consultas, 5) GeoServer. Los 'Crear' guardan el id en una variable que usan los siguientes."
+  },
+  "variable": [
+    {
+      "key": "base",
+      "value": "http://localhost:8080/geotravel/api"
+    },
+    {
+      "key": "geoserver",
+      "value": "http://localhost:8082/geoserver/geotravel"
+    },
+    {
+      "key": "zonaId",
+      "value": "1"
+    },
+    {
+      "key": "incidenteId",
+      "value": "1"
+    },
+    {
+      "key": "recursoId",
+      "value": "1"
+    },
+    {
+      "key": "x",
+      "value": "572993.6"
+    },
+    {
+      "key": "y",
+      "value": "6137023.3"
+    },
+    {
+      "key": "lon",
+      "value": "-56.2034"
+    },
+    {
+      "key": "lat",
+      "value": "-34.9069"
+    },
+    {
+      "key": "nuevaZonaId",
+      "value": ""
+    },
+    {
+      "key": "nuevoRecursoId",
+      "value": ""
+    },
+    {
+      "key": "nuevoIncidenteId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Salud",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Zonas operativas (ABM)",
+      "item": [
+        {
+          "name": "Listar zonas (geom en GeoJSON lon/lat)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/zonas"
+          }
+        },
+        {
+          "name": "Crear zona (valida polígono y no-superposición)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/zonas",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"ZONA PRUEBA\",\n  \"descripcion\": \"Zona de prueba (Postman)\",\n  \"nivelPrioridad\": 2,\n  \"responsable\": \"Equipo Prueba\",\n  \"observaciones\": \"\",\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Polygon\\\", \\\"coordinates\\\": [[[-56.205, -34.865], [-56.195, -34.865], [-56.195, -34.858], [-56.205, -34.858], [-56.205, -34.865]]]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Guarda el id en la variable nuevaZonaId."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Respuesta correcta (201)\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"nuevaZonaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar zona",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/zonas/{{nuevaZonaId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"ZONA PRUEBA EDITADA\",\n  \"descripcion\": \"Zona de prueba (Postman)\",\n  \"nivelPrioridad\": 3,\n  \"responsable\": \"Equipo Prueba\",\n  \"observaciones\": \"\",\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Polygon\\\", \\\"coordinates\\\": [[[-56.206, -34.866], [-56.194, -34.866], [-56.194, -34.857], [-56.206, -34.857], [-56.206, -34.866]]]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear zona que se superpone con Centro (debe dar 409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/zonas",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"CHOCA CON CENTRO\",\n  \"descripcion\": \"Zona de prueba (Postman)\",\n  \"nivelPrioridad\": 2,\n  \"responsable\": \"Equipo Prueba\",\n  \"observaciones\": \"\",\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Polygon\\\", \\\"coordinates\\\": [[[-56.21, -34.91], [-56.205, -34.91], [-56.205, -34.906], [-56.21, -34.906], [-56.21, -34.91]]]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar zona",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base}}/zonas/{{nuevaZonaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Recursos (ABM)",
+      "item": [
+        {
+          "name": "Listar recursos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/recursos"
+          }
+        },
+        {
+          "name": "Crear recurso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/recursos",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identificacion\": \"PAT-99\",\n  \"nombre\": \"Patrulla 99\",\n  \"tipo\": \"patrulla\",\n  \"estadoOperativo\": \"Disponible\",\n  \"descripcion\": \"Recurso de prueba (Postman)\",\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Point\\\", \\\"coordinates\\\": [-56.1925, -34.906]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Respuesta correcta (201)\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"nuevoRecursoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar recurso (estado operativo)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/recursos/{{nuevoRecursoId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identificacion\": \"PAT-99\",\n  \"nombre\": \"Patrulla 99\",\n  \"tipo\": \"patrulla\",\n  \"estadoOperativo\": \"En servicio\",\n  \"descripcion\": \"Recurso de prueba (Postman)\",\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Point\\\", \\\"coordinates\\\": [-56.1925, -34.906]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear recurso con estado inválido (debe dar 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/recursos",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identificacion\": \"PAT-99\",\n  \"nombre\": \"Patrulla 99\",\n  \"tipo\": \"patrulla\",\n  \"estadoOperativo\": \"Roto\",\n  \"descripcion\": \"Recurso de prueba (Postman)\",\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Point\\\", \\\"coordinates\\\": [-56.1925, -34.906]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Estados válidos: Disponible, En servicio, Fuera de servicio."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar recurso",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base}}/recursos/{{nuevoRecursoId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Incidentes (ABM + estados + historial)",
+      "item": [
+        {
+          "name": "Listar incidentes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/incidentes"
+          }
+        },
+        {
+          "name": "Crear incidente (nace 'Registrado')",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/incidentes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Prueba Postman\",\n  \"descripcion\": \"Incidente de prueba (Postman)\",\n  \"tipoIncidente\": \"incendio\",\n  \"prioridad\": 2,\n  \"equipoResponsable\": \"Equipo Centro\",\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Point\\\", \\\"coordinates\\\": [-56.193, -34.9065]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Respuesta correcta (201)\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"nuevoIncidenteId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar incidente (no cambia el estado)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/incidentes/{{nuevoIncidenteId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Prueba Postman EDITADA\",\n  \"descripcion\": \"Incidente de prueba (Postman)\",\n  \"tipoIncidente\": \"incendio\",\n  \"prioridad\": 1,\n  \"equipoResponsable\": \"Equipo Centro\",\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Point\\\", \\\"coordinates\\\": [-56.193, -34.9065]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Asignar un recurso al incidente (necesita nuevoRecursoId: crear el recurso antes)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base}}/incidentes/{{nuevoIncidenteId}}/recursos/{{nuevoRecursoId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recursos asignados al incidente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/incidentes/{{nuevoIncidenteId}}/recursos"
+          }
+        },
+        {
+          "name": "Avanzar a 'En atención'",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/incidentes/{{nuevoIncidenteId}}/avanzar",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"En atención\",\n  \"usuario\": \"gonzalo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Avanzar a 'Registrado' (transición inválida, debe dar 409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/incidentes/{{nuevoIncidenteId}}/avanzar",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"Registrado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Avanzar a 'Resuelto'",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/incidentes/{{nuevoIncidenteId}}/avanzar",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"Resuelto\",\n  \"usuario\": \"gonzalo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Transiciones: Registrado → En atención | Derivado | Cancelado; En atención → Resuelto | Derivado | Cancelado; Derivado → En atención | Cancelado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historial de estados (estado, fecha y usuario)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/incidentes/{{nuevoIncidenteId}}/historial"
+          }
+        },
+        {
+          "name": "Quitar la asignación del recurso",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base}}/incidentes/{{nuevoIncidenteId}}/recursos/{{nuevoRecursoId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar incidente",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base}}/incidentes/{{nuevoIncidenteId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Consultas geográficas (calculadas por PostGIS)",
+      "item": [
+        {
+          "name": "C1. Incidentes por zona",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/incidentes-por-zona/{{zonaId}}"
+          }
+        },
+        {
+          "name": "C2. Zonas con más incidentes (todo el período)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/zonas-mas-incidentes"
+          }
+        },
+        {
+          "name": "C2b. Zonas con más incidentes (rango de fechas)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/zonas-mas-incidentes?desde=2026-01-01&hasta=2027-01-01"
+          }
+        },
+        {
+          "name": "C3. Recursos cercanos a un incidente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}?limite=3"
+          }
+        },
+        {
+          "name": "C3b. Recursos cercanos, solo los disponibles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}?limite=3&soloDisponibles=true"
+          }
+        },
+        {
+          "name": "C4. Búsqueda de incidente: el más cercano a un punto (x,y en EPSG:32721)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/incidente-mas-cercano?x={{x}}&y={{y}}"
+          }
+        },
+        {
+          "name": "C4b. Búsqueda de incidente: el más cercano a un punto (lon,lat: lo que da un clic en el mapa)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/incidente-mas-cercano?lon={{lon}}&lat={{lat}}"
+          }
+        },
+        {
+          "name": "C5. Búsqueda de zona: zona que contiene un punto (x,y en EPSG:32721)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/zona-por-punto?x={{x}}&y={{y}}"
+          }
+        },
+        {
+          "name": "C5b. Búsqueda de zona: zona que contiene un punto (lon,lat)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/zona-por-punto?lon={{lon}}&lat={{lat}}"
+          }
+        },
+        {
+          "name": "C5c. Zona de un punto sin coordenada (debe dar 400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/zona-por-punto"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C6. Recursos por zona",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/recursos-por-zona/{{zonaId}}"
+          }
+        },
+        {
+          "name": "C7. Incidentes por recurso",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/incidentes-por-recurso/{{recursoId}}"
+          }
+        },
+        {
+          "name": "C8. Zonas con mayor concentración (incidentes/km²)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/zonas-mayor-concentracion"
+          }
+        },
+        {
+          "name": "C8b. Concentración en un rango de fechas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/zonas-mayor-concentracion?desde=2026-01-01&hasta=2027-01-01"
+          }
+        },
+        {
+          "name": "Reporte. Incidentes por zona (sin filtros)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/reportes/incidentes-por-zona"
+          }
+        },
+        {
+          "name": "Reporte b. Con filtros (zona, tipo, prioridad, estado, fechas)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/reportes/incidentes-por-zona?zonaId={{zonaId}}&tipo=incendio&prioridad=1&estado=Registrado&desde=2026-01-01&hasta=2027-01-01"
+          }
+        },
+        {
+          "name": "Extra. Línea: qué hay a lo largo de una línea (pasillo de 200 m por defecto)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/consultas/por-figura",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"LineString\\\", \\\"coordinates\\\": [[-56.206, -34.9072], [-56.199, -34.9066], [-56.19, -34.9057]]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extra b. Polígono: qué hay dentro de un polígono (0 m: solo lo de adentro)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/consultas/por-figura",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Polygon\\\", \\\"coordinates\\\": [[[-56.22, -34.915], [-56.19, -34.915], [-56.19, -34.9], [-56.22, -34.9], [-56.22, -34.915]]]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extra c. Línea con pasillo de 1000 m",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/consultas/por-figura",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"LineString\\\", \\\"coordinates\\\": [[-56.206, -34.9072], [-56.19, -34.9057]]}\",\n  \"distanciaM\": 1000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extra d. Un punto no es una figura válida (debe dar 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/consultas/por-figura",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Point\\\", \\\"coordinates\\\": [-56.2, -34.9]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Auxiliar. Tipos de incidente que existen (DISTINCT, para armar filtros)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/tipos-incidente"
+          }
+        },
+        {
+          "name": "C4/C5 aux. Autocompletar nombres de calle",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/calles?q=mag"
+          }
+        },
+        {
+          "name": "C4/C5 aux. Cruce de dos calles (Magallanes y Colonia: el ejercicio 6 del Práctico 2)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/interseccion?calle1=MAGALLANES&calle2=COLONIA"
+          }
+        },
+        {
+          "name": "C4/C5 aux. Dos calles que no se cruzan (devuelve [])",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/interseccion?calle1=MAGALLANES&calle2=MERCEDES"
+          }
+        },
+        {
+          "name": "C4/C5 aux. Intersección sin una de las calles (debe dar 400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/interseccion?calle1=COLONIA"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C4/C5 aux. Ubicar una dirección (tabla de puertas de Montevideo)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/geocodificar?direccion=Av 18 de Julio 1000"
+          }
+        },
+        {
+          "name": "C4/C5 aux. Dirección con abreviatura y número aproximado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/geocodificar?direccion=Camino Carrasco 4680"
+          }
+        },
+        {
+          "name": "C4/C5 aux. Dirección inexistente (404 del respaldo de la IDE)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/geocodificar?direccion=zzzzqqq 12"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. GeoServer (WMS / WFS)",
+      "item": [
+        {
+          "name": "WMS GetCapabilities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{geoserver}}/wms?service=WMS&version=1.3.0&request=GetCapabilities"
+          }
+        },
+        {
+          "name": "WMS GetMap: zonas + incidentes + recursos (PNG, usar Preview)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{geoserver}}/wms?service=WMS&version=1.1.1&request=GetMap&layers=geotravel:zona_operativa,geotravel:recurso,geotravel:incidente&styles=&srs=EPSG:32721&bbox=565000,6133000,580000,6140000&width=800&height=373&format=image/png&transparent=true"
+          }
+        },
+        {
+          "name": "WFS GetFeature: incidentes en GeoJSON",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=geotravel:incidente&outputFormat=application/json&srsName=EPSG:4326"
+          }
+        },
+        {
+          "name": "WFS GetFeature: filtrar por atributo (CQL)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=geotravel:incidente&outputFormat=application/json&cql_filter=estado%3D%27Registrado%27"
+          }
+        },
+        {
+          "name": "WFS conteo de zonas (resultType=hits)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=geotravel:zona_operativa&resultType=hits"
+          }
+        },
+        {
+          "name": "WFS DescribeFeatureType: zona_operativa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=DescribeFeatureType&typeNames=geotravel:zona_operativa"
+          }
+        },
+        {
+          "name": "WFS conteo de calles (capa via)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=geotravel:via&resultType=hits"
+          }
+        },
+        {
+          "name": "WFS conteo de números de puerta (capa acceso)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=geotravel:acceso&resultType=hits"
+          }
+        },
+        {
+          "name": "WFS una puerta por calle y número (CQL)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=geotravel:acceso&outputFormat=application/json&cql_filter=nom_calle%3D%27CNO%20CARRASCO%27%20AND%20num_puerta%3D4680"
+          }
+        },
+        {
+          "name": "WMS GetMap: calles y números de puerta (acercado, usar Preview)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{geoserver}}/wms?service=WMS&version=1.1.1&request=GetMap&layers=geotravel:via,geotravel:acceso&styles=&srs=EPSG:4326&bbox=-56.1960,-34.9070,-56.1938,-34.9055&width=900&height=600&format=image/png"
+          }
+        }
+      ]
+    }
+  ]
+}
