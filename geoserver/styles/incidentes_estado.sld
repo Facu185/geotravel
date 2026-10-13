@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Estilo para la capa de incidentes por estado (PointSymbolizer)
+  Estilo para la capa de incidentes por estado (Puntos, Líneas y Polígonos)
 -->
 <StyledLayerDescriptor version="1.0.0"
     xmlns="http://www.opengis.net/sld"
@@ -35,6 +35,22 @@
               <Size>10</Size>
             </Graphic>
           </PointSymbolizer>
+          <LineSymbolizer>
+            <Stroke>
+              <CssParameter name="stroke">#2b6b9e</CssParameter>
+              <CssParameter name="stroke-width">3</CssParameter>
+            </Stroke>
+          </LineSymbolizer>
+          <PolygonSymbolizer>
+            <Fill>
+              <CssParameter name="fill">#2b6b9e</CssParameter>
+              <CssParameter name="fill-opacity">0.4</CssParameter>
+            </Fill>
+            <Stroke>
+              <CssParameter name="stroke">#1f4d73</CssParameter>
+              <CssParameter name="stroke-width">1.5</CssParameter>
+            </Stroke>
+          </PolygonSymbolizer>
         </Rule>
         <Rule>
           <Name>En atención</Name>
@@ -58,6 +74,22 @@
               <Size>10</Size>
             </Graphic>
           </PointSymbolizer>
+          <LineSymbolizer>
+            <Stroke>
+              <CssParameter name="stroke">#9a5a12</CssParameter>
+              <CssParameter name="stroke-width">3</CssParameter>
+            </Stroke>
+          </LineSymbolizer>
+          <PolygonSymbolizer>
+            <Fill>
+              <CssParameter name="fill">#9a5a12</CssParameter>
+              <CssParameter name="fill-opacity">0.4</CssParameter>
+            </Fill>
+            <Stroke>
+              <CssParameter name="stroke">#73430d</CssParameter>
+              <CssParameter name="stroke-width">1.5</CssParameter>
+            </Stroke>
+          </PolygonSymbolizer>
         </Rule>
         <Rule>
           <Name>Derivado</Name>
@@ -81,6 +113,22 @@
               <Size>10</Size>
             </Graphic>
           </PointSymbolizer>
+          <LineSymbolizer>
+            <Stroke>
+              <CssParameter name="stroke">#7a3b8f</CssParameter>
+              <CssParameter name="stroke-width">3</CssParameter>
+            </Stroke>
+          </LineSymbolizer>
+          <PolygonSymbolizer>
+            <Fill>
+              <CssParameter name="fill">#7a3b8f</CssParameter>
+              <CssParameter name="fill-opacity">0.4</CssParameter>
+            </Fill>
+            <Stroke>
+              <CssParameter name="stroke">#5c2c6b</CssParameter>
+              <CssParameter name="stroke-width">1.5</CssParameter>
+            </Stroke>
+          </PolygonSymbolizer>
         </Rule>
         <Rule>
           <Name>Resuelto</Name>
@@ -104,6 +152,22 @@
               <Size>10</Size>
             </Graphic>
           </PointSymbolizer>
+          <LineSymbolizer>
+            <Stroke>
+              <CssParameter name="stroke">#1f7a5c</CssParameter>
+              <CssParameter name="stroke-width">3</CssParameter>
+            </Stroke>
+          </LineSymbolizer>
+          <PolygonSymbolizer>
+            <Fill>
+              <CssParameter name="fill">#1f7a5c</CssParameter>
+              <CssParameter name="fill-opacity">0.4</CssParameter>
+            </Fill>
+            <Stroke>
+              <CssParameter name="stroke">#15543f</CssParameter>
+              <CssParameter name="stroke-width">1.5</CssParameter>
+            </Stroke>
+          </PolygonSymbolizer>
         </Rule>
         <Rule>
           <Name>Cancelado</Name>
@@ -127,6 +191,22 @@
               <Size>8</Size>
             </Graphic>
           </PointSymbolizer>
+          <LineSymbolizer>
+            <Stroke>
+              <CssParameter name="stroke">#a8392b</CssParameter>
+              <CssParameter name="stroke-width">3</CssParameter>
+            </Stroke>
+          </LineSymbolizer>
+          <PolygonSymbolizer>
+            <Fill>
+              <CssParameter name="fill">#a8392b</CssParameter>
+              <CssParameter name="fill-opacity">0.4</CssParameter>
+            </Fill>
+            <Stroke>
+              <CssParameter name="stroke">#7d2a20</CssParameter>
+              <CssParameter name="stroke-width">1.5</CssParameter>
+            </Stroke>
+          </PolygonSymbolizer>
         </Rule>
       </FeatureTypeStyle>
     </UserStyle>
