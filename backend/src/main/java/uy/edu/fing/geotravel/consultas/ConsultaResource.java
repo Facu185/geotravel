@@ -87,12 +87,11 @@ public class ConsultaResource {
         }
     }
 
-    // ---------------------------------- 8. Zonas con mayor concentración de incidentes
+    // ------------------------------------------- Extra: zonas por incidentes por km²
     /**
-     * AMBIGÜEDAD EN LA LETRA: aparece como requerimiento aparte de "zonas con mayor
-     * cantidad" (arriba), sin aclarar la diferencia -- se asume que "concentración" es
-     * la cantidad NORMALIZADA por área (incidentes / km²), a diferencia del conteo bruto.
-     * Confirmar con el tutor si el criterio esperado es otro.
+     * Extra de la consulta 2 (la letra actualizada unificó "mayor cantidad" y "mayor concentración"):
+     * la misma cuenta de incidentes por zona, pero normalizada por el área (incidentes / km²), para
+     * que una zona chica con pocos incidentes pueda salir más cargada que una grande.
      */
     @GET
     @Path("/zonas-mayor-concentracion")
