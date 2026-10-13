@@ -148,29 +148,32 @@ Actualizá los nombres reales del equipo acá, en `CONTRIBUTING.md` y en
 Ver [`CONTRIBUTING.md`](CONTRIBUTING.md) — ramas, Pull Requests, cómo se
 versiona el esquema de datos y el contrato de API.
 
-## Preguntas abiertas para el tutor
+## Preguntas para el tutor
 
-La letra deja algunas decisiones sin especificar; se tomó un supuesto
-razonable en cada caso, documentado en el código (buscar "SUPUESTO"):
+La letra deja algunas decisiones sin especificar; se tomó un supuesto razonable en cada caso,
+documentado en el código (buscar "SUPUESTO").
 
-- **Diagrama de estados de un incidente** (`IncidenteResource.java`): solo se
-  da un ejemplo lineal y se menciona que existen derivación y cancelación,
-  sin dibujar el diagrama completo.
-- **Relación incidente–recurso** (`incidente_recurso`): se modeló N a M con
-  fecha de asignación; podría ser más simple (un recurso por incidente).
-- **"Zonas con mayor cantidad" vs. "mayor concentración" de incidentes**: se
-  implementaron como dos consultas distintas (conteo bruto vs. incidentes/km²)
-  por no tener claro si la letra las considera lo mismo.
+**Aclaradas por el tutor:**
+
+- **Consultas 2 y 8:** era la misma consulta (error de la letra, ya corregida). Queda la consulta 2 por
+  cantidad de incidentes; el orden por incidentes/km² quedó como extra.
+- **Ubicación de los recursos:** es la ubicación geográfica del recurso, que se elige en el mapa al
+  registrarlo y se ve en el mapa en las consultas del invitado.
+- **Líneas:** la ubicación de un incidente puede ser un punto, una línea (por ejemplo una calle cortada) o una zona.
+- **Histórico:** historial de estados de cada incidente, con estado, fecha, hora y usuario.
+
+**Siguen abiertas:**
+
 - **Guardado de las geografías:** se guarda por el backend (REST) y GeoServer solo publica y dibuja
   (WMS/WFS de lectura). No se usa WFS-T; falta confirmar que sea lo esperado.
 - **Direcciones** (consultas 4 y 5): se buscan en la tabla de puertas `acceso` (capa de GeoServer);
   lo que no resuelve ("calle esquina calle") pasa al servicio de direcciones de la IDE (internet). El mapa
   de fondo (Esri/OpenStreetMap) también usa internet.
-- **Filtro "ubicación" de recursos** en la vista Invitado: hoy se filtra por tipo y estado.
-- **Líneas:** zonas son polígonos e incidentes y recursos son puntos; falta saber si la ubicación de un
-  incidente puede ser una línea (por ejemplo una calle cortada).
-- **Escala de `nivel_prioridad`**: se asumió 1–5 (1 = máxima), igual que el
-  "nivel de atractivo" de GeoTravel.
+- **Diagrama de estados de un incidente** (`IncidenteResource.java`): solo se da un ejemplo lineal y se
+  menciona que existen derivación y cancelación, sin dibujar el diagrama completo.
+- **Relación incidente–recurso** (`incidente_recurso`): se modeló N a M con fecha de asignación; podría ser
+  más simple (un recurso por incidente).
+- **Escala de `nivel_prioridad`**: se asumió 1–5 (1 = máxima).
 
 ## Estado
 

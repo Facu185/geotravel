@@ -124,6 +124,13 @@ export function Seleccion({ objetos }) {
   });
 }
 
+/** "lat, lon" de un punto en EPSG:3857 (como llega del GetFeatureInfo), o null si no es un punto. */
+const textoUbicacion = (geometria) => {
+  if (geometria?.type !== "Point") return null;
+  const { lat, lng } = aLatLng(geometria.coordinates);
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+};
+
 const formatoFecha = (iso) =>
   new Date(iso).toLocaleString("es-UY", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
 
@@ -176,6 +183,7 @@ function Objeto({ objeto }) {
         <dl className="datos">
           <Dato nombre="Tipo">{p.tipo}</Dato>
           <Dato nombre="Nombre">{p.nombre}</Dato>
+          <Dato nombre="Ubicación">{textoUbicacion(objeto.geometry)}</Dato>
         </dl>
       </article>
     );

@@ -34,6 +34,10 @@ import java.util.*;
  * GeoTravel -- mismos patrones SQL (point-in-polygon, nearest, agregaciones), aplicados
  * a zona_operativa / incidente / recurso en vez de zona_turistica / recorrido / atraccion.
  *
+ * Un incidente puede ser un punto, una línea (calle cortada) o una zona: "incidente de una zona" se calcula
+ * con ST_Intersects (una calle cortada que cruza dos zonas cuenta en las dos), y las distancias con
+ * ST_Distance y el operador <->, que sirven igual para puntos, líneas y polígonos.
+ *
  * "Búsqueda de incidente/zona por dirección o intersección de calles" recibe ya resuelta
  * la coordenada (x, y o lon, lat). Esa resolución la hacen /consultas/geocodificar (calle y
  * número, con la tabla acceso), /consultas/interseccion (cruce de dos calles, con la tabla via)
@@ -51,7 +55,7 @@ public class ConsultaResource {
         String sql =
             "SELECT i.id, i.titulo, i.tipo_incidente, i.estado, i.prioridad " +
             "FROM incidente i, zona_operativa z " +
-            "WHERE z.id = ? AND ST_Contains(z.geom, i.geom) " +
+            "WHERE z.id = ? AND ST_Intersects(z.geom, i.geom) " +
             "ORDER BY i.fecha_hora_registro DESC";
         try (Connection conn = DataSourceProvider.get().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -70,7 +74,7 @@ public class ConsultaResource {
         String sql =
             "SELECT z.id, z.nombre, count(i.id) AS cantidad_incidentes " +
             "FROM zona_operativa z " +
-            "LEFT JOIN incidente i ON ST_Contains(z.geom, i.geom) " +
+            "LEFT JOIN incidente i ON ST_Intersects(z.geom, i.geom) " +
             "  AND (?::timestamp IS NULL OR i.fecha_hora_registro >= ?::timestamp) " +
             "  AND (?::timestamp IS NULL OR i.fecha_hora_registro <  ?::timestamp) " +
             "GROUP BY z.id, z.nombre " +
@@ -99,7 +103,7 @@ public class ConsultaResource {
             "SELECT z.id, z.nombre, count(i.id) AS cantidad_incidentes, " +
             "       round((count(i.id) / (ST_Area(z.geom) / 1e6))::numeric, 3) AS incidentes_por_km2 " +
             "FROM zona_operativa z " +
-            "LEFT JOIN incidente i ON ST_Contains(z.geom, i.geom) " +
+            "LEFT JOIN incidente i ON ST_Intersects(z.geom, i.geom) " +
             "  AND (?::timestamp IS NULL OR i.fecha_hora_registro >= ?::timestamp) " +
             "  AND (?::timestamp IS NULL OR i.fecha_hora_registro <  ?::timestamp) " +
             "GROUP BY z.id, z.nombre, z.geom " +
@@ -265,7 +269,7 @@ public class ConsultaResource {
         String sql =
             "SELECT z.id AS zona_id, z.nombre AS zona_nombre, i.id, i.titulo, i.tipo_incidente, i.prioridad, i.estado, i.fecha_hora_registro " +
             "FROM zona_operativa z " +
-            "JOIN incidente i ON ST_Contains(z.geom, i.geom) " +
+            "JOIN incidente i ON ST_Intersects(z.geom, i.geom) " +
             "WHERE (?::int  IS NULL OR z.id = ?) " +
             "  AND (?::text IS NULL OR i.tipo_incidente = ?) " +
             "  AND (?::int  IS NULL OR i.prioridad = ?) " +

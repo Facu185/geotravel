@@ -21,9 +21,25 @@ import { CONSULTAS, RESULTADO_VACIO } from "./paneles.jsx";
  * dibujar los resultados, que la API de consultas devuelve solo como ids y datos.
  */
 
-const posicion = (geomTexto) => {
-  const [lng, lat] = JSON.parse(geomTexto).coordinates;
-  return [lat, lng];
+/**
+ * Punto [lat, lng] que representa una geometría GeoJSON: el punto mismo, el vértice del medio de una
+ * línea o el promedio de los vértices de una zona. Los incidentes pueden ser puntos, líneas o zonas, y
+ * esto sirve para ubicarlos en el mapa (rótulos, distancias dibujadas) sin importar su forma.
+ */
+const posicion = (geometria) => {
+  const { type, coordinates } = geometria;
+  let punto;
+  if (type === "Point") punto = coordinates;
+  else if (type === "LineString") punto = coordinates[Math.floor(coordinates.length / 2)];
+  else {
+    const anillo = type === "Polygon" ? coordinates[0].slice(0, -1) : coordinates.flat(type === "MultiPolygon" ? 2 : 1);
+    punto = anillo.reduce((a, c) => [a[0] + c[0] / anillo.length, a[1] + c[1] / anillo.length], [0, 0]);
+  }
+  return [punto[1], punto[0]];
+};
+const conGeometria = (objeto) => {
+  const geometria = JSON.parse(objeto.geom);
+  return { ...objeto, geometria, pos: posicion(geometria) };
 };
 
 function useDatosBase() {
@@ -35,8 +51,8 @@ function useDatosBase() {
       .then(([zonas, incidentes, recursos]) =>
         setDatos({
           zonas: zonas.map((z) => ({ ...z, geometria: JSON.parse(z.geom) })),
-          incidentes: incidentes.map((i) => ({ ...i, pos: posicion(i.geom) })),
-          recursos: recursos.map((r) => ({ ...r, pos: posicion(r.geom) })),
+          incidentes: incidentes.map(conGeometria),
+          recursos: recursos.map(conGeometria),
         }),
       )
       .catch((e) => setError(e.message));
@@ -146,9 +162,13 @@ function CapaResultado({ datos, resultado, punto }) {
 
       {datos.incidentes
         .filter((i) => !incidentesResaltados.has(i.id))
-        .map((i) => (
-          <CircleMarker key={`i${i.id}`} center={i.pos} radius={4} interactive={false} pathOptions={{ color: "#7b8794", weight: 1, fillOpacity: 0.35 }} />
-        ))}
+        .map((i) =>
+          i.geometria.type === "Point" ? (
+            <CircleMarker key={`i${i.id}`} center={i.pos} radius={4} interactive={false} pathOptions={{ color: "#7b8794", weight: 1, fillOpacity: 0.35 }} />
+          ) : (
+            <GeoJSON key={`i${i.id}`} data={i.geometria} interactive={false} style={{ color: "#7b8794", weight: 2, opacity: 0.5, fillOpacity: 0.08 }} />
+          ),
+        )}
       {datos.recursos
         .filter((r) => !recursosResaltados.has(r.id))
         .map((r) => (
@@ -163,19 +183,33 @@ function CapaResultado({ datos, resultado, punto }) {
 
       {datos.incidentes
         .filter((i) => incidentesResaltados.has(i.id))
-        .map((i) => (
-          <CircleMarker
-            key={`I${i.id}`}
-            center={i.pos}
-            radius={10}
-            bubblingMouseEvents={false}
-            pathOptions={{ color: COLOR_ESTADO_INCIDENTE[i.estado] ?? "#555", weight: 3, fillOpacity: 0.85 }}
-          >
-            <Tooltip>
-              {i.titulo} — {i.estado}
-            </Tooltip>
-          </CircleMarker>
-        ))}
+        .map((i) =>
+          i.geometria.type === "Point" ? (
+            <CircleMarker
+              key={`I${i.id}`}
+              center={i.pos}
+              radius={10}
+              bubblingMouseEvents={false}
+              pathOptions={{ color: COLOR_ESTADO_INCIDENTE[i.estado] ?? "#555", weight: 3, fillOpacity: 0.85 }}
+            >
+              <Tooltip>
+                {i.titulo} — {i.estado}
+              </Tooltip>
+            </CircleMarker>
+          ) : (
+            // Un incidente lineal (calle cortada) o una zona: se dibuja con su forma, con el color de su estado.
+            <GeoJSON
+              key={`I${i.id}`}
+              data={i.geometria}
+              bubblingMouseEvents={false}
+              style={{ color: COLOR_ESTADO_INCIDENTE[i.estado] ?? "#555", weight: 6, opacity: 0.9, fillOpacity: 0.25 }}
+            >
+              <Tooltip sticky>
+                {i.titulo} — {i.estado}
+              </Tooltip>
+            </GeoJSON>
+          ),
+        )}
       {datos.recursos
         .filter((r) => recursosResaltados.has(r.id))
         .map((r) => (
