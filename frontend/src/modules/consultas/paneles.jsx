@@ -437,7 +437,7 @@ function PanelIncidentesRecurso({ datos, setResultado }) {
   );
 }
 
-// --------------------------------------- 2 y 8: zonas con más incidentes / mayor concentración
+// ------------------------------------------------ 2: zonas con mayor cantidad de incidentes
 
 const METRICAS = {
   cantidad: { ruta: "zonas-mas-incidentes", campo: "cantidadIncidentes", unidad: ["incidente", "incidentes"] },
@@ -475,7 +475,7 @@ function PanelRankings({ setResultado }) {
         onChange={setMetrica}
         opciones={[
           { valor: "cantidad", etiqueta: "Cantidad", color: "#2b6b9e" },
-          { valor: "km2", etiqueta: "Por km²", color: "#9a5a12" },
+          { valor: "km2", etiqueta: "Extra: por km²", color: "#9a5a12" },
         ]}
       />
       <div className="campos-2">
@@ -719,9 +719,9 @@ export const CONSULTAS = [
   },
   {
     id: "rankings",
-    titulo: "2 y 8. Zonas con más incidentes (cantidad y concentración)",
-    descripcion: "Ranking de zonas en un período, por cantidad o por concentración. En el mapa, más oscura = más incidentes.",
-    postgis: "ST_Contains + COUNT; ST_Area para la concentración",
+    titulo: "2. Zonas con mayor cantidad de incidentes",
+    descripcion: "Ranking de zonas por cantidad de incidentes en un período. En el mapa, más oscura = más incidentes. Extra: también se puede ordenar por incidentes por km².",
+    postgis: "ST_Intersects + COUNT; ST_Area para el extra por km²",
     Panel: PanelRankings,
   },
   {

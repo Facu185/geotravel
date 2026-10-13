@@ -709,22 +709,6 @@
           }
         },
         {
-          "name": "C8. Zonas con mayor concentración (incidentes/km²)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{base}}/consultas/zonas-mayor-concentracion"
-          }
-        },
-        {
-          "name": "C8b. Concentración en un rango de fechas",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{base}}/consultas/zonas-mayor-concentracion?desde=2026-01-01&hasta=2027-01-01"
-          }
-        },
-        {
           "name": "Reporte. Incidentes por zona (sin filtros)",
           "request": {
             "method": "GET",
@@ -738,6 +722,14 @@
             "method": "GET",
             "header": [],
             "url": "{{base}}/consultas/reportes/incidentes-por-zona?zonaId={{zonaId}}&tipo=incendio&prioridad=1&estado=Registrado&desde=2026-01-01&hasta=2027-01-01"
+          }
+        },
+        {
+          "name": "Extra. Zonas por incidentes/km² (la consulta 8 se unificó con la 2)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/zonas-mayor-concentracion"
           }
         },
         {
@@ -772,6 +764,14 @@
               }
             }
           ]
+        },
+        {
+          "name": "Extra b. Incidentes/km² en un rango de fechas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/zonas-mayor-concentracion?desde=2026-01-01&hasta=2027-01-01"
+          }
         },
         {
           "name": "Extra b. Polígono: qué hay dentro de un polígono (0 m: solo lo de adentro)",

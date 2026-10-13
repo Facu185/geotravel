@@ -225,7 +225,7 @@ paths:
   /consultas/zonas-mayor-concentracion:
     get:
       summary: >
-        C8. Zonas ordenadas por incidentes/km² (concentración normalizada por área).
+        Extra (la letra unificó la consulta 8 con la 2). Zonas ordenadas por incidentes/km² (normalizado por área).
         AMBIGÜEDAD EN LA LETRA: no queda claro si difiere de "zonas-mas-incidentes"
         -- confirmar con el tutor el criterio esperado. Opcionalmente en un rango de fechas.
       tags: [consultas]
