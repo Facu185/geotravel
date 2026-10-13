@@ -67,6 +67,33 @@ Como comprobación inicial de integración, se realizaron solicitudes HTTP a los
 
 Estas comprobaciones no sustituyen una batería completa de pruebas funcionales. Queda pendiente validar el despliegue actualizado y ampliar la cobertura de las reglas de negocio y los escenarios de error.
 
+### Backend y servicios REST (P2)
+
+El backend de UrbanSafe fue desarrollado en Java y se ejecuta sobre Apache Tomcat 9. Para la exposición de servicios REST se utiliza Jersey 2.41, una implementación de JAX-RS. Maven se emplea para administrar las dependencias, compilar el código y generar el archivo WAR utilizado para desplegar la aplicación.
+
+La configuración principal se encuentra en WEB-INF/web.xml, donde se registra el servlet de Jersey, se define la ruta /api/* y se configura el descubrimiento de recursos REST dentro del paquete uy.edu.fing.geotravel.
+
+**Acceso a la base de datos**
+
+La comunicación con PostgreSQL/PostGIS se realiza mediante JDBC y el controlador de PostgreSQL. Para gestionar las conexiones se utiliza HikariCP, centralizado en la clase DataSourceProvider.
+
+Esta clase configura un pool de hasta diez conexiones y obtiene los parámetros de conexión mediante variables de entorno. Esto permite que los distintos módulos del backend compartan un mecanismo de acceso a la base de datos sin duplicar configuraciones.
+
+**Comunicación con el frontend**
+
+La aplicación React consume los servicios REST publicados por el backend, mientras que GeoServer proporciona servicios geoespaciales para visualizar las capas del mapa.
+
+Se implementó CorsFilter para incorporar las cabeceras CORS necesarias para la comunicación entre el frontend y el backend. Durante el desarrollo se permite cualquier origen mediante Access-Control-Allow-Origin: *. Para un despliegue de producción sería conveniente restringir los orígenes autorizados.
+
+**Pruebas y verificación**
+
+Se incorporó una prueba unitaria automatizada utilizando JUnit 4 para HealthResource. La prueba comprueba los valores de los campos status y service devueltos por el método health().
+
+La ejecución de Maven finalizó correctamente, con una prueba ejecutada y sin errores. También se comprobó la generación del archivo geotravel.war mediante el comando mvn clean package.
+
+Como verificación inicial de integración, se realizaron peticiones HTTP a los endpoints de zonas operativas y recursos, obteniendo respuestas HTTP 200 con información geográfica en formato JSON. Se verificó además la presencia de las cabeceras CORS en el endpoint de salud.
+
+Estas peticiones se realizaron sobre un despliegue local anterior a las últimas actualizaciones de main. Por tanto, queda pendiente verificar nuevamente la versión actualizada y ampliar las pruebas sobre las reglas de negocio y los escenarios de error.
 ### Productos y herramientas
 
 | Producto | Puntos fuertes | Puntos débiles | Evaluación general |
