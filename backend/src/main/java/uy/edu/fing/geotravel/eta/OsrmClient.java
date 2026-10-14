@@ -9,6 +9,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -29,10 +31,12 @@ public final class OsrmClient {
     public static final class Ruta {
         public final double distanciaMetros;
         public final double duracionSegundos;
+        public final List<List<Double>> coordenadas;
 
-        public Ruta(double distanciaMetros, double duracionSegundos) {
+        public Ruta(double distanciaMetros, double duracionSegundos, List<List<Double>> coordenadas) {
             this.distanciaMetros = distanciaMetros;
             this.duracionSegundos = duracionSegundos;
+            this.coordenadas = coordenadas;
         }
 
         public long minutosRedondeados() {
@@ -57,7 +61,7 @@ public final class OsrmClient {
 
         // OSRM utiliza lon,lat (en ese orden) en coordenadas geograficas.
         String url = String.format(Locale.ROOT,
-                "%s/route/v1/driving/%.7f,%.7f;%.7f,%.7f?overview=false&steps=false",
+            "%s/route/v1/driving/%.7f,%.7f;%.7f,%.7f?overview=full&geometries=geojson&steps=false",
                 base, origenLon, origenLat, destinoLon, destinoLat);
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
@@ -91,6 +95,24 @@ public final class OsrmClient {
                 || metros < 0 || segundos < 0) {
             throw new IOException("Medidas invalidas en la ruta de OSRM");
         }
-        return new Ruta(metros, segundos);
+        JsonNode coordenadasJson = ruta.path("geometry").path("coordinates");
+        if (!coordenadasJson.isArray() || coordenadasJson.size() < 2) {
+            throw new IOException("OSRM no devolvio la geometria de la ruta");
+        }
+        List<List<Double>> coordenadas = new ArrayList<>();
+        for (JsonNode coordenada : coordenadasJson) {
+            if (!coordenada.isArray() || coordenada.size() < 2
+                    || !coordenada.get(0).isNumber() || !coordenada.get(1).isNumber()) {
+                throw new IOException("Geometria invalida en la ruta de OSRM");
+            }
+            double longitud = coordenada.get(0).asDouble();
+            double latitud = coordenada.get(1).asDouble();
+            if (!Double.isFinite(longitud) || !Double.isFinite(latitud)
+                    || longitud < -180 || longitud > 180 || latitud < -90 || latitud > 90) {
+                throw new IOException("Coordenada invalida en la ruta de OSRM");
+            }
+            coordenadas.add(List.of(longitud, latitud));
+        }
+        return new Ruta(metros, segundos, coordenadas);
     }
 }
