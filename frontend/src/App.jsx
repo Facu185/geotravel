@@ -2,6 +2,7 @@ import { NavLink, Route, Routes, Navigate, useLocation } from "react-router-dom"
 import ZonasPage from "./modules/zonas/ZonasPage.jsx";
 import RecursosPage from "./modules/recursos/RecursosPage.jsx";
 import IncidentesPage from "./modules/incidentes/IncidentesPage.jsx";
+import EtaPage from "./modules/eta/EtaPage.jsx";
 import ConsultasPage from "./modules/consultas/ConsultasPage.jsx";
 import InvitadoPage from "./modules/invitado/InvitadoPage.jsx";
 
@@ -10,10 +11,11 @@ const NAV = [
   { to: "/zonas", label: "Zonas operativas", module: "P3" },
   { to: "/recursos", label: "Recursos", module: "P3" },
   { to: "/incidentes", label: "Incidentes", module: "P4" },
+  { to: "/eta", label: "ETA", module: "P2" },
   { to: "/consultas", label: "Consultas", module: "P5" },
 ];
 
-const RUTAS_CON_MAPA = ["/invitado", "/zonas", "/recursos", "/incidentes", "/consultas"];
+const RUTAS_CON_MAPA = ["/invitado", "/zonas", "/recursos", "/incidentes", "/eta", "/consultas"];
 
 /** Marca: un "ping" de radar, con el punto en el rojo de máxima prioridad. */
 function LogoMarca() {
@@ -62,6 +64,7 @@ export default function App() {
           <Route path="/zonas" element={<ZonasPage />} />
           <Route path="/recursos" element={<RecursosPage />} />
           <Route path="/incidentes" element={<IncidentesPage />} />
+          <Route path="/eta" element={<EtaPage />} />
           <Route path="/consultas" element={<ConsultasPage />} />
         </Routes>
       </main>
