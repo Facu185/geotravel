@@ -7,8 +7,10 @@
 1. El backend busca en **PostgreSQL/PostGIS** las geometrías del recurso y el incidente, almacenadas en **EPSG:32721**.
 2. PostGIS obtiene la posición del recurso y, para incidentes de tipo línea/polígono, un punto del incidente cercano al recurso usando `ST_ClosestPoint`.
 3. `ST_Transform` transforma ambas posiciones a **EPSG:4326**, que usa OSRM, en orden longitud, latitud.
-4. Java 11 `HttpClient` consulta el perfil `driving` de **OSRM** y recibe longitud del recorrido (metros) y duración (segundos).
-5. El endpoint devuelve los minutos estimados redondeados hacia arriba. No utiliza tráfico en tiempo real.
+4. Java 11 `HttpClient` consulta el perfil `driving` de **OSRM**, solicitando distancia, duración y geometría GeoJSON de la ruta.
+5. El endpoint devuelve los minutos estimados redondeados hacia arriba y la `LineString` que dibuja Leaflet. No utiliza tráfico en tiempo real.
+
+El cliente valida `OSRM_URL` (solo HTTP(S), sin credenciales ni query), las coordenadas, el estado HTTP, el tipo de contenido y la geometría. La conexión tiene un timeout de 4 segundos y cada solicitud, de 10 segundos. Se rechazan respuestas con más de 100.000 coordenadas.
 
 ## Para ejecutar en Windows (PowerShell)
 
@@ -30,6 +32,10 @@ La ruta usa los datos de prueba solo si existen recurso 1 e incidente 1. La resp
   "distanciaMetros": 1800,
   "duracionSegundos": 260,
   "tiempoEstimadoMinutos": 5,
+  "ruta": {
+    "type": "LineString",
+    "coordinates": [[-56.18, -34.90], [-56.17, -34.89]]
+  },
   "motor": "OSRM driving",
   "aclaracion": "Estimacion de recorrido vial sin trafico en tiempo real"
 }
@@ -47,4 +53,8 @@ La ruta usa los datos de prueba solo si existen recurso 1 e incidente 1. La resp
 
 ## Pruebas
 
-`OsrmClientTest` incluye tres pruebas unitarias sin llamadas externas: ruta correcta, ruta inexistente y respuesta incompleta. Para comprobar toda la integración es necesaria una conexión OSRM funcional. El frontend aún no tiene un botón para mostrar esta respuesta; se demuestra por el endpoint REST.
+`OsrmClientTest` cubre respuesta correcta, `NoRoute`, datos/geométricas incompletos, formato GeoJSON de la solicitud, HTTP 503, tipo de contenido incorrecto, esquema de URL inseguro, coordenadas inválidas y timeout. Las pruebas HTTP usan un servidor local efímero y no dependen de Internet.
+
+## Uso desde la aplicación
+
+La sección **ETA** de la navegación abre `http://localhost:5173/eta`. Allí se elige un incidente activo y un recurso, y se pulsa **Calcular ETA**. El mapa encuadra el recorrido vial, marca salida/llegada y presenta distancia y duración. El detalle de cada incidente también conserva el cálculo contextual. La ruta se representa con las coordenadas longitud/latitud entregadas por OSRM, convertidas al orden latitud/longitud de Leaflet.

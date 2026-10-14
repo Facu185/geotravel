@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleMarker, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import { CircleMarker, Tooltip, useMapEvents } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
+import RutaEtaEnMapa from "../../components/RutaEtaEnMapa.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Insignia, Segmentado } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, OPCIONES_PRIORIDAD, nombreTipoRecurso } from "../../components/colores.js";
 import { api } from "../../api/client.js";
@@ -41,30 +42,6 @@ const formatoFecha = (iso) =>
 function ClickEnMapa({ alClick }) {
   useMapEvents({ click: (e) => alClick(e.latlng) });
   return null;
-}
-
-function RutaEtaEnMapa({ ruta }) {
-  const mapa = useMap();
-  const posiciones = ruta.coordinates.map(([lng, lat]) => [lat, lng]);
-
-  useEffect(() => {
-    const coordenadas = ruta.coordinates.map(([lng, lat]) => [lat, lng]);
-    if (coordenadas.length > 1) mapa.fitBounds(coordenadas, { padding: [48, 48], maxZoom: 16 });
-  }, [mapa, ruta]);
-
-  return (
-    <>
-      <Polyline positions={posiciones} pathOptions={{ color: "#c34d32", weight: 6, opacity: 0.9 }}>
-        <Tooltip sticky>Ruta OSRM</Tooltip>
-      </Polyline>
-      <CircleMarker center={posiciones[0]} radius={8} pathOptions={{ color: "#176b87", fillOpacity: 1 }}>
-        <Tooltip>Salida del recurso</Tooltip>
-      </CircleMarker>
-      <CircleMarker center={posiciones[posiciones.length - 1]} radius={8} pathOptions={{ color: "#c34d32", fillOpacity: 1 }}>
-        <Tooltip>Llegada al incidente</Tooltip>
-      </CircleMarker>
-    </>
-  );
 }
 
 export default function IncidentesPage() {

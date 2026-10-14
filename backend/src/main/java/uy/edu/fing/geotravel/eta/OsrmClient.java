@@ -23,7 +23,10 @@ public final class OsrmClient {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(4))
+            .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
+        private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
+        private static final int MAX_ROUTE_COORDINATES = 100_000;
 
     private OsrmClient() {
     }
@@ -57,23 +60,65 @@ public final class OsrmClient {
         if (base == null || base.isBlank()) {
             base = "https://router.project-osrm.org";
         }
-        base = base.replaceAll("/+$", "");
+        return consultar(origenLon, origenLat, destinoLon, destinoLat, base, REQUEST_TIMEOUT);
+    }
+
+    static Ruta consultar(double origenLon, double origenLat,
+                          double destinoLon, double destinoLat,
+                          String base, Duration timeout)
+            throws IOException, InterruptedException {
+        validarCoordenada(origenLon, origenLat);
+        validarCoordenada(destinoLon, destinoLat);
+        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+            throw new IOException("El tiempo de espera de OSRM debe ser positivo");
+        }
+
+        URI baseUri;
+        try {
+            baseUri = URI.create(base == null ? "" : base.trim());
+        } catch (IllegalArgumentException e) {
+            throw new IOException("OSRM_URL no es una URL valida", e);
+        }
+        String esquema = baseUri.getScheme();
+        if (baseUri.getHost() == null || esquema == null
+                || !("http".equalsIgnoreCase(esquema) || "https".equalsIgnoreCase(esquema))
+                || baseUri.getRawQuery() != null || baseUri.getRawFragment() != null
+                || baseUri.getRawUserInfo() != null) {
+            throw new IOException("OSRM_URL debe ser una URL HTTP(S) con host, sin credenciales ni query");
+        }
+        String urlBase = base.trim().replaceAll("/+$", "");
 
         // OSRM utiliza lon,lat (en ese orden) en coordenadas geograficas.
         String url = String.format(Locale.ROOT,
-            "%s/route/v1/driving/%.7f,%.7f;%.7f,%.7f?overview=full&geometries=geojson&steps=false",
-                base, origenLon, origenLat, destinoLon, destinoLat);
+                "%s/route/v1/driving/%.7f,%.7f;%.7f,%.7f?overview=full&geometries=geojson&steps=false",
+                urlBase, origenLon, origenLat, destinoLon, destinoLat);
 
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(10))
-                .header("Accept", "application/json")
-                .GET()
-                .build();
+        HttpRequest request;
+        try {
+            request = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(timeout)
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build();
+        } catch (IllegalArgumentException e) {
+            throw new IOException("No se pudo construir la solicitud a OSRM", e);
+        }
         HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             throw new IOException("Servicio OSRM no disponible (HTTP " + response.statusCode() + ")");
         }
+        String contentType = response.headers().firstValue("Content-Type").orElse("");
+        if (!contentType.toLowerCase(Locale.ROOT).startsWith("application/json")) {
+            throw new IOException("OSRM devolvio una respuesta que no es JSON");
+        }
         return parsearRuta(response.body());
+    }
+
+    private static void validarCoordenada(double longitud, double latitud) throws IOException {
+        if (!Double.isFinite(longitud) || !Double.isFinite(latitud)
+                || longitud < -180 || longitud > 180 || latitud < -90 || latitud > 90) {
+            throw new IOException("Coordenadas invalidas para consultar OSRM");
+        }
     }
 
     /** Metodo puro para poder probar el calculo sin hacer solicitudes externas. */
@@ -96,7 +141,8 @@ public final class OsrmClient {
             throw new IOException("Medidas invalidas en la ruta de OSRM");
         }
         JsonNode coordenadasJson = ruta.path("geometry").path("coordinates");
-        if (!coordenadasJson.isArray() || coordenadasJson.size() < 2) {
+        if (!coordenadasJson.isArray() || coordenadasJson.size() < 2
+            || coordenadasJson.size() > MAX_ROUTE_COORDINATES) {
             throw new IOException("OSRM no devolvio la geometria de la ruta");
         }
         List<List<Double>> coordenadas = new ArrayList<>();
