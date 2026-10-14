@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CircleMarker, Tooltip, useMapEvents } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Insignia, Segmentado } from "../../components/ui.jsx";
-import { COLOR_ESTADO_INCIDENTE, OPCIONES_PRIORIDAD } from "../../components/colores.js";
+import { COLOR_ESTADO_INCIDENTE, OPCIONES_PRIORIDAD, nombreTipoRecurso } from "../../components/colores.js";
 import { api } from "../../api/client.js";
 
 /**
@@ -45,6 +45,8 @@ function ClickEnMapa({ alClick }) {
 
 export default function IncidentesPage() {
   const [incidentes, setIncidentes] = useState([]);
+  const [recursos, setRecursos] = useState([]);
+  const [recursosCargando, setRecursosCargando] = useState(true);
   const [vista, setVista] = useState("lista"); // "lista" | "detalle" | "nuevo"
   const [seleccionado, setSeleccionado] = useState(null);
   const [historial, setHistorial] = useState([]);
@@ -54,11 +56,20 @@ export default function IncidentesPage() {
   const [punto, setPunto] = useState(null);
   const [error, setError] = useState(null);
   const [mensaje, setMensaje] = useState(null);
+  const [recursoEtaId, setRecursoEtaId] = useState("");
+  const [eta, setEta] = useState(null);
+  const [etaCargando, setEtaCargando] = useState(false);
+  const [etaError, setEtaError] = useState(null);
+  const etaSolicitud = useRef(0);
 
   const cargar = () => api.get("/incidentes").then(setIncidentes).catch((e) => setError(e.message));
 
   useEffect(() => {
     cargar();
+    api.get("/recursos")
+      .then(setRecursos)
+      .catch((e) => setEtaError(e.message))
+      .finally(() => setRecursosCargando(false));
   }, []);
 
   const reiniciar = () => {
@@ -68,6 +79,11 @@ export default function IncidentesPage() {
     setForm(FORM_VACIO);
     setPunto(null);
     setError(null);
+    etaSolicitud.current += 1;
+    setRecursoEtaId("");
+    setEta(null);
+    setEtaCargando(false);
+    setEtaError(null);
   };
 
   const volverALista = () => {
@@ -125,6 +141,22 @@ export default function IncidentesPage() {
       cargar();
     } catch (e) {
       setError(e.message); // p. ej. No se puede pasar de "Resuelto" a "Registrado"
+    }
+  };
+
+  const calcularEta = async () => {
+    if (!recursoEtaId || !seleccionado) return;
+    const solicitud = ++etaSolicitud.current;
+    setEta(null);
+    setEtaError(null);
+    setEtaCargando(true);
+    try {
+      const resultado = await api.get(`/eta/recursos/${recursoEtaId}/incidentes/${seleccionado.id}`);
+      if (etaSolicitud.current === solicitud) setEta(resultado);
+    } catch (e) {
+      if (etaSolicitud.current === solicitud) setEtaError(e.message);
+    } finally {
+      if (etaSolicitud.current === solicitud) setEtaCargando(false);
     }
   };
 
@@ -233,6 +265,62 @@ export default function IncidentesPage() {
 
           {mensaje && <Aviso tipo="ok">{mensaje}</Aviso>}
           {error && <Aviso tipo="error">{error}</Aviso>}
+
+          <section className="bloque">
+            <h4 className="bloque__titulo">Tiempo estimado de llegada</h4>
+            <label className="campo">
+              <span className="campo__etiqueta">Recurso</span>
+              <select
+                value={recursoEtaId}
+                disabled={recursosCargando || recursos.length === 0}
+                onChange={(e) => {
+                  setRecursoEtaId(e.target.value);
+                  setEta(null);
+                  setEtaError(null);
+                }}
+              >
+                <option value="" disabled>
+                  {recursosCargando ? "Cargando recursos…" : "Elegí un recurso…"}
+                </option>
+                {recursos.map((recurso) => (
+                  <option key={recurso.id} value={recurso.id}>
+                    {recurso.identificacion} · {nombreTipoRecurso(recurso.tipo)} · {recurso.estadoOperativo}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {!recursosCargando && recursos.length === 0 && !etaError && (
+              <p className="ayuda">No hay recursos registrados para calcular la ETA.</p>
+            )}
+            {etaError && <Aviso tipo="error">{etaError}</Aviso>}
+            <button
+              type="button"
+              className="btn btn--primario"
+              onClick={calcularEta}
+              disabled={!recursoEtaId || etaCargando || recursosCargando}
+            >
+              {etaCargando ? "Calculando…" : "Calcular ETA"}
+            </button>
+            {eta && (
+              <>
+                <dl className="datos">
+                  <div>
+                    <dt>Tiempo estimado</dt>
+                    <dd>{eta.tiempoEstimadoMinutos} min</dd>
+                  </div>
+                  <div>
+                    <dt>Distancia vial</dt>
+                    <dd>{new Intl.NumberFormat("es-UY").format(eta.distanciaMetros)} m</dd>
+                  </div>
+                  <div>
+                    <dt>Duración calculada</dt>
+                    <dd>{eta.duracionSegundos} s</dd>
+                  </div>
+                </dl>
+                <p className="ayuda">{eta.aclaracion}</p>
+              </>
+            )}
+          </section>
 
           <section className="bloque">
             <h4 className="bloque__titulo">Cambiar estado</h4>
