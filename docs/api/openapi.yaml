@@ -234,49 +234,6 @@ paths:
         - { name: hasta, in: query, required: false, schema: { type: string, format: date-time } }
       responses: { "200": { description: OK } }
 
-  /eta/recursos/{recursoId}/incidentes/{incidenteId}:
-    get:
-      summary: "Opcional P2. Tiempo estimado por ruta vial entre un recurso y un incidente (OSRM driving)"
-      description: >
-        Obtiene coordenadas desde PostGIS, llama a OSRM y devuelve distancia y tiempo
-        estimado sin tráfico en tiempo real. Para LineString/Polygon toma el punto
-        del incidente más cercano al recurso. El cálculo requiere conectividad con OSRM;
-        el servicio público por defecto es solo para desarrollo.
-      tags: [eta]
-      parameters:
-        - { name: recursoId, in: path, required: true, schema: { type: integer, minimum: 1 } }
-        - { name: incidenteId, in: path, required: true, schema: { type: integer, minimum: 1 } }
-      responses:
-        "200":
-          description: "Tiempo estimado calculado por ruta vial"
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  recursoId: { type: integer }
-                  incidenteId: { type: integer }
-                  distanciaMetros: { type: integer }
-                  duracionSegundos: { type: integer }
-                  tiempoEstimadoMinutos: { type: integer }
-                  ruta:
-                    type: object
-                    properties:
-                      type: { type: string, enum: [LineString] }
-                      coordinates:
-                        type: array
-                        items:
-                          type: array
-                          minItems: 2
-                          maxItems: 2
-                          items: { type: number }
-                  motor: { type: string }
-                  aclaracion: { type: string }
-        "400": { description: "IDs incorrectos" }
-        "404": { description: "Recurso o incidente inexistente" }
-        "422": { description: "Sin recorrido por calles entre los puntos" }
-        "503": { description: "Servicio OSRM no disponible" }
-
   /consultas/recursos-cercanos/{incidenteId}:
     get:
       summary: C3. Los N recursos más cercanos al incidente dado (por defecto 5)
