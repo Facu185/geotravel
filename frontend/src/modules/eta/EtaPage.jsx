@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import RutaEtaEnMapa from "../../components/RutaEtaEnMapa.jsx";
 import { Aviso } from "../../components/ui.jsx";
@@ -16,6 +16,7 @@ export default function EtaPage() {
   const [cargandoDatos, setCargandoDatos] = useState(true);
   const [calculando, setCalculando] = useState(false);
   const [error, setError] = useState(null);
+  const solicitudEta = useRef(0);
 
   useEffect(() => {
     let activa = true;
@@ -33,30 +34,37 @@ export default function EtaPage() {
       });
     return () => {
       activa = false;
+      solicitudEta.current += 1;
     };
   }, []);
 
   const calcular = async () => {
     if (!recursoId || !incidenteId) return;
+    const solicitud = ++solicitudEta.current;
     setCalculando(true);
     setEta(null);
     setError(null);
     try {
-      setEta(await api.get(`/eta/recursos/${recursoId}/incidentes/${incidenteId}`));
+      const resultado = await api.get(`/eta/recursos/${recursoId}/incidentes/${incidenteId}`);
+      if (solicitudEta.current === solicitud) setEta(resultado);
     } catch (e) {
-      setError(e.message);
+      if (solicitudEta.current === solicitud) setError(e.message);
     } finally {
-      setCalculando(false);
+      if (solicitudEta.current === solicitud) setCalculando(false);
     }
   };
 
   const cambiarRecurso = (e) => {
+    solicitudEta.current += 1;
+    setCalculando(false);
     setRecursoId(e.target.value);
     setEta(null);
     setError(null);
   };
 
   const cambiarIncidente = (e) => {
+    solicitudEta.current += 1;
+    setCalculando(false);
     setIncidenteId(e.target.value);
     setEta(null);
     setError(null);
