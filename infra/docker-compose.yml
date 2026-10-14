@@ -107,6 +107,14 @@ services:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
       - fotos_data:/data/fotos   # fotos subidas: sobreviven a los redespliegues del .war
+    develop:
+      watch:
+        - action: rebuild
+          path: ../backend/src
+        - action: rebuild
+          path: ../backend/pom.xml
+        - action: rebuild
+          path: ../backend/Dockerfile
 
   geoserver:
     image: kartoza/geoserver:2.25.2
