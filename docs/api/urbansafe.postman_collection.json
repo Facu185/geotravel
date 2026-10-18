@@ -1064,6 +1064,41 @@
           ]
         },
         {
+          "name": "C4/C5 aux. Dirección en Salto (IDE)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/geocodificar?direccion=Uruguay 1000&departamento=salto&localidad=salto"
+          }
+        },
+        {
+          "name": "C4/C5 aux. Esquina en Salto (IDE): Uruguay y Artigas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/geocodificar?direccion=Uruguay&esquina=Artigas&departamento=salto&localidad=salto"
+          }
+        },
+        {
+          "name": "C4/C5 aux. Departamento inválido (debe dar 400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/geocodificar?direccion=Uruguay 1000&departamento=salto%26x%3D1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "C4/C5 aux. Autocompletar nombres de calle",
           "request": {
             "method": "GET",

@@ -82,3 +82,27 @@ La pantalla Consultas tampoco carga todos los objetos al abrirse:
 - **Vista:** al terminar la consulta el mapa se encuadra solo en el resultado (puede estar en cualquier parte del país).
 
 Probado con `db/pruebas/carga-masiva.sql` (700 zonas, 3.000 recursos): las consultas responden en 10 a 30 ms.
+
+## Mapa público (P5)
+
+El mapa público ya dibujaba todo con GeoServer (imágenes), así que escala. Lo que faltaba eran los números:
+
+- **Conteos de lo que se ve:** al terminar de mover o hacer zoom (con una espera de 400 ms), el mapa lee el rectángulo
+  visible y lo suma al filtro de cada capa como `BBOX(geom, oeste, sur, este, norte, 'EPSG:4326')`. GeoServer cuenta con
+  `resultType=hits` usando el índice espacial, sin descargar objetos. Los filtros de incidentes y recursos se combinan
+  con ese rectángulo.
+- **Detalle al tocar:** `GetFeatureInfo` trae como máximo 10 objetos.
+- **Región:** el mapa abre centrado en Salto (`region.js`); los datos de prueba están en Montevideo, así que en Salto
+  los conteos dan 0 hasta cargar datos de esa zona.
+
+## Direcciones por región (P5)
+
+Las consultas 4 y 5 aceptan una dirección y una esquina. Según la región (`REGION.ide` en `region.js`):
+
+| | Montevideo | Resto del país (Salto) |
+|---|---|---|
+| Calle y número | Tabla propia `acceso` (números de puerta de la Intendencia) | Servicio de direcciones de la IDE (`?departamento=salto&localidad=salto`) |
+| Esquina | Cruce calculado con PostGIS sobre `via` (con autocompletado de calles) | IDE, con el parámetro `esquina` (sin autocompletado: no hay calles propias) |
+
+Para sumar otro departamento alcanza con agregar una entrada en `region.js`. Probado con "Uruguay 1000" y la esquina
+"Uruguay y Artigas" de Salto.

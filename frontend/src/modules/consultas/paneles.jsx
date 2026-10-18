@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { Aviso, Insignia, Segmentado, Selector } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
 import { api } from "../../api/client.js";
+import { REGION } from "../../components/region.js";
 import { conGeometria, deBusqueda } from "./geometria.js";
 
 /**
@@ -253,7 +254,8 @@ function CampoCalle({ etiqueta, valor, onChange }) {
   const id = useId();
 
   useEffect(() => {
-    if (valor.trim().length < 2) {
+    // Las calles propias son solo de Montevideo: en otra región no hay sugerencias, se escribe el nombre.
+    if (!REGION.callesPropias || valor.trim().length < 2) {
       setSugerencias([]);
       return undefined;
     }
@@ -273,7 +275,7 @@ function CampoCalle({ etiqueta, valor, onChange }) {
   return (
     <label className="campo">
       <span className="campo__etiqueta">{etiqueta}</span>
-      <input list={id} value={valor} onChange={(e) => onChange(e.target.value)} placeholder="Escribí y elegí de la lista" autoComplete="off" />
+      <input list={id} value={valor} onChange={(e) => onChange(e.target.value)} placeholder={REGION.callesPropias ? "Escribí y elegí de la lista" : "Ej.: Uruguay"} autoComplete="off" />
       <datalist id={id}>
         {sugerencias.map((nombre) => (
           <option key={nombre} value={nombre} />
@@ -284,8 +286,9 @@ function CampoCalle({ etiqueta, valor, onChange }) {
 }
 
 /**
- * Alternativa al clic en el mapa: ubica el punto donde se cruzan dos calles (PostGIS intersecta
- * los tramos de cada una, ver /consultas/interseccion) y lo deja como punto de búsqueda.
+ * Alternativa al clic en el mapa: ubica el punto donde se cruzan dos calles y lo deja como punto de búsqueda.
+ * En Montevideo lo calcula PostGIS con los tramos de cada calle (/consultas/interseccion); en el resto
+ * del país lo resuelve el servicio de direcciones de la IDE como "esquina" (/consultas/geocodificar).
  */
 function BuscadorIntersecciones({ setPunto }) {
   const [calle1, setCalle1] = useState("");
@@ -296,7 +299,9 @@ function BuscadorIntersecciones({ setPunto }) {
     evento.preventDefault();
     setBusqueda({ fase: "cargando", cruces: [], elegido: 0, error: null });
     try {
-      const cruces = await api.get(`/consultas/interseccion${query({ calle1: calle1.trim(), calle2: calle2.trim() })}`);
+      const cruces = REGION.callesPropias
+        ? await api.get(`/consultas/interseccion${query({ calle1: calle1.trim(), calle2: calle2.trim() })}`)
+        : [await api.get(`/consultas/geocodificar${query({ direccion: calle1.trim(), esquina: calle2.trim(), ...REGION.ide })}`)];
       setBusqueda({ fase: "ok", cruces, elegido: 0, error: null });
       if (cruces.length > 0) setPunto([cruces[0].lat, cruces[0].lon]);
     } catch (e) {
@@ -321,6 +326,11 @@ function BuscadorIntersecciones({ setPunto }) {
       {busqueda.fase === "ok" && busqueda.cruces.length === 0 && (
         <Aviso tipo="info">Esas calles no se cruzan, o algún nombre no existe. Elegí los nombres de la lista de sugerencias.</Aviso>
       )}
+      {busqueda.fase === "ok" && !REGION.callesPropias && busqueda.cruces.length === 1 && (
+        <Aviso tipo="ok">
+          Esquina ubicada (servicio de la IDE): <strong>{busqueda.cruces[0].direccion}</strong>
+        </Aviso>
+      )}
       {busqueda.cruces.length > 1 && (
         <>
           <p className="ayuda">Hay {busqueda.cruces.length} cruces con esos nombres. Elegí uno:</p>
@@ -340,8 +350,9 @@ function BuscadorIntersecciones({ setPunto }) {
 // ------------------------------------------------ elegir el punto escribiendo una dirección
 
 /**
- * Ubica una dirección ("calle número") con los números de puerta de Montevideo (ver
- * /consultas/geocodificar) y la deja como punto de búsqueda.
+ * Ubica una dirección ("calle número") y la deja como punto de búsqueda (ver /consultas/geocodificar).
+ * En Montevideo la busca en los números de puerta propios; en el resto del país, en la IDE, según el
+ * departamento y la localidad de la región configurada (components/region.js).
  */
 function BuscadorDireccion({ setPunto }) {
   const [texto, setTexto] = useState("");
@@ -351,7 +362,7 @@ function BuscadorDireccion({ setPunto }) {
     evento.preventDefault();
     setBusqueda({ fase: "cargando", resultado: null, error: null });
     try {
-      const r = await api.get(`/consultas/geocodificar${query({ direccion: texto.trim() })}`);
+      const r = await api.get(`/consultas/geocodificar${query({ direccion: texto.trim(), ...REGION.ide })}`);
       setBusqueda({ fase: "ok", resultado: r, error: null });
       setPunto([r.lat, r.lon]);
     } catch (e) {
@@ -365,7 +376,7 @@ function BuscadorDireccion({ setPunto }) {
       <h4 className="bloque__titulo">Por dirección</h4>
       <label className="campo">
         <span className="campo__etiqueta">Calle y número</span>
-        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ej.: Buenos Aires 451" autoComplete="off" />
+        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={`Ej.: ${REGION.ejemploDireccion}`} autoComplete="off" />
       </label>
       <button type="submit" className="btn btn--secundario" disabled={!texto.trim() || fase === "cargando"}>
         {fase === "cargando" ? "Buscando…" : "Ubicar la dirección"}
@@ -387,7 +398,11 @@ function BuscadoresDePunto({ setPunto }) {
     <>
       <BuscadorDireccion setPunto={setPunto} />
       <BuscadorIntersecciones setPunto={setPunto} />
-      <p className="ayuda">Las direcciones se buscan en los números de puerta de Montevideo (capa «acceso» de GeoServer).</p>
+      <p className="ayuda">
+        {REGION.callesPropias
+          ? "Las direcciones se buscan en los números de puerta de Montevideo (capa «acceso» de GeoServer)."
+          : `Las direcciones y esquinas de ${REGION.nombre} las resuelve el servicio de direcciones de la IDE (necesita internet).`}
+      </p>
     </>
   );
 }
@@ -793,7 +808,7 @@ export const CONSULTAS = [
     id: "incidente-cercano",
     titulo: "4. Búsqueda de incidente (dirección, cruce o punto)",
     descripcion: "Elegí un punto con un clic en el mapa, escribí una dirección o ubicá el cruce de dos calles, y se busca el incidente más cercano.",
-    postgis: "operador <-> y ST_Distance; la dirección con la tabla de puertas; el cruce de calles con ST_Intersection",
+    postgis: "operador <-> y ST_Distance; la dirección con la tabla de puertas (Montevideo) o la IDE (resto del país); el cruce de calles con ST_Intersection",
     pideClic: true,
     Panel: PanelIncidenteCercano,
   },
@@ -801,7 +816,7 @@ export const CONSULTAS = [
     id: "zona-punto",
     titulo: "5. Búsqueda de zona (dirección, cruce o punto)",
     descripcion: "Elegí un punto con un clic en el mapa, escribí una dirección o ubicá el cruce de dos calles, y se indica a qué zona operativa pertenece.",
-    postgis: "ST_Contains(zona, punto); la dirección con la tabla de puertas; el cruce de calles con ST_Intersection",
+    postgis: "ST_Contains(zona, punto); la dirección con la tabla de puertas (Montevideo) o la IDE (resto del país); el cruce de calles con ST_Intersection",
     pideClic: true,
     Panel: PanelZonaPunto,
   },

@@ -471,13 +471,16 @@ paths:
         y devuelve lon/lat (EPSG:4326). Se busca en la tabla acceso, los números de puerta de
         Montevideo (capa mdg_accesos de la Intendencia; es también la capa "acceso" de GeoServer),
         tolerando abreviaturas ("Camino" = CNO, "Avenida" = AV) y errores de tipeo. Si el número no
-        existe se devuelve la puerta más cercana de la calle y se marca "aproximada". Lo que no se
-        resuelve ahí (por ejemplo "calle esquina calle") se pasa al servicio de direcciones de la IDE
-        de Uruguay (requiere internet). El resultado se usa como lon/lat en
+        existe se devuelve la puerta más cercana de la calle y se marca "aproximada". La tabla de puertas es
+        solo de Montevideo: con otro departamento, o con el parámetro esquina, se usa el servicio de
+        direcciones de la IDE de Uruguay, que cubre todo el país (requiere internet). El resultado se usa como lon/lat en
         /consultas/incidente-mas-cercano y /consultas/zona-por-punto.
       tags: [consultas]
       parameters:
         - { name: direccion, in: query, required: true, schema: { type: string }, description: "Por ejemplo: Buenos Aires 451" }
+        - { name: esquina, in: query, required: false, schema: { type: string }, description: "Segunda calle: ubica la esquina de direccion y esquina (siempre con la IDE)" }
+        - { name: departamento, in: query, required: false, schema: { type: string, default: montevideo }, description: "Departamento donde buscar. Fuera de Montevideo se usa la IDE, que cubre todo el país" }
+        - { name: localidad, in: query, required: false, schema: { type: string }, description: "Localidad (por defecto, igual al departamento)" }
       responses:
         "200":
           description: OK

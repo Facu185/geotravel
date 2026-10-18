@@ -597,22 +597,47 @@ public class ConsultaResource {
      * Se busca en la tabla acceso (los números de puerta de Montevideo, capa mdg_accesos de la
      * Intendencia; la capa "acceso" de GeoServer es esa misma tabla). La calle se compara por
      * nombre tolerando abreviaturas y errores de tipeo. Si el número no existe se usa la puerta más
-     * cercana de esa calle y se marca "aproximada". Lo que no se resuelve acá ("calle esquina
-     * calle", calles que no están en la base) se pasa al servicio de direcciones de la IDE.
+     * cercana de esa calle y se marca "aproximada". Esa tabla es solo de Montevideo. En otro departamento
+     * (parámetros departamento y localidad, por ejemplo salto y salto), y para las esquinas (parámetro
+     * esquina: dos calles que se cruzan), se usa el servicio de direcciones de la IDE, que cubre el país.
      */
     @GET
     @Path("/geocodificar")
     @Produces(MediaType.APPLICATION_JSON)
-    public Map<String, Object> geocodificar(@QueryParam("direccion") String direccion) throws SQLException {
+    public Map<String, Object> geocodificar(@QueryParam("direccion") String direccion,
+                                            @QueryParam("esquina") String esquina,
+                                            @QueryParam("departamento") String departamento,
+                                            @QueryParam("localidad") String localidad) throws SQLException {
         if (direccion == null || direccion.trim().isEmpty()) {
             throw peticionInvalida("Falta la dirección (por ejemplo: Buenos Aires 451)");
         }
-        java.util.regex.Matcher m = CALLE_Y_NUMERO.matcher(normalizarCalle(direccion));
-        if (m.matches() && !m.group(1).contains(" ESQ")) {
-            Map<String, Object> propio = buscarPuerta(m.group(1), Integer.parseInt(m.group(2)), m.group(3));
-            if (propio != null) return propio;
+        String dep = lugar(departamento, "montevideo");
+        String loc = lugar(localidad, dep);
+        boolean hayEsquina = esquina != null && !esquina.trim().isEmpty();
+        // La tabla de puertas propia es solo de Montevideo: en otro departamento va directo a la IDE.
+        if (dep.equals("montevideo") && !hayEsquina) {
+            java.util.regex.Matcher m = CALLE_Y_NUMERO.matcher(normalizarCalle(direccion));
+            if (m.matches() && !m.group(1).contains(" ESQ")) {
+                Map<String, Object> propio = buscarPuerta(m.group(1), Integer.parseInt(m.group(2)), m.group(3));
+                if (propio != null) return propio;
+            }
         }
-        return geocodificarConIde(direccion);
+        return geocodificarConIde(direccion, hayEsquina ? esquina.trim() : null, dep, loc);
+    }
+
+    /**
+     * Nombre de departamento o localidad para el servicio de direcciones: minúsculas, solo letras,
+     * espacios, punto, apóstrofo y guion, hasta 40 caracteres. Sin valor usa el de por defecto.
+     */
+    static String lugar(String valor, String porDefecto) {
+        if (valor == null || valor.trim().isEmpty()) {
+            return porDefecto;
+        }
+        String limpio = valor.trim().toLowerCase(Locale.ROOT);
+        if (!limpio.matches("[\\p{L} .'-]{2,40}")) {
+            throw peticionInvalida("El departamento o la localidad no es válido");
+        }
+        return limpio;
     }
 
     /** Busca la puerta en la tabla acceso; null si la calle o el número no están en la base. */
@@ -675,10 +700,12 @@ public class ConsultaResource {
      * Único de Direcciones Geográficas), por internet. Si el número no existe el servicio ubica la
      * calle y se marca "aproximada". Sin internet o con el servicio caído responde 502 con un mensaje.
      */
-    private Map<String, Object> geocodificarConIde(String direccion) {
+    private Map<String, Object> geocodificarConIde(String direccion, String esquinaPedida, String departamento, String localidad) {
         String url = IDE_BUSQUEDA_DIRECCION
             + "?calle=" + URLEncoder.encode(direccion.trim(), StandardCharsets.UTF_8)
-            + "&departamento=montevideo&localidad=montevideo";
+            + (esquinaPedida != null ? "&esquina=" + URLEncoder.encode(esquinaPedida, StandardCharsets.UTF_8) : "")
+            + "&departamento=" + URLEncoder.encode(departamento, StandardCharsets.UTF_8)
+            + "&localidad=" + URLEncoder.encode(localidad, StandardCharsets.UTF_8);
         JsonNode lista;
         try {
             HttpResponse<String> respuesta = HTTP.send(
@@ -701,14 +728,14 @@ public class ConsultaResource {
         if (sinCalle) {
             throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
                 .type(MediaType.APPLICATION_JSON)
-                .entity(Map.of("error", "No se encontró esa dirección. Probá con el formato \"calle número\", por ejemplo: Buenos Aires 451"))
+                .entity(Map.of("error", "No se encontró esa dirección. Probá con el formato \"calle número\" (por ejemplo: Buenos Aires 451) o con otra calle"))
                 .build());
         }
         JsonNode mejor = lista.get(0);
         JsonNode datos = mejor.path("direccion");
         String calle = datos.path("calle").path("nombre_normalizado").asText("");
         String numero = datos.path("numero").path("nro_puerta").asText("");
-        String esquina = datos.path("esquina").path("nombre_normalizado").asText("");
+        String esquina = esquinaPedida != null ? esquinaPedida : datos.path("esquina").path("nombre_normalizado").asText("");
         String texto = !esquina.isEmpty() ? calle + " esq. " + esquina
             : !numero.isEmpty() ? calle + " " + numero
             : direccion.trim();
@@ -717,6 +744,8 @@ public class ConsultaResource {
         Map<String, Object> resultado = new LinkedHashMap<>();
         resultado.put("direccion", texto);
         resultado.put("fuente", "IDE");
+        resultado.put("departamento", departamento);
+        resultado.put("localidad", localidad);
         resultado.put("lon", mejor.get("puntoX").asDouble());
         resultado.put("lat", mejor.get("puntoY").asDouble());
         resultado.put("aproximada", !error.isEmpty());

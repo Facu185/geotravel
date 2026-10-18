@@ -184,9 +184,9 @@ documentado en el código (buscar "SUPUESTO").
 
 - **Guardado de las geografías:** se guarda por el backend (REST) y GeoServer solo publica y dibuja
   (WMS/WFS de lectura). No se usa WFS-T; falta confirmar que sea lo esperado.
-- **Direcciones** (consultas 4 y 5): se buscan en la tabla de puertas `acceso` (capa de GeoServer);
-  lo que no resuelve ("calle esquina calle") pasa al servicio de direcciones de la IDE (internet). El mapa
-  de fondo (Esri/OpenStreetMap) también usa internet.
+- **Direcciones** (consultas 4 y 5): en Montevideo se buscan en la tabla de puertas `acceso` (capa de GeoServer);
+  en el resto del país, por departamento y localidad de la región configurada, y las esquinas, las resuelve el
+  servicio de direcciones de la IDE (internet). El mapa de fondo (Esri/OpenStreetMap) también usa internet.
 - **Diagrama de estados de un incidente** (`IncidenteResource.java`): solo se da un ejemplo lineal y se
   menciona que existen derivación y cancelación, sin dibujar el diagrama completo.
 - **Relación incidente–recurso** (`incidente_recurso`): se modeló N a M con fecha de asignación; podría ser

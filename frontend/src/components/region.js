@@ -8,10 +8,19 @@
  *
  * Para agregar un departamento o localidad alcanza con sumar una entrada a REGIONES.
  * encuadre: [[lat sur, lng oeste], [lat norte, lng este]], con un poco de aire.
+ *
+ * Búsqueda de direcciones (consultas 4 y 5):
+ *   ide: departamento y localidad que se mandan al servicio de direcciones de la IDE (cubre todo el país).
+ *   callesPropias: true solo en Montevideo, que tiene calles y números de puerta en la base propia
+ *     (cruce de calles y autocompletado). En el resto la dirección y la esquina las resuelve la IDE.
+ *   ejemploDireccion: texto de ayuda del campo.
  */
 const REGIONES = {
   salto: {
     nombre: "Salto",
+    ide: { departamento: "salto", localidad: "salto" },
+    callesPropias: false,
+    ejemploDireccion: "Uruguay 1000",
     centro: [-31.3857, -57.9606],
     encuadre: [
       [-31.405, -57.995],
@@ -20,6 +29,9 @@ const REGIONES = {
   },
   montevideo: {
     nombre: "Montevideo",
+    ide: { departamento: "montevideo", localidad: "montevideo" },
+    callesPropias: true,
+    ejemploDireccion: "Buenos Aires 451",
     centro: [-34.9011, -56.1645],
     encuadre: [
       [-34.9205, -56.2215],
