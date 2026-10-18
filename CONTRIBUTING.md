@@ -36,10 +36,10 @@ docs: agrega diagrama de arquitectura
 
 | Carpeta | Módulo | Responsable |
 |---|---|---|
-| `db/`, `geoserver/` | Datos & GeoServer | P1 |
-| `backend/.../health`, `backend/.../db` | Backend base & reglas | P2 |
-| `backend/.../zonas`, `.../recursos`, `frontend/.../zonas`, `.../recursos` | Zonas Operativas + Recursos | P3 |
-| `backend/.../incidentes`, `frontend/.../incidentes` | Incidentes | P4 |
-| `backend/.../consultas`, `frontend/.../consultas`, `.../invitado` | Consultas, reportes, vista invitado | P5 |
+| `db/`, `geoserver/` | Datos & GeoServer | P1 · Nahuel |
+| `backend/.../health`, `backend/.../db` | Backend base & reglas | P2 · Nicolas |
+| `backend/.../zonas`, `.../recursos`, `frontend/.../zonas`, `.../recursos` | Zonas Operativas + Recursos | P3 · Facundo |
+| `backend/.../incidentes`, `frontend/.../incidentes` | Incidentes | P4 · Bruno |
+| `backend/.../consultas`, `frontend/.../consultas`, `.../invitado` | Consultas, reportes, vista invitado | P5 · Gonzalo |
 
-Actualizá esta tabla con los nombres/usuarios reales del equipo y reflejalos también en `.github/CODEOWNERS`.
+Falta reflejar los usuarios de GitHub de cada uno en `.github/CODEOWNERS`.
