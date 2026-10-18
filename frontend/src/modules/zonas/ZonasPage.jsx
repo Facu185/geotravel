@@ -4,6 +4,7 @@ import { FeatureGroup, GeoJSON } from "react-leaflet";
 import { EditControl } from "react-leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
+import CargaPorZona, { AvisoCarga, SIN_CARGAR } from "../../components/CargaPorZona.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Segmentado } from "../../components/ui.jsx";
 import { COLOR_PRIORIDAD, OPCIONES_PRIORIDAD } from "../../components/colores.js";
 import { api } from "../../api/client.js";
@@ -19,13 +20,18 @@ import { api } from "../../api/client.js";
  *    Dibujar un polígono con la lista abierta ya abre el formulario de una zona nueva.
  *  - Al guardar, la geometría se lee directo de la capa del mapa (no del estado): así vale
  *    lo que se ve en pantalla aunque no se haya apretado "Save" en la barra de dibujo.
+ *  - Carga a demanda (CargaPorZona): solo se traen las zonas del rectángulo visible, hasta un
+ *    límite. Con el mapa alejado no se carga nada editable y las zonas las dibuja GeoServer
+ *    como imagen (capa WMS), así el navegador nunca tiene miles de polígonos en memoria.
  */
 
 const FORM_VACIO = { nombre: "", descripcion: "", nivelPrioridad: 3, responsable: "", observaciones: "" };
 
 export default function ZonasPage() {
-  const [zonas, setZonas] = useState([]);
+  const [carga, setCarga] = useState(SIN_CARGAR); // zonas de la vista actual (ver CargaPorZona)
+  const [recarga, setRecarga] = useState(0); // cambiarlo vuelve a pedir la vista (después de guardar o borrar)
   const [version, setVersion] = useState(0); // fuerza a <GeoJSON> a redibujarse cuando cambian los datos
+  const zonas = carga.items;
   const [vista, setVista] = useState("lista"); // "lista" | "form"
   const [seleccionada, setSeleccionada] = useState(null);
   const [form, setForm] = useState(FORM_VACIO);
@@ -34,18 +40,11 @@ export default function ZonasPage() {
   const [mensaje, setMensaje] = useState(null);
   const grupoRef = useRef(null);
 
-  const cargar = () =>
-    api
-      .get("/zonas")
-      .then((data) => {
-        setZonas(data);
-        setVersion((v) => v + 1);
-      })
-      .catch((e) => setError(e.message));
-
-  useEffect(() => {
-    cargar();
-  }, []);
+  const alCargar = (nueva) => {
+    setCarga(nueva);
+    if (nueva.estado === "listo" || nueva.estado === "lejos") setVersion((v) => v + 1);
+  };
+  const cargar = () => setRecarga((n) => n + 1);
 
   // Cada vez que cambia la zona seleccionada, se carga su polígono en el grupo editable.
   useEffect(() => {
@@ -173,8 +172,11 @@ export default function ZonasPage() {
       })),
   };
 
+  const lejos = carga.estado === "lejos";
+
   const hijosMapa = (
     <>
+      <CargaPorZona ruta="/zonas" recarga={recarga} alCambiar={alCargar} />
       <GeoJSON
         key={`${version}-${seleccionada?.id ?? "nueva"}`}
         data={fondo}
@@ -204,7 +206,15 @@ export default function ZonasPage() {
   );
 
   return (
-    <PaginaMapa etiqueta="Administración" titulo="Zonas operativas" etiquetaBoton="Zonas" hijosMapa={hijosMapa}>
+    <PaginaMapa
+      etiqueta="Administración"
+      titulo="Zonas operativas"
+      etiquetaBoton="Zonas"
+      hijosMapa={hijosMapa}
+      // Alejado, las zonas se ven igual: las dibuja GeoServer (imagen, no objetos en memoria).
+      mapaProps={{ layers: lejos ? ["geotravel:zona_operativa"] : [], wmsExtra: { actualizado: recarga } }}
+      aviso={<AvisoCarga carga={carga} nombre="zonas" />}
+    >
       {vista === "lista" ? (
         <>
           <div className="panel__seccion">
@@ -214,6 +224,11 @@ export default function ZonasPage() {
               <IconoMas /> Nueva zona
             </button>
             <p className="ayuda">También podés dibujar el polígono directo en el mapa, o tocar una zona para editarla.</p>
+            {!lejos && zonas.length > 0 && (
+              <p className="ayuda">
+                {carga.truncado ? `Zonas en esta vista: ${zonas.length} de ${carga.total}` : `Zonas en esta vista: ${zonas.length}`}
+              </p>
+            )}
           </div>
           <ul className="items">
             {zonas.map((z) => (
@@ -232,7 +247,8 @@ export default function ZonasPage() {
               </li>
             ))}
           </ul>
-          {zonas.length === 0 && <p className="vacio">Todavía no hay zonas operativas.</p>}
+          {lejos && <p className="vacio">Acercá el mapa para listar y editar las zonas de esa área.</p>}
+          {carga.estado === "listo" && zonas.length === 0 && <p className="vacio">No hay zonas operativas en esta parte del mapa.</p>}
         </>
       ) : (
         <form className="panel__seccion formulario" onSubmit={guardar}>

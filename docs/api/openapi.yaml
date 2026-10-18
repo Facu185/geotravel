@@ -26,13 +26,26 @@ paths:
   /zonas:
     get:
       summary: Lista de zonas operativas (geom en GeoJSON lon/lat)
+      description: >
+        Sin bbox devuelve todas las zonas como arreglo (compatibilidad). Con bbox devuelve solo las
+        del rectángulo visible, hasta limit, como {items, total, truncado}: es lo que usan los ABM
+        para no cargar miles de objetos en el navegador.
       tags: [zonas]
+      parameters:
+        - $ref: "#/components/parameters/Bbox"
+        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/Zona" } }
+              schema:
+                oneOf:
+                  - { type: array, items: { $ref: "#/components/schemas/Zona" } }
+                  - allOf:
+                      - $ref: "#/components/schemas/ListadoPorZona"
+                      - { properties: { items: { type: array, items: { $ref: "#/components/schemas/Zona" } } } }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
     post:
       summary: Crear zona (valida datos y que no se superponga con otra)
       tags: [zonas]
@@ -71,11 +84,23 @@ paths:
   /recursos:
     get:
       summary: Lista de recursos de emergencia (geom en GeoJSON lon/lat)
+      description: Igual que GET /zonas - sin bbox, arreglo con todos; con bbox, {items, total, truncado}.
       tags: [recursos]
+      parameters:
+        - $ref: "#/components/parameters/Bbox"
+        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: OK
-          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Recurso" } } } }
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { type: array, items: { $ref: "#/components/schemas/Recurso" } }
+                  - allOf:
+                      - $ref: "#/components/schemas/ListadoPorZona"
+                      - { properties: { items: { type: array, items: { $ref: "#/components/schemas/Recurso" } } } }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
     post:
       summary: Crear recurso
       tags: [recursos]
@@ -461,6 +486,21 @@ paths:
         "404": { $ref: "#/components/responses/NoExiste" }
 
 components:
+  parameters:
+    Bbox:
+      name: bbox
+      in: query
+      required: false
+      description: >
+        Rectángulo visible del mapa en lon/lat (EPSG:4326) - oeste,sur,este,norte, el formato de
+        Leaflet map.getBounds().toBBoxString(). Se recorta a la extensión de Uruguay.
+      schema: { type: string, example: "-57.995,-31.405,-57.925,-31.365" }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Máximo de objetos a devolver con bbox (por defecto 500, máximo 2000).
+      schema: { type: integer, minimum: 1, maximum: 2000, default: 500 }
   responses:
     DatosInvalidos:
       description: Datos inválidos
@@ -472,6 +512,13 @@ components:
       description: No existe
       content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
   schemas:
+    ListadoPorZona:
+      type: object
+      description: Respuesta de los listados a demanda (con bbox).
+      properties:
+        items: { type: array, items: { type: object } }
+        total: { type: integer, description: Cuántos objetos hay en el rectángulo }
+        truncado: { type: boolean, description: true si quedaron objetos afuera por el límite }
     Error:
       type: object
       properties: { error: { type: string } }

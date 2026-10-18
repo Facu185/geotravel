@@ -1,17 +1,12 @@
 import { MapContainer, TileLayer, WMSTileLayer, ZoomControl } from "react-leaflet";
+import { REGION } from "./region.js";
 
 export const GEOSERVER_WMS_URL =
   import.meta.env.VITE_GEOSERVER_WMS_URL ?? "http://localhost:8082/geoserver/geotravel/wms";
 
-// Centro aproximado de Montevideo. Ajustar si el proyecto trabaja otra zona.
-const MONTEVIDEO_CENTER = [-34.9011, -56.1645];
-
-// Rectángulo que encuadra los datos de ejemplo (Montevideo) con un poco de aire:
-// [[lat sur, lng oeste], [lat norte, lng este]]. Lo usan las páginas que ocupan todo el mapa.
-export const ENCUADRE_MONTEVIDEO = [
-  [-34.9205, -56.2215],
-  [-34.9005, -56.1395],
-];
+// Centro y encuadre iniciales: dependen de la región configurada (ver region.js, VITE_REGION).
+// El encuadre lo usan las páginas que ocupan todo el mapa.
+export const ENCUADRE_REGION = REGION.encuadre;
 
 // Mapas base disponibles. "osm" es el de siempre; "claro" es más sobrio y deja que
 // los colores de las capas de GeoServer sean lo único que destaque.
@@ -60,7 +55,7 @@ export default function MapView({
   className,
 }) {
   const mapaBase = MAPAS_BASE[base] ?? MAPAS_BASE.osm;
-  const encuadre = bounds ? { bounds, boundsOptions } : { center: MONTEVIDEO_CENTER, zoom: 13 };
+  const encuadre = bounds ? { bounds, boundsOptions } : { center: REGION.centro, zoom: 13 };
 
   return (
     <MapContainer

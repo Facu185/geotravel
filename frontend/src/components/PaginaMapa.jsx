@@ -1,5 +1,5 @@
 import { useState } from "react";
-import MapView, { ENCUADRE_MONTEVIDEO } from "./MapView.jsx";
+import MapView, { ENCUADRE_REGION } from "./MapView.jsx";
 
 /**
  * Página con el mapa a pantalla completa y un panel flotante: en escritorio es una tarjeta
@@ -44,7 +44,7 @@ export default function PaginaMapa({
         base="claro"
         zoomPosition="bottomright"
         height="100%"
-        bounds={ENCUADRE_MONTEVIDEO}
+        bounds={ENCUADRE_REGION}
         boundsOptions={{ paddingTopLeft: [margen.izquierda, 32], paddingBottomRight: [16, margen.abajo] }}
         {...mapaProps}
       >
