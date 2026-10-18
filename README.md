@@ -130,6 +130,24 @@ npm run dev
 
 Abre en `http://localhost:5173`.
 
+## Ingreso y vistas
+
+Hay dos vistas, separadas por un login básico:
+
+| Vista | Cómo se entra | Qué ve |
+|---|---|---|
+| **Invitado** | Sin ingresar: es la pantalla inicial | El mapa público, con filtros, conteos y detalle |
+| **Administrador** | `/login` (botón "Ingresar") | Todo lo anterior, más zonas, recursos, incidentes y consultas |
+
+- **Usuario de prueba:** `admin` / `urbansafe`. Se cambian con `ADMIN_USUARIO` y `ADMIN_CLAVE` en `infra/.env`
+  (ver `infra/.env.example`). Hay un único usuario; no hay ABM de usuarios.
+- **Cómo funciona:** `POST /auth/login` devuelve un token (vale 8 horas, vive en la memoria del backend: si se
+  reinicia hay que ingresar de nuevo) que el frontend manda en `Authorization: Bearer ...`. Un filtro del backend
+  (`auth/AuthFilter.java`) **protege toda la API por defecto**: solo son públicos `/health`, `/auth/login`,
+  `/auth/logout`, `GET /consultas/tipos-incidente` y `GET /fotos/...`. El mapa público dibuja con GeoServer.
+- **En el frontend:** `frontend/src/auth/` (sesión, pantalla de ingreso y `RutaAdmin`, que manda al ingreso si no
+  hay sesión). En Postman, correr primero la carpeta 0, que guarda el token.
+
 ## Módulos y dueños
 
 | Módulo | Carpetas | Responsable |

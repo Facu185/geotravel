@@ -1,4 +1,12 @@
+import { obtenerToken, sesionVencida } from "../auth/sesion.js";
+
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080/geotravel/api";
+
+/** Encabezado con el token de la sesión del administrador, si hay una. */
+const autorizacion = () => {
+  const token = obtenerToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 /**
  * Wrapper mínimo de fetch. Cada módulo lo usa así:
@@ -9,6 +17,7 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080/geotravel
  * listo para mostrarle al usuario.
  */
 async function leerRespuesta(res, descripcion) {
+  if (res.status === 401 && obtenerToken()) sesionVencida(); // el token venció o el backend se reinició
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `${descripcion} -> ${res.status}`);
@@ -19,8 +28,8 @@ async function leerRespuesta(res, descripcion) {
 
 async function request(path, options = {}) {
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers: { "Content-Type": "application/json", ...autorizacion(), ...options.headers },
   });
   return leerRespuesta(res, `${options.method ?? "GET"} ${path}`);
 }
@@ -32,7 +41,7 @@ async function request(path, options = {}) {
 async function upload(path, archivo) {
   const datos = new FormData();
   datos.append("archivo", archivo);
-  const res = await fetch(`${API_URL}${path}`, { method: "POST", body: datos });
+  const res = await fetch(`${API_URL}${path}`, { method: "POST", body: datos, headers: autorizacion() });
   return leerRespuesta(res, `POST ${path}`);
 }
 

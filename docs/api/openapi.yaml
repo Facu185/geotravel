@@ -15,12 +15,68 @@ info:
 servers:
   - url: http://localhost:8080/geotravel/api
 
+# Seguridad: toda la API exige una sesión de administrador (encabezado Authorization: Bearer <token>) salvo
+# /health, /auth/login, /auth/logout, GET /consultas/tipos-incidente y GET /fotos/... Sin token responde 401.
+# El mapa público no pasa por esta API: lo dibuja GeoServer.
+security:
+  - bearerAuth: []
+
 paths:
   /health:
     get:
       summary: Estado del servicio
+      security: []
       responses:
         "200": { description: OK }
+
+  # ------------------------------------------------------------ Ingreso del administrador
+  /auth/login:
+    post:
+      summary: Ingresa como administrador y devuelve el token de la sesión (vale 8 horas)
+      description: >
+        Hay un único usuario de prueba, configurado con las variables ADMIN_USUARIO y ADMIN_CLAVE
+        (por defecto admin / urbansafe). Las sesiones viven en memoria: si se reinicia el backend hay que ingresar de nuevo.
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [usuario, clave]
+              properties:
+                usuario: { type: string }
+                clave: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  usuario: { type: string }
+                  rol: { type: string, example: admin }
+                  venceEnHoras: { type: integer }
+        "401": { description: Usuario o contraseña incorrectos }
+
+  /auth/logout:
+    post:
+      summary: Cierra la sesión del token que se manda
+      tags: [auth]
+      security: []
+      responses:
+        "204": { description: Sesión cerrada }
+
+  /auth/yo:
+    get:
+      summary: Datos de la sesión actual (sirve para comprobar que el token sigue vigente)
+      tags: [auth]
+      responses:
+        "200": { description: OK }
+        "401": { description: Sin sesión o vencida }
 
   # ------------------------------------------------------------ Zonas operativas
   /zonas:
@@ -444,6 +500,7 @@ paths:
     get:
       summary: Tipos de incidente que existen (valores distintos), para armar filtros
       tags: [consultas]
+      security: []
       responses:
         "200":
           description: OK
@@ -516,6 +573,10 @@ paths:
         "404": { $ref: "#/components/responses/NoExiste" }
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
   parameters:
     Bbox:
       name: bbox

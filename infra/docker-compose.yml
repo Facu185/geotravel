@@ -101,6 +101,9 @@ services:
       DB_USER: ${POSTGRES_USER:-geotravel}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
       FOTOS_DIR: /data/fotos
+      # Login básico del administrador (un único usuario de prueba). Cambiar la clave fuera de desarrollo.
+      ADMIN_USUARIO: ${ADMIN_USUARIO:-admin}
+      ADMIN_CLAVE: ${ADMIN_CLAVE:-urbansafe}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:

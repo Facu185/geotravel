@@ -1443,3 +1443,60 @@ body {
     animation: none;
   }
 }
+
+/* ------------------------------------------------------------------ sesión y login */
+.cabecera__sesion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cabecera__usuario {
+  color: #9fb0c0;
+  font-size: 0.85rem;
+}
+
+.cabecera__salir,
+.cabecera__sesion a.cabecera__ingresar {
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 7px;
+  background: transparent;
+  color: #e6edf3;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.cabecera__salir:hover,
+.cabecera__sesion a.cabecera__ingresar:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cabecera__salir:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.ingreso {
+  max-width: 380px;
+  margin: 8vh auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ingreso__titulo {
+  margin: 0;
+  font-size: 1.4rem;
+  color: var(--tinta);
+}
+
+.ingreso__formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
