@@ -231,9 +231,39 @@ paths:
         "404": { description: No estaba asignado }
 
   # --------------------------------------------------------- Consultas geográficas
+# Consultas "a demanda": cada consulta devuelve ya la geometría de lo que encontró (campo "geom", GeoJSON
+# en lon/lat como texto) para que el navegador no tenga que cargar todos los objetos. Las que pueden dar muchas
+# filas aceptan ?limit= (500 por defecto, máximo 2000; el ranking de zonas, 50) y responden
+# {items, total, truncado}: C1, C2 (y su extra por km²), C6, C7 y el reporte.
+  /consultas/buscar:
+    get:
+      summary: >
+        Auxiliar de las consultas. Busca por texto una zona, un incidente o un recurso para elegirlo sin
+        cargar la lista completa. Devuelve hasta "limite" resultados (10 por defecto, máximo 25) con su
+        etiqueta y su geometría (GeoJSON lon/lat como texto en "geom").
+      tags: [consultas]
+      parameters:
+        - { name: tipo, in: query, required: true, schema: { type: string, enum: [zona, incidente, recurso] } }
+        - { name: q, in: query, required: false, schema: { type: string }, description: "Texto a buscar; vacío devuelve los primeros" }
+        - { name: limite, in: query, required: false, schema: { type: integer, default: 10 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: integer }
+                    etiqueta: { type: string }
+                    geom: { type: string, description: GeoJSON en lon/lat }
+        "400": { description: tipo inválido }
+
   /consultas/incidentes-por-zona/{zonaId}:
     get:
-      summary: C1. Incidentes dentro de la zona dada
+      summary: C1. Incidentes que tocan la zona dada (con su geometría; responde {items, total, truncado})
       tags: [consultas]
       parameters: [{ name: zonaId, in: path, required: true, schema: { type: integer } }]
       responses: { "200": { description: OK } }

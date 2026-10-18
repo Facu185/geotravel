@@ -159,7 +159,7 @@ documentado en el código (buscar "SUPUESTO").
   cantidad de incidentes; el orden por incidentes/km² quedó como extra.
 - **Ubicación de los recursos:** es la ubicación geográfica del recurso, que se elige en el mapa al
   registrarlo y se ve en el mapa en las consultas del invitado.
-- **Líneas:** la ubicación de un incidente puede ser un punto, una línea (por ejemplo una calle cortada) o una zona.
+- **Líneas:** la ubicación de un incidente puede ser un punto, una línea (por ejemplo una calle cortada) o un polígono (la letra dice "zona": un área, no una zona operativa).
 - **Histórico:** historial de estados de cada incidente, con estado, fecha, hora y usuario.
 
 **Siguen abiertas:**

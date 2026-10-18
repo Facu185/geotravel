@@ -610,6 +610,14 @@
           }
         },
         {
+          "name": "C1b. Incidentes por zona con límite (responde items, total y truncado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/incidentes-por-zona/{{zonaId}}?limit=1"
+          }
+        },
+        {
           "name": "C2. Zonas con más incidentes (todo el período)",
           "request": {
             "method": "GET",
@@ -879,6 +887,49 @@
             "header": [],
             "url": "{{base}}/consultas/tipos-incidente"
           }
+        },
+        {
+          "name": "Auxiliar. Buscar una zona por texto (con geometría)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/buscar?tipo=zona&q=cen"
+          }
+        },
+        {
+          "name": "Auxiliar. Buscar un incidente por texto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/buscar?tipo=incidente&q=choque"
+          }
+        },
+        {
+          "name": "Auxiliar. Buscar un recurso por texto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/buscar?tipo=recurso&q=amb"
+          }
+        },
+        {
+          "name": "Auxiliar. Buscar con un tipo inválido (debe dar 400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/buscar?tipo=otra"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "C4/C5 aux. Autocompletar nombres de calle",
