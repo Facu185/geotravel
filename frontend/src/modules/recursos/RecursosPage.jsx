@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import L from "leaflet";
 import { CircleMarker, Tooltip, useMapEvents } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import CargaPorZona, { AvisoCarga, SIN_CARGAR } from "../../components/CargaPorZona.jsx";
+import Enfocar from "../../components/Enfocar.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Segmentado } from "../../components/ui.jsx";
 import { COLOR_ESTADO_RECURSO, TIPOS_RECURSO, nombreTipoRecurso } from "../../components/colores.js";
 import { api } from "../../api/client.js";
@@ -51,6 +53,10 @@ export default function RecursosPage() {
   const [recarga, setRecarga] = useState(0); // cambiarlo vuelve a pedir la vista (después de guardar o borrar)
   const recursos = carga.items;
   const lejos = carga.estado === "lejos";
+  const [enfoque, setEnfoque] = useState(null); // recurso elegido en la lista: el mapa va hasta él
+  // Los marcadores van en un único lienzo (canvas) en vez de un elemento SVG por recurso:
+  // con cientos de recursos en pantalla el mapa se mueve mucho más fluido.
+  const lienzo = useMemo(() => L.canvas({ padding: 0.5 }), []);
   const [vista, setVista] = useState("lista"); // "lista" | "form"
   const [seleccionado, setSeleccionado] = useState(null);
   const [form, setForm] = useState(FORM_VACIO);
@@ -137,6 +143,7 @@ export default function RecursosPage() {
   const hijosMapa = (
     <>
       <CargaPorZona ruta="/recursos" recarga={recarga} alCambiar={setCarga} />
+      <Enfocar objetivo={enfoque} />
       <ClickEnMapa alClick={(ubicacion) => vista === "form" && setPunto(ubicacion)} />
 
       {/* Los demás recursos, de fondo. bubblingMouseEvents=false evita que el clic sobre un
@@ -150,7 +157,7 @@ export default function RecursosPage() {
               key={r.id}
               center={[lat, lng]}
               radius={8}
-              pathOptions={{ color: COLOR_ESTADO_RECURSO[r.estadoOperativo] ?? "#555", fillOpacity: 0.85 }}
+              pathOptions={{ color: COLOR_ESTADO_RECURSO[r.estadoOperativo] ?? "#555", fillOpacity: 0.85, renderer: lienzo }}
               bubblingMouseEvents={false}
               eventHandlers={{ click: () => seleccionar(r) }}
             >
@@ -202,7 +209,14 @@ export default function RecursosPage() {
           <ul className="items">
             {recursos.map((r) => (
               <li key={r.id}>
-                <button type="button" className="item" onClick={() => seleccionar(r)}>
+                <button
+                  type="button"
+                  className="item"
+                  onClick={() => {
+                    seleccionar(r);
+                    setEnfoque({ geom: JSON.parse(r.geom) });
+                  }}
+                >
                   <span className="item__marca item__marca--cuadrado" style={{ "--color": COLOR_ESTADO_RECURSO[r.estadoOperativo] }} aria-hidden="true" />
                   <span className="item__texto">
                     <span className="item__titulo">{r.identificacion}</span>

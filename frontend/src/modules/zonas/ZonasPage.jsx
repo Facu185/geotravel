@@ -5,6 +5,7 @@ import { EditControl } from "react-leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import CargaPorZona, { AvisoCarga, SIN_CARGAR } from "../../components/CargaPorZona.jsx";
+import Enfocar from "../../components/Enfocar.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Segmentado } from "../../components/ui.jsx";
 import { COLOR_PRIORIDAD, OPCIONES_PRIORIDAD } from "../../components/colores.js";
 import { api } from "../../api/client.js";
@@ -32,6 +33,7 @@ export default function ZonasPage() {
   const [recarga, setRecarga] = useState(0); // cambiarlo vuelve a pedir la vista (después de guardar o borrar)
   const [version, setVersion] = useState(0); // fuerza a <GeoJSON> a redibujarse cuando cambian los datos
   const zonas = carga.items;
+  const [enfoque, setEnfoque] = useState(null); // zona elegida en la lista: el mapa va hasta ella
   const [vista, setVista] = useState("lista"); // "lista" | "form"
   const [seleccionada, setSeleccionada] = useState(null);
   const [form, setForm] = useState(FORM_VACIO);
@@ -177,6 +179,7 @@ export default function ZonasPage() {
   const hijosMapa = (
     <>
       <CargaPorZona ruta="/zonas" recarga={recarga} alCambiar={alCargar} />
+      <Enfocar objetivo={enfoque} />
       <GeoJSON
         key={`${version}-${seleccionada?.id ?? "nueva"}`}
         data={fondo}
@@ -233,7 +236,14 @@ export default function ZonasPage() {
           <ul className="items">
             {zonas.map((z) => (
               <li key={z.id}>
-                <button type="button" className="item" onClick={() => seleccionar(z)}>
+                <button
+                  type="button"
+                  className="item"
+                  onClick={() => {
+                    seleccionar(z);
+                    setEnfoque({ geom: JSON.parse(z.geom) });
+                  }}
+                >
                   <span className="item__marca item__marca--zona" style={{ "--color": COLOR_PRIORIDAD[z.nivelPrioridad] }} aria-hidden="true" />
                   <span className="item__texto">
                     <span className="item__titulo">{z.nombre}</span>

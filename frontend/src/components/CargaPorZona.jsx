@@ -87,7 +87,7 @@ export function AvisoCarga({ carga, nombre }) {
   else if (carga.estado === "error") texto = `No se pudieron cargar ${nombre}: ${carga.error}`;
   else if (carga.truncado) texto = `Mostrando ${carga.items.length} de ${carga.total} ${nombre}: acercá el mapa para ver el resto`;
   return texto ? (
-    <p className="pagina-mapa__vacio" role="status">
+    <p className="pagina-mapa__vacio pagina-mapa__vacio--carga" role="status">
       {texto}
     </p>
   ) : null;
