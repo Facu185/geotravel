@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useMap } from "react-leaflet";
 import { GEOSERVER_WMS_URL } from "../../components/MapView.jsx";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import { Selector } from "../../components/ui.jsx";
@@ -13,7 +14,8 @@ import { FILTROS_VACIOS, cqlDeCapa, cqlParaCapas } from "./filtros.js";
  *
  * Todo lo que se ve sale de GeoServer:
  *   - las capas, por WMS (GetMap);
- *   - los conteos, por WFS (resultType=hits, que cuenta sin descargar los objetos);
+ *   - los conteos, por WFS (resultType=hits, que cuenta sin descargar los objetos), de lo que se
+ *     ve en el mapa: el rectángulo visible entra al filtro como BBOX, que usa el índice espacial;
  *   - el detalle al tocar un objeto, por WMS GetFeatureInfo (ver detalle.jsx);
  *   - los filtros de incidentes y recursos, como CQL_FILTER en los tres pedidos (ver filtros.js).
  * Lo único que no viene de GeoServer es la lista de tipos de incidente del filtro (la API la
@@ -28,6 +30,41 @@ const ESTADOS_RECURSO = Object.keys(COLOR_ESTADO_RECURSO).map((e) => ({ valor: e
 const TIPOS_DE_RECURSO = TIPOS_RECURSO.map((t) => ({ valor: t, texto: t }));
 const PRIORIDADES = [1, 2, 3, 4, 5].map((n) => ({ valor: n, texto: String(n) }));
 
+/**
+ * Suma al filtro de una capa el rectángulo visible del mapa (lon/lat: oeste, sur, este, norte).
+ * Todas las capas guardan su geometría en la columna "geom". Sin vista (todavía no se midió), no cambia el filtro.
+ */
+function cqlConVista(cql, vista) {
+  if (!vista) return cql;
+  const caja = `BBOX(geom,${vista.join(",")},'EPSG:4326')`;
+  return cql === "INCLUDE" ? caja : `(${cql}) AND ${caja}`;
+}
+
+/**
+ * Lee el rectángulo que se ve en el mapa cada vez que termina de moverse o de hacer zoom
+ * (con una espera, para no medir mientras se arrastra). Va dentro del mapa.
+ */
+function VistaDelMapa({ alCambiar }) {
+  const map = useMap();
+  useEffect(() => {
+    let espera;
+    const leer = () => {
+      clearTimeout(espera);
+      espera = setTimeout(() => {
+        const b = map.getBounds();
+        alCambiar([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => Number(v.toFixed(5))));
+      }, 400);
+    };
+    leer();
+    map.on("moveend", leer);
+    return () => {
+      map.off("moveend", leer);
+      clearTimeout(espera);
+    };
+  }, [map, alCambiar]);
+  return null;
+}
+
 /** Cantidad de objetos de una capa que cumplen el filtro, sin descargarlos (WFS 2.0, resultType=hits). */
 async function contarObjetos(capa, cql) {
   let url = `${WFS_URL}?service=WFS&version=2.0.0&request=GetFeature&typeNames=${encodeURIComponent(capa)}&resultType=hits`;
@@ -41,10 +78,10 @@ async function contarObjetos(capa, cql) {
 }
 
 /**
- * Conteos por capa (con el filtro aplicado y el total sin filtrar) + si hay conexión con
- * GeoServer. `version` fuerza una nueva lectura.
+ * Conteos por capa de lo que se ve en el mapa (`vista`): con el filtro aplicado y el total sin filtrar,
+ * más si hay conexión con GeoServer. `version` fuerza una nueva lectura.
  */
-function useGeoServer(version, filtros) {
+function useGeoServer(version, filtros, vista) {
   const [estado, setEstado] = useState({ conexion: "conectando", conteos: {}, ultima: null });
 
   useEffect(() => {
@@ -54,8 +91,8 @@ function useGeoServer(version, filtros) {
         const pares = await Promise.all(
           CAPAS.map(async (c) => {
             const cql = cqlDeCapa(c.id, filtros);
-            const cantidad = await contarObjetos(c.capa, cql);
-            const total = cql === "INCLUDE" ? cantidad : await contarObjetos(c.capa, "INCLUDE");
+            const cantidad = await contarObjetos(c.capa, cqlConVista(cql, vista));
+            const total = cql === "INCLUDE" ? cantidad : await contarObjetos(c.capa, cqlConVista("INCLUDE", vista));
             return [c.id, { cantidad, total }];
           }),
         );
@@ -70,7 +107,7 @@ function useGeoServer(version, filtros) {
       vigente = false;
       clearInterval(reloj);
     };
-  }, [version, filtros]);
+  }, [version, filtros, vista]);
 
   return estado;
 }
@@ -168,7 +205,8 @@ export default function InvitadoPage() {
   const [filtros, setFiltros] = useState(FILTROS_VACIOS);
   const [objetos, setObjetos] = useState([]); // lo que se tocó en el mapa (GetFeatureInfo)
   const [errorDetalle, setErrorDetalle] = useState(null);
-  const { conexion, conteos, ultima } = useGeoServer(version, filtros);
+  const [vista, setVista] = useState(null); // rectángulo visible [oeste, sur, este, norte]
+  const { conexion, conteos, ultima } = useGeoServer(version, filtros, vista);
   const tiposIncidente = useTiposIncidente(version);
 
   const alternarCapa = useCallback((id) => {
@@ -193,6 +231,7 @@ export default function InvitadoPage() {
 
   const hijosMapa = (
     <>
+      <VistaDelMapa alCambiar={setVista} />
       <ClickConsulta capas={capasVisibles} cql={cql} alResultado={setObjetos} alError={setErrorDetalle} />
       <Seleccion objetos={objetos} />
     </>
@@ -248,7 +287,7 @@ export default function InvitadoPage() {
                   <span className="capa__nombre">{c.nombre}</span>
                   <span className="capa__descripcion">{c.descripcion}</span>
                 </span>
-                <span className="capa__conteo" title={conteo === undefined ? "Sin dato" : filtrado ? `${conteo.cantidad} de ${conteo.total} con los filtros` : `${conteo.cantidad} en la base`}>
+                <span className="capa__conteo" title={conteo === undefined ? "Sin dato" : filtrado ? `${conteo.cantidad} de ${conteo.total} en la vista, con los filtros` : `${conteo.cantidad} en la vista`}>
                   {conteo === undefined ? "—" : conteo.cantidad}
                   {filtrado && <small>de {conteo.total}</small>}
                 </span>
@@ -275,7 +314,7 @@ export default function InvitadoPage() {
           );
         })}
       </ul>
-      <p className="ayuda panel__nota">Tocá un incidente, recurso o zona del mapa para ver su detalle.</p>
+      <p className="ayuda panel__nota">Los números cuentan lo que se ve en el mapa y cambian al moverlo. Tocá un incidente, recurso o zona para ver su detalle.</p>
     </PaginaMapa>
   );
 }
