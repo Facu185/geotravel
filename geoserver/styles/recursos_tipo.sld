@@ -16,6 +16,7 @@
         <Rule>
           <Name>ambulancia</Name>
           <Title>Ambulancia</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>tipo</ogc:PropertyName>
@@ -39,6 +40,7 @@
         <Rule>
           <Name>bomberos</Name>
           <Title>Bomberos</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>tipo</ogc:PropertyName>
@@ -62,6 +64,7 @@
         <Rule>
           <Name>patrulla</Name>
           <Title>Patrulla</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>tipo</ogc:PropertyName>
@@ -85,6 +88,7 @@
         <Rule>
           <Name>centro_atencion</Name>
           <Title>Centro de atención</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>tipo</ogc:PropertyName>
@@ -108,6 +112,7 @@
         <Rule>
           <Name>otro</Name>
           <Title>Otro</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>tipo</ogc:PropertyName>

@@ -1,14 +1,14 @@
 -- V2__via.sql
--- Red vial de Montevideo (ejes de calle del curso, v_sig_vias): capa de REFERENCIA, no se edita.
+-- Red vial de Salto (ejes de calle del curso, v_sig_vias): capa de REFERENCIA, no se edita.
 -- Sirve para ubicar una intersección de calles (consultas "búsqueda de incidente" y "búsqueda
 -- de zona" por dirección). Cada fila es un tramo; una calle son varios tramos con el mismo nombre.
--- Los datos están en db/data/vias.sql.gz y los carga infra/init/seed.sh.
+-- Los datos están en db/data/vias.csv.gz y los carga infra/init/seed.sh.
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE TABLE via (
     gid          serial PRIMARY KEY,
-    nom_calle    varchar(36) NOT NULL,
+    nom_calle    varchar(60) NOT NULL,
     cod_depto    integer,
     cod_locali   double precision,
     gid_origen   numeric,
