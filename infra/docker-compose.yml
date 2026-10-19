@@ -94,12 +94,15 @@ services:
         condition: service_healthy
       flyway:
         condition: service_completed_successfully
+      seed:
+        condition: service_completed_successfully
     environment:
       DB_HOST: db
       DB_PORT: "5432"
       DB_NAME: ${POSTGRES_DB:-geotravel}
       DB_USER: ${POSTGRES_USER:-geotravel}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      OSRM_URL: ${OSRM_URL:-https://router.project-osrm.org}
       FOTOS_DIR: /data/fotos
     ports:
       - "${BACKEND_PORT:-8080}:8080"

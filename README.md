@@ -57,6 +57,18 @@ Después, solo el frontend: `cd frontend && npm install && npm run dev`.
 Todo es repetible: el seed no duplica datos y la configuración de GeoServer deja como está lo que
 ya existe. Los pasos de abajo son el mismo proceso, a mano, por si hace falta hacer uno solo.
 
+### Demostracion P2: ETA en Salto
+
+En `feat/backend-p2`, Docker prepara automaticamente un recurso y un incidente
+para **Salto, Uruguay** (`db/seed/seed_salto_eta.sql`). Funciona tanto en una
+instalacion nueva como en una base Docker que ya tenga datos; nunca se asignan
+IDs fijos. La pantalla `/eta` muestra distancia, duracion y la ruta vial
+GeoJSON sobre Leaflet. El calculo de rutas utiliza un servicio OSRM con acceso
+a internet. Los datos historicos de calles y puertas siguen siendo de Montevideo.
+
+**Guia de instalacion en otra computadora y verificaciones:**
+[docs/ETA_SALTO_DEMO.md](docs/ETA_SALTO_DEMO.md).
+
 ### 1. Datos: PostGIS + GeoServer (a mano)
 
 Cada paso es uno de los servicios que levanta `docker compose up -d`; se pueden correr de a uno
