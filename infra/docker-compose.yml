@@ -103,6 +103,8 @@ services:
       DB_USER: ${POSTGRES_USER:-geotravel}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
       OSRM_URL: ${OSRM_URL:-https://router.project-osrm.org}
+      IDE_DEPARTAMENTO: ${IDE_DEPARTAMENTO:-salto}
+      IDE_LOCALIDAD: ${IDE_LOCALIDAD:-salto}
       FOTOS_DIR: /data/fotos
     ports:
       - "${BACKEND_PORT:-8080}:8080"

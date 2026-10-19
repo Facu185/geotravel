@@ -220,12 +220,28 @@ paths:
   # -------------------------------------------------------------------- Incidentes
   /incidentes:
     get:
-      summary: Lista de incidentes (geom en GeoJSON lon/lat)
+      summary: Lista incidentes, opcionalmente filtrados por bbox
+      description: >
+        Sin bbox devuelve el arreglo tradicional. Con bbox devuelve {items, total, truncado}.
+        El bbox usa EPSG:4326 y el orden oeste,sur,este,norte (minLon,minLat,maxLon,maxLat);
+        PostGIS filtra las geometrías almacenadas en EPSG:32721. geom contiene GeoJSON serializado
+        como texto y puede ser Point, LineString o Polygon en EPSG:4326.
       tags: [incidentes]
+      parameters:
+        - $ref: "#/components/parameters/Bbox"
+        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: OK
-          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Incidente" } } } }
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { type: array, items: { $ref: "#/components/schemas/Incidente" } }
+                  - allOf:
+                      - $ref: "#/components/schemas/ListadoPorZona"
+                      - { properties: { items: { type: array, items: { $ref: "#/components/schemas/Incidente" } } } }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
     post:
       summary: Registrar incidente (siempre nace en estado "Registrado")
       tags: [incidentes]
@@ -428,7 +444,8 @@ paths:
     get:
       summary: >
         Auxiliar de C4 y C5. Nombres de calle que contienen el texto dado (mínimo 2 letras; vacío si es menos), con
-        los que empiezan por él primero. Máximo 10. Para el autocompletado de intersecciones.
+        los que empiezan por él primero. Máximo 10. Para el autocompletado de intersecciones. Usa la red vial local,
+        actualmente de Montevideo; no representa cobertura de Salto.
       tags: [consultas]
       parameters:
         - { name: q, in: query, required: true, schema: { type: string } }
@@ -443,7 +460,7 @@ paths:
     get:
       summary: >
         Auxiliar de C4 y C5. Puntos donde se cruzan dos calles (lon/lat, EPSG:4326), calculados en PostGIS sobre la
-        red vial (tabla via). Lista vacía si no se cruzan o algún nombre no existe; varios
+        red vial local (tabla via, actualmente Montevideo). Lista vacía si no se cruzan o algún nombre no existe; varios
         elementos si hay nombres repetidos en la ciudad. El resultado se usa como lon/lat en
         /consultas/incidente-mas-cercano y /consultas/zona-por-punto.
       tags: [consultas]
@@ -468,12 +485,10 @@ paths:
     get:
       summary: >
         Auxiliar de C4 y C5. Ubica una dirección "calle número" (por ejemplo "Camino Carrasco 4680")
-        y devuelve lon/lat (EPSG:4326). Se busca en la tabla acceso, los números de puerta de
-        Montevideo (capa mdg_accesos de la Intendencia; es también la capa "acceso" de GeoServer),
-        tolerando abreviaturas ("Camino" = CNO, "Avenida" = AV) y errores de tipeo. Si el número no
-        existe se devuelve la puerta más cercana de la calle y se marca "aproximada". Lo que no se
-        resuelve ahí (por ejemplo "calle esquina calle") se pasa al servicio de direcciones de la IDE
-        de Uruguay (requiere internet). El resultado se usa como lon/lat en
+        y devuelve lon/lat (EPSG:4326). Si IDE_DEPARTAMENTO e IDE_LOCALIDAD son Montevideo,
+        primero busca en acceso (puertas locales de Montevideo), tolerando abreviaturas y errores;
+        si no se resuelve, o en cualquier localidad distinta, usa el servicio de direcciones IDE de Uruguay
+        con la localidad configurada (requiere internet). El resultado se usa como lon/lat en
         /consultas/incidente-mas-cercano y /consultas/zona-por-punto.
       tags: [consultas]
       parameters:
@@ -491,7 +506,7 @@ paths:
                   lat: { type: number }
                   aproximada: { type: boolean }
                   aviso: { type: string, nullable: true }
-                  fuente: { type: string, description: "Puertas de Montevideo, o IDE si se usó el respaldo" }
+                  fuente: { type: string, description: "Puertas locales solo para Montevideo; IDE para otras localidades" }
         "400": { description: Falta la dirección }
         "404": { description: No se encontró la calle (solo con el respaldo de la IDE) }
         "502": { description: Respaldo de la IDE no disponible (sin internet) }
@@ -640,7 +655,7 @@ components:
         tipo: { type: string, enum: [ambulancia, bomberos, patrulla, centro_atencion, otro] }
         estadoOperativo: { type: string, enum: [Disponible, "En servicio", "Fuera de servicio"] }
         descripcion: { type: string }
-        geom: { type: string, description: "GeoJSON Point en lon/lat (EPSG:4326), como texto" }
+        geom: { type: string, description: "GeoJSON Point, LineString o Polygon en lon/lat (EPSG:4326), como texto" }
     RecursoInput:
       type: object
       required: [identificacion, tipo, estadoOperativo, geomGeoJson]

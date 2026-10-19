@@ -101,4 +101,16 @@ public final class Bbox {
         }
         return Math.min(pedido, LIMITE_MAXIMO);
     }
+
+    /** Parse the optional query parameter before applying the shared limit rules. */
+    public static int limiteDesdeTexto(String pedido) {
+        if (pedido == null) {
+            return LIMITE_POR_DEFECTO;
+        }
+        try {
+            return limite(Integer.valueOf(pedido.trim()));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("limit debe ser un entero");
+        }
+    }
 }

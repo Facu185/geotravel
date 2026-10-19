@@ -18,7 +18,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -39,9 +38,9 @@ import java.util.*;
  * ST_Distance y el operador <->, que sirven igual para puntos, líneas y polígonos.
  *
  * "Búsqueda de incidente/zona por dirección o intersección de calles" recibe ya resuelta
- * la coordenada (x, y o lon, lat). Esa resolución la hacen /consultas/geocodificar (calle y
- * número, con la tabla acceso), /consultas/interseccion (cruce de dos calles, con la tabla via)
- * y, en el frontend, el clic en el mapa.
+ * la coordenada (x, y o lon, lat). /consultas/geocodificar usa las puertas locales de Montevideo
+ * solo cuando el backend está configurado para esa localidad; en otro caso consulta la IDE.
+ * /consultas/interseccion usa la tabla via, cuya cobertura local actual es Montevideo.
  */
 @Path("/consultas")
 public class ConsultaResource {
@@ -448,6 +447,7 @@ public class ConsultaResource {
     private static final String IDE_BUSQUEDA_DIRECCION = "https://direcciones.ide.uy/api/v0/geocode/BusquedaDireccion";
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ConfiguracionIde CONFIGURACION_IDE = ConfiguracionIde.desdeEntorno();
 
     /** Cómo se abrevian en los nombres de calle de la base ("AV 18 DE JULIO", "CNO CARRASCO"). */
     private static final Map<String, String> ABREVIATURAS = Map.ofEntries(
@@ -490,12 +490,23 @@ public class ConsultaResource {
         if (direccion == null || direccion.trim().isEmpty()) {
             throw peticionInvalida("Falta la dirección (por ejemplo: Buenos Aires 451)");
         }
-        java.util.regex.Matcher m = CALLE_Y_NUMERO.matcher(normalizarCalle(direccion));
-        if (m.matches() && !m.group(1).contains(" ESQ")) {
+        java.util.regex.Matcher m = coincidenciaPuertaLocal(direccion, CONFIGURACION_IDE);
+        if (m != null) {
             Map<String, Object> propio = buscarPuerta(m.group(1), Integer.parseInt(m.group(2)), m.group(3));
             if (propio != null) return propio;
         }
         return geocodificarConIde(direccion);
+    }
+
+    static java.util.regex.Matcher coincidenciaPuertaLocal(
+            String direccion,
+            ConfiguracionIde configuracion
+    ) {
+        if (direccion == null || !configuracion.usaPuertasLocales()) {
+            return null;
+        }
+        java.util.regex.Matcher matcher = CALLE_Y_NUMERO.matcher(normalizarCalle(direccion));
+        return matcher.matches() && !matcher.group(1).contains(" ESQ") ? matcher : null;
     }
 
     /** Busca la puerta en la tabla acceso; null si la calle o el número no están en la base. */
@@ -559,9 +570,7 @@ public class ConsultaResource {
      * calle y se marca "aproximada". Sin internet o con el servicio caído responde 502 con un mensaje.
      */
     private Map<String, Object> geocodificarConIde(String direccion) {
-        String url = IDE_BUSQUEDA_DIRECCION
-            + "?calle=" + URLEncoder.encode(direccion.trim(), StandardCharsets.UTF_8)
-            + "&departamento=montevideo&localidad=montevideo";
+        String url = CONFIGURACION_IDE.urlBusqueda(IDE_BUSQUEDA_DIRECCION, direccion);
         JsonNode lista;
         try {
             HttpResponse<String> respuesta = HTTP.send(
