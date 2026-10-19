@@ -65,4 +65,53 @@ public class OsrmClientTest {
 
         OsrmClient.parsearRuta(json);
     }
+
+    @Test
+    public void interpretaGeometriaGeoJson() throws Exception {
+        String json = "{\"code\":\"Ok\",\"routes\":[{"
+                + "\"distance\":1051,"
+                + "\"duration\":170,"
+                + "\"geometry\":{"
+                + "\"type\":\"LineString\","
+                + "\"coordinates\":["
+                + "[-57.96215,-31.39029],"
+                + "[-57.95340,-31.38927]"
+                + "]}}]}";
+
+        OsrmClient.Ruta ruta = OsrmClient.parsearRuta(json);
+
+        assertEquals(1051.0, ruta.distanciaMetros, 0.001);
+        assertEquals(170.0, ruta.duracionSegundos, 0.001);
+        assertEquals(3L, ruta.minutosRedondeados());
+        assertEquals("LineString", ruta.geometriaRuta.path("type").asText());
+        assertEquals(2, ruta.geometriaRuta.path("coordinates").size());
+    }
+
+    @Test(expected = IOException.class)
+    public void rechazaGeometriaSinPuntosSuficientes() throws Exception {
+        String json = "{\"code\":\"Ok\",\"routes\":[{"
+                + "\"distance\":1051,"
+                + "\"duration\":170,"
+                + "\"geometry\":{"
+                + "\"type\":\"LineString\","
+                + "\"coordinates\":[[-57.96215,-31.39029]]"
+                + "}}]}";
+
+        OsrmClient.parsearRuta(json);
+    }
+
+    @Test(expected = IOException.class)
+    public void rechazaCoordenadasFueraDeRango() throws Exception {
+        String json = "{\"code\":\"Ok\",\"routes\":[{"
+                + "\"distance\":1051,"
+                + "\"duration\":170,"
+                + "\"geometry\":{"
+                + "\"type\":\"LineString\","
+                + "\"coordinates\":["
+                + "[-200,-31.39029],"
+                + "[-57.95340,-31.38927]"
+                + "]}}]}";
+
+        OsrmClient.parsearRuta(json);
+    }
 }

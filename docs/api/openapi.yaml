@@ -22,6 +22,92 @@ paths:
       responses:
         "200": { description: OK }
 
+  # ------------------------------------------------------------ ETA / OSRM
+  /eta/recursos/{recursoId}/incidentes/{incidenteId}:
+    get:
+      summary: Calcular tiempo estimado de llegada
+      description: >
+        Obtiene las ubicaciones del recurso y del incidente desde PostGIS.
+        Consulta OSRM con perfil driving para obtener distancia, duración y
+        recorrido vial. La geometría se devuelve como GeoJSON en EPSG:4326.
+        No incorpora tráfico en tiempo real.
+      tags: [eta]
+      parameters:
+        - name: recursoId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: incidenteId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: ETA calculada correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - recursoId
+                  - incidenteId
+                  - distanciaMetros
+                  - duracionSegundos
+                  - tiempoEstimadoMinutos
+                  - geometriaRuta
+                  - motor
+                  - aclaracion
+                properties:
+                  recursoId:
+                    type: integer
+                  incidenteId:
+                    type: integer
+                  distanciaMetros:
+                    type: integer
+                    minimum: 0
+                  duracionSegundos:
+                    type: integer
+                    minimum: 0
+                  tiempoEstimadoMinutos:
+                    type: integer
+                    minimum: 0
+                  geometriaRuta:
+                    type: object
+                    description: >
+                      Recorrido vial GeoJSON LineString. Coordenadas en orden
+                      lon, lat, sistema EPSG:4326.
+                    required: [type, coordinates]
+                    properties:
+                      type:
+                        type: string
+                        enum: [LineString]
+                      coordinates:
+                        type: array
+                        minItems: 2
+                        items:
+                          type: array
+                          minItems: 2
+                          items:
+                            type: number
+                  motor:
+                    type: string
+                    example: OSRM driving
+                  aclaracion:
+                    type: string
+                    example: Estimacion sin trafico en tiempo real
+        "400":
+          $ref: "#/components/responses/DatosInvalidos"
+        "404":
+          $ref: "#/components/responses/NoExiste"
+        "422":
+          description: OSRM no encontró una ruta vial
+        "503":
+          description: Servicio OSRM no disponible
+
   # ------------------------------------------------------------ Zonas operativas
   /zonas:
     get:

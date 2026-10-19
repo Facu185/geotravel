@@ -85,6 +85,7 @@ public class EtaResource {
             respuesta.put("distanciaMetros", Math.round(ruta.distanciaMetros));
             respuesta.put("duracionSegundos", Math.round(ruta.duracionSegundos));
             respuesta.put("tiempoEstimadoMinutos", ruta.minutosRedondeados());
+            respuesta.put("geometriaRuta", ruta.geometriaRuta);
             respuesta.put("motor", "OSRM driving");
             respuesta.put("aclaracion", "Estimacion sin trafico en tiempo real");
 

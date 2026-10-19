@@ -27,10 +27,20 @@ public final class OsrmClient {
 
         public final double distanciaMetros;
         public final double duracionSegundos;
+        public final JsonNode geometriaRuta;
 
         public Ruta(double distanciaMetros, double duracionSegundos) {
+            this(distanciaMetros, duracionSegundos, null);
+        }
+
+        public Ruta(
+                double distanciaMetros,
+                double duracionSegundos,
+                JsonNode geometriaRuta
+        ) {
             this.distanciaMetros = distanciaMetros;
             this.duracionSegundos = duracionSegundos;
+            this.geometriaRuta = geometriaRuta;
         }
 
         public long minutosRedondeados() {
@@ -62,7 +72,8 @@ public final class OsrmClient {
 
         String url = String.format(
                 Locale.ROOT,
-                "%s/route/v1/driving/%.7f,%.7f;%.7f,%.7f?overview=false&steps=false",
+            "%s/route/v1/driving/%.7f,%.7f;%.7f,%.7f"
+                + "?overview=full&geometries=geojson&steps=false",
                 servidor,
                 origenLon,
                 origenLat,
@@ -88,7 +99,11 @@ public final class OsrmClient {
             );
         }
 
-        return parsearRuta(respuesta.body());
+        Ruta ruta = parsearRuta(respuesta.body());
+        if (ruta.geometriaRuta == null) {
+            throw new IOException("OSRM no devolvio la geometria del recorrido");
+        }
+        return ruta;
     }
 
     static Ruta parsearRuta(String contenido) throws IOException {
@@ -124,6 +139,34 @@ public final class OsrmClient {
             throw new IOException("Datos de ruta invalidos");
         }
 
-        return new Ruta(distancia, duracion);
+        JsonNode geometria = ruta.path("geometry");
+        if (geometria.isMissingNode() || geometria.isNull()) {
+            geometria = null;
+        } else {
+            if (!"LineString".equals(geometria.path("type").asText())
+                    || !geometria.path("coordinates").isArray()
+                    || geometria.path("coordinates").size() < 2) {
+                throw new IOException("Geometria GeoJSON invalida");
+            }
+
+            for (JsonNode punto : geometria.path("coordinates")) {
+                if (!punto.isArray()
+                        || punto.size() < 2
+                        || !punto.get(0).isNumber()
+                        || !punto.get(1).isNumber()) {
+                    throw new IOException("Coordenadas de ruta invalidas");
+                }
+
+                double lon = punto.get(0).asDouble();
+                double lat = punto.get(1).asDouble();
+                if (!Double.isFinite(lon) || !Double.isFinite(lat)
+                        || lon < -180 || lon > 180
+                        || lat < -90 || lat > 90) {
+                    throw new IOException("Coordenadas fuera de rango");
+                }
+            }
+        }
+
+        return new Ruta(distancia, duracion, geometria);
     }
 }
