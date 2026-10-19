@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import L from "leaflet";
 import { CircleMarker, Tooltip, useMapEvents } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
+import CargaPorZona, { AvisoCarga, SIN_CARGAR } from "../../components/CargaPorZona.jsx";
+import Enfocar from "../../components/Enfocar.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Segmentado } from "../../components/ui.jsx";
 import { COLOR_ESTADO_RECURSO, TIPOS_RECURSO, nombreTipoRecurso } from "../../components/colores.js";
 import { api } from "../../api/client.js";
@@ -19,6 +22,10 @@ import { api } from "../../api/client.js";
  *
  * El panel tiene dos vistas: la lista de recursos y el formulario (nuevo o en edición).
  * El mapa solo acepta clics de ubicación cuando el formulario está abierto.
+ *
+ * Carga a demanda (CargaPorZona): solo se traen los recursos del rectángulo visible, hasta un
+ * límite. Con el mapa alejado no se carga nada editable y los recursos los dibuja GeoServer
+ * como imagen (capa WMS).
  */
 
 const ESTADOS_OPERATIVOS = Object.keys(COLOR_ESTADO_RECURSO).map((estado) => ({
@@ -42,7 +49,14 @@ function ClickEnMapa({ alClick }) {
 }
 
 export default function RecursosPage() {
-  const [recursos, setRecursos] = useState([]);
+  const [carga, setCarga] = useState(SIN_CARGAR); // recursos de la vista actual (ver CargaPorZona)
+  const [recarga, setRecarga] = useState(0); // cambiarlo vuelve a pedir la vista (después de guardar o borrar)
+  const recursos = carga.items;
+  const lejos = carga.estado === "lejos";
+  const [enfoque, setEnfoque] = useState(null); // recurso elegido en la lista: el mapa va hasta él
+  // Los marcadores van en un único lienzo (canvas) en vez de un elemento SVG por recurso:
+  // con cientos de recursos en pantalla el mapa se mueve mucho más fluido.
+  const lienzo = useMemo(() => L.canvas({ padding: 0.5 }), []);
   const [vista, setVista] = useState("lista"); // "lista" | "form"
   const [seleccionado, setSeleccionado] = useState(null);
   const [form, setForm] = useState(FORM_VACIO);
@@ -50,11 +64,7 @@ export default function RecursosPage() {
   const [error, setError] = useState(null);
   const [mensaje, setMensaje] = useState(null);
 
-  const cargar = () => api.get("/recursos").then(setRecursos).catch((e) => setError(e.message));
-
-  useEffect(() => {
-    cargar();
-  }, []);
+  const cargar = () => setRecarga((n) => n + 1);
 
   const reiniciar = () => {
     setSeleccionado(null);
@@ -132,6 +142,8 @@ export default function RecursosPage() {
 
   const hijosMapa = (
     <>
+      <CargaPorZona ruta="/recursos" recarga={recarga} alCambiar={setCarga} />
+      <Enfocar objetivo={enfoque} />
       <ClickEnMapa alClick={(ubicacion) => vista === "form" && setPunto(ubicacion)} />
 
       {/* Los demás recursos, de fondo. bubblingMouseEvents=false evita que el clic sobre un
@@ -145,7 +157,7 @@ export default function RecursosPage() {
               key={r.id}
               center={[lat, lng]}
               radius={8}
-              pathOptions={{ color: COLOR_ESTADO_RECURSO[r.estadoOperativo] ?? "#555", fillOpacity: 0.85 }}
+              pathOptions={{ color: COLOR_ESTADO_RECURSO[r.estadoOperativo] ?? "#555", fillOpacity: 0.85, renderer: lienzo }}
               bubblingMouseEvents={false}
               eventHandlers={{ click: () => seleccionar(r) }}
             >
@@ -170,7 +182,15 @@ export default function RecursosPage() {
   );
 
   return (
-    <PaginaMapa etiqueta="Administración" titulo="Recursos de emergencia" etiquetaBoton="Recursos" hijosMapa={hijosMapa}>
+    <PaginaMapa
+      etiqueta="Administración"
+      titulo="Recursos de emergencia"
+      etiquetaBoton="Recursos"
+      hijosMapa={hijosMapa}
+      // Alejado, los recursos se ven igual: los dibuja GeoServer (imagen, no objetos en memoria).
+      mapaProps={{ layers: lejos ? ["geotravel:recurso"] : [], wmsExtra: { actualizado: recarga } }}
+      aviso={<AvisoCarga carga={carga} nombre="recursos" />}
+    >
       {vista === "lista" ? (
         <>
           <div className="panel__seccion">
@@ -180,11 +200,23 @@ export default function RecursosPage() {
               <IconoMas /> Nuevo recurso
             </button>
             <p className="ayuda">También podés tocar un recurso en el mapa para editarlo.</p>
+            {!lejos && recursos.length > 0 && (
+              <p className="ayuda">
+                {carga.truncado ? `Recursos en esta vista: ${recursos.length} de ${carga.total}` : `Recursos en esta vista: ${recursos.length}`}
+              </p>
+            )}
           </div>
           <ul className="items">
             {recursos.map((r) => (
               <li key={r.id}>
-                <button type="button" className="item" onClick={() => seleccionar(r)}>
+                <button
+                  type="button"
+                  className="item"
+                  onClick={() => {
+                    seleccionar(r);
+                    setEnfoque({ geom: JSON.parse(r.geom) });
+                  }}
+                >
                   <span className="item__marca item__marca--cuadrado" style={{ "--color": COLOR_ESTADO_RECURSO[r.estadoOperativo] }} aria-hidden="true" />
                   <span className="item__texto">
                     <span className="item__titulo">{r.identificacion}</span>
@@ -197,7 +229,8 @@ export default function RecursosPage() {
               </li>
             ))}
           </ul>
-          {recursos.length === 0 && <p className="vacio">Todavía no hay recursos.</p>}
+          {lejos && <p className="vacio">Acercá el mapa para listar y editar los recursos de esa área.</p>}
+          {carga.estado === "listo" && recursos.length === 0 && <p className="vacio">No hay recursos en esta parte del mapa.</p>}
         </>
       ) : (
         <form className="panel__seccion formulario" onSubmit={guardar}>

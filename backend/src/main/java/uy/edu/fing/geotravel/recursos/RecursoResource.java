@@ -1,6 +1,7 @@
 package uy.edu.fing.geotravel.recursos;
 
 import uy.edu.fing.geotravel.db.DataSourceProvider;
+import uy.edu.fing.geotravel.mapa.Bbox;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -10,6 +11,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.sql.Connection;
@@ -52,10 +54,15 @@ public class RecursoResource {
     private static final String GEOM_IN =
             "ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326), 32721)";
 
-    private static final String SELECT_ALL =
+    private static final String COLUMNAS =
             "SELECT id, identificacion, nombre, tipo, estado_operativo, descripcion, "
-          + "       ST_AsGeoJSON(ST_Transform(geom, 4326)) AS geom_json "
-          + "FROM recurso ORDER BY id";
+          + "       ST_AsGeoJSON(ST_Transform(geom, 4326)) AS geom_json ";
+
+    private static final String SELECT_ALL = COLUMNAS + "FROM recurso ORDER BY id";
+
+    /** Recursos del rectángulo visible. COUNT(*) OVER() se calcula antes del LIMIT: es el total real. */
+    private static final String SELECT_BBOX =
+            COLUMNAS + ", COUNT(*) OVER () AS total FROM recurso WHERE " + Bbox.FILTRO + " ORDER BY id LIMIT ?";
 
     public static class RecursoInput {
         public String identificacion;
@@ -66,27 +73,64 @@ public class RecursoResource {
         public String geomGeoJson;   // GeoJSON Point en lon/lat, como texto
     }
 
+    /**
+     * Sin bbox: todos los recursos, como lista (lo sigue usando Consultas).
+     * Con bbox: solo los del rectángulo visible, hasta "limit", como {items, total, truncado}.
+     */
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public List<Map<String, Object>> listar() throws SQLException {
+    public Response listar(@QueryParam("bbox") String bbox, @QueryParam("limit") Integer limit) throws SQLException {
+        if (bbox == null) {
+            return Response.ok(listarTodos()).build();
+        }
+        Bbox rect;
+        int limite;
+        try {
+            rect = Bbox.parse(bbox);
+            limite = Bbox.limite(limit);
+        } catch (IllegalArgumentException e) {
+            return error(400, e.getMessage());
+        }
+        List<Map<String, Object>> recursos = new ArrayList<>();
+        int total = 0;
+        if (!rect.vacio()) {
+            try (Connection conn = DataSourceProvider.get().getConnection();
+                 PreparedStatement ps = conn.prepareStatement(SELECT_BBOX)) {
+                ps.setInt(rect.enlazar(ps, 1), limite);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        total = rs.getInt("total");
+                        recursos.add(aRecurso(rs));
+                    }
+                }
+            }
+        }
+        return Response.ok(Bbox.resultado(recursos, total)).build();
+    }
+
+    private static List<Map<String, Object>> listarTodos() throws SQLException {
         List<Map<String, Object>> recursos = new ArrayList<>();
         try (Connection conn = DataSourceProvider.get().getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(SELECT_ALL)) {
 
             while (rs.next()) {
-                Map<String, Object> r = new LinkedHashMap<>();
-                r.put("id", rs.getInt("id"));
-                r.put("identificacion", rs.getString("identificacion"));
-                r.put("nombre", rs.getString("nombre"));
-                r.put("tipo", rs.getString("tipo"));
-                r.put("estadoOperativo", rs.getString("estado_operativo"));
-                r.put("descripcion", rs.getString("descripcion"));
-                r.put("geom", rs.getString("geom_json")); // texto GeoJSON: el frontend hace JSON.parse
-                recursos.add(r);
+                recursos.add(aRecurso(rs));
             }
         }
         return recursos;
+    }
+
+    private static Map<String, Object> aRecurso(ResultSet rs) throws SQLException {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("id", rs.getInt("id"));
+        r.put("identificacion", rs.getString("identificacion"));
+        r.put("nombre", rs.getString("nombre"));
+        r.put("tipo", rs.getString("tipo"));
+        r.put("estadoOperativo", rs.getString("estado_operativo"));
+        r.put("descripcion", rs.getString("descripcion"));
+        r.put("geom", rs.getString("geom_json")); // texto GeoJSON: el frontend hace JSON.parse
+        return r;
     }
 
     @POST

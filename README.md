@@ -49,20 +49,6 @@ store, capas y estilos) y el backend en Tomcat con el `.war` ya adentro. La prim
 lento); cuando termina quedan en `Exited (0)` `flyway`, `seed` y `geoserver-init`, es lo esperado.
 Después, solo el frontend: `cd frontend && npm install && npm run dev`.
 
-### Windows con actualización automática
-
-Desde PowerShell, en la raíz del repositorio:
-
-```powershell
-.\run-windows.cmd
-```
-
-El lanzador prepara `.env` si falta, instala las dependencias del frontend si hace falta, abre
-`http://localhost:5173` en el navegador y levanta Docker Compose en modo watch. El frontend se sirve
-con actualización en caliente; al guardar cambios en `backend/src`, el backend se reconstruye y
-reinicia automáticamente.
-Detené Compose con `Ctrl+C` y cerrá también la ventana del frontend al terminar.
-
 - **Día a día:** `docker compose up -d` (los datos quedan en volúmenes de Docker).
 - **Cambió código del backend:** `docker compose up -d --build`.
 - **Cambió un estilo SLD** de `geoserver/styles/`: `docker compose up -d` (se vuelve a subir solo).

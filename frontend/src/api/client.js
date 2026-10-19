@@ -37,7 +37,8 @@ async function upload(path, archivo) {
 }
 
 export const api = {
-  get: (path) => request(path),
+  // options.signal (AbortController) permite cancelar un pedido que ya no sirve
+  get: (path, options) => request(path, options),
   post: (path, body) => request(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
   put: (path, body) => request(path, { method: "PUT", body: body ? JSON.stringify(body) : undefined }),
   del: (path) => request(path, { method: "DELETE" }),

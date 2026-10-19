@@ -272,6 +272,20 @@ body {
   box-shadow: var(--sombra);
 }
 
+/* Aviso de la carga a demanda ("Acercá el mapa..."): en pantallas chicas el panel sube desde
+   abajo y lo taparía, así que va arriba, entre los controles del mapa. */
+@media (max-width: 799px) {
+  .pagina-mapa__vacio--carga {
+    top: 12px;
+    bottom: auto;
+    width: max-content;
+    max-width: calc(100% - 120px);
+    border-radius: 12px;
+    text-align: center;
+    font-size: 0.82rem;
+  }
+}
+
 /* ================================================================== panel flotante */
 
 .panel {
