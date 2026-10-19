@@ -16,6 +16,7 @@
         <Rule>
           <Name>Registrado</Name>
           <Title>Registrado</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>estado</ogc:PropertyName>
@@ -55,6 +56,7 @@
         <Rule>
           <Name>En atención</Name>
           <Title>En atención</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>estado</ogc:PropertyName>
@@ -94,6 +96,7 @@
         <Rule>
           <Name>Derivado</Name>
           <Title>Derivado</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>estado</ogc:PropertyName>
@@ -133,6 +136,7 @@
         <Rule>
           <Name>Resuelto</Name>
           <Title>Resuelto</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>estado</ogc:PropertyName>
@@ -172,6 +176,7 @@
         <Rule>
           <Name>Cancelado</Name>
           <Title>Cancelado</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>estado</ogc:PropertyName>
