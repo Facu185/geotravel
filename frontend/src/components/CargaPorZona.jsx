@@ -34,13 +34,15 @@ export default function CargaPorZona({ ruta, alCambiar, recarga = 0, zoomMinimo 
   // reiniciar la escucha del mapa por eso.
   const avisar = useRef(alCambiar);
   avisar.current = alCambiar;
+  // Lo último informado vive fuera del efecto: al pedir de nuevo (p. ej. tras guardar, cambia
+  // "recarga") los objetos de antes siguen en el mapa hasta que llegan los nuevos, sin parpadeo.
+  const anterior = useRef(SIN_CARGAR);
 
   useEffect(() => {
     let temporizador;
     let controlador;
-    let ultimo = SIN_CARGAR;
     const emitir = (estado) => {
-      ultimo = estado;
+      anterior.current = estado;
       avisar.current(estado);
     };
 
@@ -54,13 +56,13 @@ export default function CargaPorZona({ ruta, alCambiar, recarga = 0, zoomMinimo 
         }
         controlador = new AbortController();
         const propio = controlador;
-        emitir({ ...ultimo, estado: "cargando", error: null });
+        emitir({ ...anterior.current, estado: "cargando", error: null });
         const bbox = map.getBounds().pad(0.1).toBBoxString(); // un 10 % de margen: al mover un poco ya está cargado
         try {
           const r = await api.get(`${ruta}?bbox=${bbox}&limit=${limite}`, { signal: propio.signal });
           emitir({ estado: "listo", items: r.items, total: r.total, truncado: r.truncado, error: null });
         } catch (e) {
-          if (e.name !== "AbortError") emitir({ ...ultimo, estado: "error", error: e.message });
+          if (e.name !== "AbortError") emitir({ ...anterior.current, estado: "error", error: e.message });
         }
       }, ESPERA_MS);
     };
