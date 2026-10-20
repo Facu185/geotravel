@@ -4,9 +4,7 @@ import { CircleMarker, FeatureGroup, GeoJSON, Marker, Polyline, Tooltip, useMap,
 import { EditControl } from "react-leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
-import { Aviso } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
-import { api } from "../../api/client.js";
 import { CONSULTAS, RESULTADO_VACIO } from "./paneles.jsx";
 
 /**
@@ -17,49 +15,13 @@ import { CONSULTAS, RESULTADO_VACIO } from "./paneles.jsx";
  * backend (backend/.../consultas/ConsultaResource.java); acá solo se piden y se muestran.
  * Cada consulta es un panel de paneles.jsx.
  *
- * Esta página carga una vez las zonas, incidentes y recursos (con su geometría) para poder
- * dibujar los resultados, que la API de consultas devuelve solo como ids y datos.
+ * Es una pantalla "a demanda": no carga las zonas, incidentes ni recursos al abrirse. Cada
+ * consulta devuelve ya la geometría de lo que encontró, y el fondo (todo lo demás) lo dibuja
+ * GeoServer como imagen. Así funciona igual con miles de objetos.
  */
 
-/**
- * Punto [lat, lng] que representa una geometría GeoJSON: el punto mismo, el vértice del medio de una
- * línea o el promedio de los vértices de una zona. Los incidentes pueden ser puntos, líneas o zonas, y
- * esto sirve para ubicarlos en el mapa (rótulos, distancias dibujadas) sin importar su forma.
- */
-const posicion = (geometria) => {
-  const { type, coordinates } = geometria;
-  let punto;
-  if (type === "Point") punto = coordinates;
-  else if (type === "LineString") punto = coordinates[Math.floor(coordinates.length / 2)];
-  else {
-    const anillo = type === "Polygon" ? coordinates[0].slice(0, -1) : coordinates.flat(type === "MultiPolygon" ? 2 : 1);
-    punto = anillo.reduce((a, c) => [a[0] + c[0] / anillo.length, a[1] + c[1] / anillo.length], [0, 0]);
-  }
-  return [punto[1], punto[0]];
-};
-const conGeometria = (objeto) => {
-  const geometria = JSON.parse(objeto.geom);
-  return { ...objeto, geometria, pos: posicion(geometria) };
-};
-
-function useDatosBase() {
-  const [datos, setDatos] = useState({ zonas: [], incidentes: [], recursos: [] });
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    Promise.all([api.get("/zonas"), api.get("/incidentes"), api.get("/recursos")])
-      .then(([zonas, incidentes, recursos]) =>
-        setDatos({
-          zonas: zonas.map((z) => ({ ...z, geometria: JSON.parse(z.geom) })),
-          incidentes: incidentes.map(conGeometria),
-          recursos: recursos.map(conGeometria),
-        }),
-      )
-      .catch((e) => setError(e.message));
-  }, []);
-
-  return { datos, error };
-}
+/** Capas que GeoServer dibuja de fondo (imágenes): todo lo que existe, sin cargarlo en el navegador. */
+const CAPAS_FONDO = ["geotravel:zona_operativa", "geotravel:incidente", "geotravel:recurso"];
 
 /** Los recursos se dibujan como cuadrados (los incidentes, como círculos), igual que en GeoServer. */
 const iconos = {};
@@ -121,10 +83,36 @@ function CentrarEn({ punto }) {
   return null;
 }
 
-/** Zonas (de fondo y resaltadas), contexto, resultado de la consulta y punto elegido. */
-function CapaResultado({ datos, resultado, punto }) {
-  const incidentesResaltados = new Set(resultado.incidentes);
-  const recursosResaltados = new Set(resultado.recursos);
+/**
+ * Encuadra el mapa en el resultado de la consulta: como los objetos pueden estar en cualquier
+ * parte del país, no alcanza con mirar la zona inicial. Deja libre el lado del panel.
+ */
+function AjustarVista({ resultado, punto }) {
+  const map = useMap();
+  useEffect(() => {
+    const capas = [
+      ...resultado.zonas.map((z) => z.geometria),
+      ...resultado.incidentes.map((i) => i.geometria),
+      ...resultado.recursos.map((r) => r.geometria),
+      ...(resultado.area ? [resultado.area] : []),
+    ];
+    if (capas.length === 0) return;
+    const limites = L.geoJSON({ type: "GeometryCollection", geometries: capas }).getBounds();
+    if (punto) limites.extend(punto);
+    if (!limites.isValid()) return;
+    const escritorio = window.matchMedia("(min-width: 800px)").matches;
+    map.fitBounds(limites, { paddingTopLeft: [escritorio ? 390 : 24, 40], paddingBottomRight: [24, escritorio ? 24 : 260], maxZoom: 16 });
+    // Solo cuando cambia el resultado, no cuando se elige un punto
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultado, map]);
+  return null;
+}
+
+const colorEstado = (i) => COLOR_ESTADO_INCIDENTE[i.estado] ?? "#555";
+
+/** Lo que devolvió la consulta, dibujado con su propia geometría, y el punto elegido. */
+function CapaResultado({ resultado, punto }) {
+  const pocasZonas = resultado.zonas.length <= 8; // con muchas, los rótulos se amontonan
 
   return (
     <>
@@ -136,44 +124,26 @@ function CapaResultado({ datos, resultado, punto }) {
           style={{ color: "#13202c", weight: 1.5, dashArray: "6 5", fillColor: "#13202c", fillOpacity: 0.07 }}
         />
       )}
-      {datos.zonas.map((z) => {
-        const intensidad = resultado.zonas[z.id];
-        const resaltada = intensidad !== undefined;
-        return (
-          <GeoJSON
-            key={`${z.id}-${intensidad ?? "fondo"}`}
-            data={z.geometria}
-            interactive={false}
-            style={{
-              color: resaltada ? COLOR_PRIORIDAD[z.nivelPrioridad] : "#8a98a6",
-              weight: resaltada ? 3 : 1,
-              fillColor: COLOR_PRIORIDAD[z.nivelPrioridad],
-              fillOpacity: resaltada ? 0.12 + 0.5 * intensidad : 0.05,
-            }}
-          >
-            {resaltada && (
-              <Tooltip permanent direction="center">
-                {z.nombre}
-              </Tooltip>
-            )}
-          </GeoJSON>
-        );
-      })}
 
-      {datos.incidentes
-        .filter((i) => !incidentesResaltados.has(i.id))
-        .map((i) =>
-          i.geometria.type === "Point" ? (
-            <CircleMarker key={`i${i.id}`} center={i.pos} radius={4} interactive={false} pathOptions={{ color: "#7b8794", weight: 1, fillOpacity: 0.35 }} />
-          ) : (
-            <GeoJSON key={`i${i.id}`} data={i.geometria} interactive={false} style={{ color: "#7b8794", weight: 2, opacity: 0.5, fillOpacity: 0.08 }} />
-          ),
-        )}
-      {datos.recursos
-        .filter((r) => !recursosResaltados.has(r.id))
-        .map((r) => (
-          <CircleMarker key={`r${r.id}`} center={r.pos} radius={4} interactive={false} pathOptions={{ color: "#7b8794", weight: 1, fillOpacity: 0.35 }} />
-        ))}
+      {resultado.zonas.map((z) => (
+        <GeoJSON
+          key={`z${z.id}-${z.intensidad}`}
+          data={z.geometria}
+          interactive={false}
+          style={{
+            color: COLOR_PRIORIDAD[z.nivelPrioridad] ?? "#13202c",
+            weight: 3,
+            fillColor: COLOR_PRIORIDAD[z.nivelPrioridad] ?? "#13202c",
+            fillOpacity: 0.12 + 0.5 * z.intensidad,
+          }}
+        >
+          {pocasZonas && (
+            <Tooltip permanent direction="center">
+              {z.nombre}
+            </Tooltip>
+          )}
+        </GeoJSON>
+      ))}
 
       {resultado.lineas.map((l, n) => (
         <Polyline key={`l${n}`} positions={[l.desde, l.hasta]} pathOptions={{ color: "#13202c", weight: 2, dashArray: "6 6" }}>
@@ -181,44 +151,36 @@ function CapaResultado({ datos, resultado, punto }) {
         </Polyline>
       ))}
 
-      {datos.incidentes
-        .filter((i) => incidentesResaltados.has(i.id))
-        .map((i) =>
-          i.geometria.type === "Point" ? (
-            <CircleMarker
-              key={`I${i.id}`}
-              center={i.pos}
-              radius={10}
-              bubblingMouseEvents={false}
-              pathOptions={{ color: COLOR_ESTADO_INCIDENTE[i.estado] ?? "#555", weight: 3, fillOpacity: 0.85 }}
-            >
-              <Tooltip>
-                {i.titulo} — {i.estado}
-              </Tooltip>
-            </CircleMarker>
-          ) : (
-            // Un incidente lineal (calle cortada) o una zona: se dibuja con su forma, con el color de su estado.
-            <GeoJSON
-              key={`I${i.id}`}
-              data={i.geometria}
-              bubblingMouseEvents={false}
-              style={{ color: COLOR_ESTADO_INCIDENTE[i.estado] ?? "#555", weight: 6, opacity: 0.9, fillOpacity: 0.25 }}
-            >
-              <Tooltip sticky>
-                {i.titulo} — {i.estado}
-              </Tooltip>
-            </GeoJSON>
-          ),
-        )}
-      {datos.recursos
-        .filter((r) => recursosResaltados.has(r.id))
-        .map((r) => (
-          <Marker key={`R${r.id}`} position={r.pos} icon={iconoRecurso(COLOR_ESTADO_RECURSO[r.estadoOperativo] ?? "#555")} bubblingMouseEvents={false}>
+      {resultado.incidentes.map((i) =>
+        i.geometria.type === "Point" ? (
+          <CircleMarker
+            key={`I${i.id}`}
+            center={i.pos}
+            radius={10}
+            bubblingMouseEvents={false}
+            pathOptions={{ color: colorEstado(i), weight: 3, fillOpacity: 0.85 }}
+          >
             <Tooltip>
-              {r.identificacion} — {r.tipo}
+              {i.titulo} — {i.estado}
             </Tooltip>
-          </Marker>
-        ))}
+          </CircleMarker>
+        ) : (
+          // Un incidente lineal (calle cortada) o un polígono: se dibuja con su forma y el color de su estado.
+          <GeoJSON key={`I${i.id}`} data={i.geometria} bubblingMouseEvents={false} style={{ color: colorEstado(i), weight: 6, opacity: 0.9, fillOpacity: 0.25 }}>
+            <Tooltip sticky>
+              {i.titulo} — {i.estado}
+            </Tooltip>
+          </GeoJSON>
+        ),
+      )}
+
+      {resultado.recursos.map((r) => (
+        <Marker key={`R${r.id}`} position={r.pos} icon={iconoRecurso(COLOR_ESTADO_RECURSO[r.estadoOperativo] ?? "#555")} bubblingMouseEvents={false}>
+          <Tooltip>
+            {r.identificacion} — {r.tipo ?? r.estadoOperativo}
+          </Tooltip>
+        </Marker>
+      ))}
 
       {punto && (
         <CircleMarker center={punto} radius={12} pathOptions={{ color: "#13202c", weight: 4, fillOpacity: 0.25 }}>
@@ -230,7 +192,6 @@ function CapaResultado({ datos, resultado, punto }) {
 }
 
 export default function ConsultasPage() {
-  const { datos, error } = useDatosBase();
   const [consultaId, setConsultaId] = useState(CONSULTAS[0].id);
   const [resultado, setResultado] = useState(RESULTADO_VACIO);
   const [punto, setPunto] = useState(null);
@@ -251,14 +212,20 @@ export default function ConsultasPage() {
       {consulta.pideClic && <ClickEnMapa alClick={setPunto} />}
       {consulta.pideClic && <CentrarEn punto={punto} />}
       {consulta.dibuja && <DibujoFigura alCambiar={setFigura} />}
-      <CapaResultado datos={datos} resultado={resultado} punto={consulta.pideClic ? punto : null} />
+      <AjustarVista resultado={resultado} punto={consulta.pideClic ? punto : null} />
+      <CapaResultado resultado={resultado} punto={consulta.pideClic ? punto : null} />
     </>
   );
 
   return (
-    <PaginaMapa etiqueta="Análisis espacial" titulo="Consultas geográficas" etiquetaBoton="Consultas" hijosMapa={hijosMapa}>
+    <PaginaMapa
+      etiqueta="Análisis espacial"
+      titulo="Consultas geográficas"
+      etiquetaBoton="Consultas"
+      hijosMapa={hijosMapa}
+      mapaProps={{ layers: CAPAS_FONDO }}
+    >
       <div className="panel__seccion">
-        {error && <Aviso tipo="error">No se pudieron cargar los datos: {error}</Aviso>}
         <label className="campo">
           <span className="campo__etiqueta">Consulta</span>
           <select value={consultaId} onChange={(e) => elegir(e.target.value)}>
@@ -275,7 +242,7 @@ export default function ConsultasPage() {
         </p>
       </div>
       <div className="panel__seccion">
-        <Panel key={consulta.id} datos={datos} punto={punto} setPunto={setPunto} figura={figura} setResultado={setResultado} />
+        <Panel key={consulta.id} punto={punto} setPunto={setPunto} figura={figura} setResultado={setResultado} />
       </div>
     </PaginaMapa>
   );

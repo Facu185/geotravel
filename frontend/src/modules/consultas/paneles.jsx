@@ -2,6 +2,8 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { Aviso, Insignia, Segmentado, Selector } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
 import { api } from "../../api/client.js";
+import { REGION } from "../../components/region.js";
+import { conGeometria, deBusqueda } from "./geometria.js";
 
 /**
  * Las consultas geográficas de la letra, un panel por consulta. Todas siguen el mismo patrón:
@@ -9,18 +11,23 @@ import { api } from "../../api/client.js";
  *   2. se llama a /api/consultas/... y el cálculo lo hace PostGIS en el backend;
  *   3. el resultado se muestra como lista y, con setResultado, también dibujado en el mapa.
  *
- * Las consultas devuelven solo ids y datos, sin geometría: para dibujar, la página ya trae
- * las zonas, incidentes y recursos (con su geometría) y acá se cruzan por id.
+ * Las consultas son "a demanda": cada una devuelve ya la geometría de lo que encontró (campo "geom",
+ * GeoJSON en lon/lat) y, las que pueden dar muchas filas, un límite y el total real. La página no
+ * carga todos los objetos: lo demás lo dibuja GeoServer de fondo. Para elegir una zona, un incidente
+ * o un recurso se busca por texto (BuscadorObjeto) en vez de listar todos.
  */
 
-/** Lo que un panel le pide dibujar al mapa. */
+/** Lo que un panel le pide dibujar al mapa: objetos con su geometría ya leída (ver geometria.js). */
 export const RESULTADO_VACIO = {
-  zonas: {}, // { [zonaId]: intensidad entre 0 y 1 } -- zonas resaltadas
-  incidentes: [], // ids de incidentes a resaltar
-  recursos: [], // ids de recursos a resaltar
+  zonas: [], // [{ id, nombre, nivelPrioridad, geometria, intensidad entre 0 y 1 }]
+  incidentes: [], // [{ id, titulo, estado, geometria, pos }]
+  recursos: [], // [{ id, identificacion, estadoOperativo, geometria, pos }]
   lineas: [], // [{ desde: [lat, lng], hasta: [lat, lng], texto }]
   area: null, // GeoJSON (lon/lat) de un área buscada, p. ej. el pasillo alrededor de una línea
 };
+
+/** Una zona de la API (o de una búsqueda) lista para dibujar, con la intensidad con la que se pinta. */
+const comoZona = (z, intensidad = 1) => ({ ...conGeometria(z), intensidad });
 
 const ESTADOS_INCIDENTE = Object.keys(COLOR_ESTADO_INCIDENTE);
 
@@ -72,9 +79,57 @@ function Estado({ fase, error }) {
   return null;
 }
 
-const opcionesZona = (datos) => datos.zonas.map((z) => ({ valor: z.id, texto: `${z.nombre} (prioridad ${z.nivelPrioridad})` }));
-const opcionesIncidente = (datos) => datos.incidentes.map((i) => ({ valor: i.id, texto: `#${i.id} ${i.titulo} — ${i.estado}` }));
-const opcionesRecurso = (datos) => datos.recursos.map((r) => ({ valor: r.id, texto: `${r.identificacion} — ${r.tipo}` }));
+/**
+ * Elegir una zona, un incidente o un recurso escribiendo: mientras se escribe se piden pocas opciones
+ * a /consultas/buscar (nunca la lista completa). Al elegir una sugerencia, onChange recibe el objeto
+ * (con su geometría); si se cambia el texto, recibe null.
+ */
+function BuscadorObjeto({ etiqueta, tipo, onChange, placeholder }) {
+  const [texto, setTexto] = useState("");
+  const [sugerencias, setSugerencias] = useState([]);
+  const id = useId();
+
+  useEffect(() => {
+    let vigente = true;
+    const espera = setTimeout(() => {
+      api
+        .get(`/consultas/buscar${query({ tipo, q: texto })}`)
+        .then((lista) => vigente && setSugerencias(lista))
+        .catch(() => {}); // sin sugerencias se puede seguir escribiendo
+    }, 250);
+    return () => {
+      vigente = false;
+      clearTimeout(espera);
+    };
+  }, [tipo, texto]);
+
+  const cambiar = (e) => {
+    const nuevo = e.target.value;
+    setTexto(nuevo);
+    onChange(sugerencias.find((o) => o.etiqueta === nuevo) ?? null);
+  };
+
+  return (
+    <label className="campo">
+      <span className="campo__etiqueta">{etiqueta}</span>
+      <input list={id} value={texto} onChange={cambiar} placeholder={placeholder} autoComplete="off" />
+      <datalist id={id}>
+        {sugerencias.map((o) => (
+          <option key={o.id} value={o.etiqueta} />
+        ))}
+      </datalist>
+    </label>
+  );
+}
+
+/** Aviso cuando la consulta devolvió solo una parte de lo que hay. */
+function Truncado({ r, nombre }) {
+  return r?.truncado ? (
+    <p className="ayuda">
+      Se muestran {r.items.length} de {r.total} {nombre}.
+    </p>
+  ) : null;
+}
 
 function FilaIncidente({ i, extra }) {
   const detalle = [i.tipoIncidente, i.prioridad ? `prioridad ${i.prioridad}` : null, i.fechaHoraRegistro?.slice(0, 16)]
@@ -110,30 +165,31 @@ function FilaRecurso({ r, dato }) {
 // ------------------------------------------ 1 y 6: incidentes y recursos por zona
 
 /** Incidentes o recursos que están dentro de una zona elegida. */
-function PanelPorZona({ datos, setResultado, tipo }) {
-  const [zonaId, setZonaId] = useState("");
-  const { fase, datos: filas, error } = useRuta(zonaId ? `/consultas/${tipo}-por-zona/${zonaId}` : null);
+function PanelPorZona({ setResultado, tipo }) {
+  const [zona, setZona] = useState(null);
+  const { fase, datos: r, error } = useRuta(zona ? `/consultas/${tipo}-por-zona/${zona.id}` : null);
 
   useEffect(() => {
-    if (!filas) {
+    if (!r || !zona) {
       setResultado(RESULTADO_VACIO);
       return;
     }
-    setResultado({ ...RESULTADO_VACIO, zonas: { [zonaId]: 1 }, [tipo]: filas.map((f) => f.id) });
-  }, [filas, zonaId, tipo, setResultado]);
+    setResultado({ ...RESULTADO_VACIO, zonas: [comoZona({ ...zona, nombre: zona.etiqueta })], [tipo]: r.items.map(conGeometria) });
+  }, [r, zona, tipo, setResultado]);
 
   const nombre = tipo === "incidentes" ? "incidentes" : "recursos";
   return (
     <>
-      <Selector etiqueta="Zona operativa" valor={zonaId} onChange={setZonaId} opciones={opcionesZona(datos)} vacio="Elegí una zona…" />
+      <BuscadorObjeto etiqueta="Zona operativa" tipo="zona" onChange={setZona} placeholder="Escribí el nombre y elegí de la lista" />
       <Estado fase={fase} error={error} />
-      {filas && (
+      {r && (
         <>
           <p className="ayuda">
-            {filas.length} {filas.length === 1 ? nombre.slice(0, -1) : nombre} en la zona.
+            {r.total} {r.total === 1 ? nombre.slice(0, -1) : nombre} en la zona.
           </p>
+          <Truncado r={r} nombre={nombre} />
           <ul className="items">
-            {filas.map((f) => (tipo === "incidentes" ? <FilaIncidente key={f.id} i={f} /> : <FilaRecurso key={f.id} r={f} />))}
+            {r.items.map((f) => (tipo === "incidentes" ? <FilaIncidente key={f.id} i={f} /> : <FilaRecurso key={f.id} r={f} />))}
           </ul>
         </>
       )}
@@ -146,31 +202,29 @@ const PanelRecursosZona = (props) => <PanelPorZona {...props} tipo="recursos" />
 
 // ------------------------------------------------------ 3: recursos cercanos a un incidente
 
-function PanelRecursosCercanos({ datos, setResultado }) {
-  const [incidenteId, setIncidenteId] = useState("");
+function PanelRecursosCercanos({ setResultado }) {
+  const [incidente, setIncidente] = useState(null);
   const [limite, setLimite] = useState(3);
   const [soloDisponibles, setSoloDisponibles] = useState(true);
   const cantidad = Math.min(10, Math.max(1, Number(limite) || 3));
 
-  const ruta = incidenteId ? `/consultas/recursos-cercanos/${incidenteId}${query({ limite: cantidad, soloDisponibles })}` : null;
+  const ruta = incidente ? `/consultas/recursos-cercanos/${incidente.id}${query({ limite: cantidad, soloDisponibles })}` : null;
   const { fase, datos: filas, error } = useRuta(ruta);
 
   useEffect(() => {
-    const incidente = datos.incidentes.find((i) => String(i.id) === incidenteId);
     if (!filas || !incidente) {
       setResultado(RESULTADO_VACIO);
       return;
     }
-    const lineas = filas
-      .map((f) => ({ f, recurso: datos.recursos.find((r) => r.id === f.id) }))
-      .filter(({ recurso }) => recurso)
-      .map(({ f, recurso }) => ({ desde: incidente.pos, hasta: recurso.pos, texto: `${f.identificacion}: ${metros(f.distanciaM)}` }));
-    setResultado({ ...RESULTADO_VACIO, incidentes: [incidente.id], recursos: filas.map((f) => f.id), lineas });
-  }, [filas, incidenteId, datos, setResultado]);
+    const origen = deBusqueda(incidente);
+    const recursos = filas.map(conGeometria);
+    const lineas = recursos.map((r) => ({ desde: origen.pos, hasta: r.pos, texto: `${r.identificacion}: ${metros(r.distanciaM)}` }));
+    setResultado({ ...RESULTADO_VACIO, incidentes: [origen], recursos, lineas });
+  }, [filas, incidente, setResultado]);
 
   return (
     <>
-      <Selector etiqueta="Incidente" valor={incidenteId} onChange={setIncidenteId} opciones={opcionesIncidente(datos)} vacio="Elegí un incidente…" />
+      <BuscadorObjeto etiqueta="Incidente" tipo="incidente" onChange={setIncidente} placeholder="Escribí el título y elegí de la lista" />
       <label className="campo">
         <span className="campo__etiqueta">Cuántos recursos</span>
         <input type="number" min="1" max="10" value={limite} onChange={(e) => setLimite(e.target.value)} />
@@ -200,7 +254,8 @@ function CampoCalle({ etiqueta, valor, onChange }) {
   const id = useId();
 
   useEffect(() => {
-    if (valor.trim().length < 2) {
+    // Las calles propias son solo de Montevideo: en otra región no hay sugerencias, se escribe el nombre.
+    if (!REGION.callesPropias || valor.trim().length < 2) {
       setSugerencias([]);
       return undefined;
     }
@@ -220,7 +275,7 @@ function CampoCalle({ etiqueta, valor, onChange }) {
   return (
     <label className="campo">
       <span className="campo__etiqueta">{etiqueta}</span>
-      <input list={id} value={valor} onChange={(e) => onChange(e.target.value)} placeholder="Escribí y elegí de la lista" autoComplete="off" />
+      <input list={id} value={valor} onChange={(e) => onChange(e.target.value)} placeholder={REGION.callesPropias ? "Escribí y elegí de la lista" : "Ej.: Uruguay"} autoComplete="off" />
       <datalist id={id}>
         {sugerencias.map((nombre) => (
           <option key={nombre} value={nombre} />
@@ -231,8 +286,9 @@ function CampoCalle({ etiqueta, valor, onChange }) {
 }
 
 /**
- * Alternativa al clic en el mapa: ubica el punto donde se cruzan dos calles (PostGIS intersecta
- * los tramos de cada una, ver /consultas/interseccion) y lo deja como punto de búsqueda.
+ * Alternativa al clic en el mapa: ubica el punto donde se cruzan dos calles y lo deja como punto de búsqueda.
+ * En Montevideo lo calcula PostGIS con los tramos de cada calle (/consultas/interseccion); en el resto
+ * del país lo resuelve el servicio de direcciones de la IDE como "esquina" (/consultas/geocodificar).
  */
 function BuscadorIntersecciones({ setPunto }) {
   const [calle1, setCalle1] = useState("");
@@ -243,7 +299,9 @@ function BuscadorIntersecciones({ setPunto }) {
     evento.preventDefault();
     setBusqueda({ fase: "cargando", cruces: [], elegido: 0, error: null });
     try {
-      const cruces = await api.get(`/consultas/interseccion${query({ calle1: calle1.trim(), calle2: calle2.trim() })}`);
+      const cruces = REGION.callesPropias
+        ? await api.get(`/consultas/interseccion${query({ calle1: calle1.trim(), calle2: calle2.trim() })}`)
+        : [await api.get(`/consultas/geocodificar${query({ direccion: calle1.trim(), esquina: calle2.trim(), ...REGION.ide })}`)];
       setBusqueda({ fase: "ok", cruces, elegido: 0, error: null });
       if (cruces.length > 0) setPunto([cruces[0].lat, cruces[0].lon]);
     } catch (e) {
@@ -268,6 +326,11 @@ function BuscadorIntersecciones({ setPunto }) {
       {busqueda.fase === "ok" && busqueda.cruces.length === 0 && (
         <Aviso tipo="info">Esas calles no se cruzan, o algún nombre no existe. Elegí los nombres de la lista de sugerencias.</Aviso>
       )}
+      {busqueda.fase === "ok" && !REGION.callesPropias && busqueda.cruces.length === 1 && (
+        <Aviso tipo="ok">
+          Esquina ubicada (servicio de la IDE): <strong>{busqueda.cruces[0].direccion}</strong>
+        </Aviso>
+      )}
       {busqueda.cruces.length > 1 && (
         <>
           <p className="ayuda">Hay {busqueda.cruces.length} cruces con esos nombres. Elegí uno:</p>
@@ -287,8 +350,9 @@ function BuscadorIntersecciones({ setPunto }) {
 // ------------------------------------------------ elegir el punto escribiendo una dirección
 
 /**
- * Ubica una dirección ("calle número") con los números de puerta de Montevideo (ver
- * /consultas/geocodificar) y la deja como punto de búsqueda.
+ * Ubica una dirección ("calle número") y la deja como punto de búsqueda (ver /consultas/geocodificar).
+ * En Montevideo la busca en los números de puerta propios; en el resto del país, en la IDE, según el
+ * departamento y la localidad de la región configurada (components/region.js).
  */
 function BuscadorDireccion({ setPunto }) {
   const [texto, setTexto] = useState("");
@@ -298,7 +362,7 @@ function BuscadorDireccion({ setPunto }) {
     evento.preventDefault();
     setBusqueda({ fase: "cargando", resultado: null, error: null });
     try {
-      const r = await api.get(`/consultas/geocodificar${query({ direccion: texto.trim() })}`);
+      const r = await api.get(`/consultas/geocodificar${query({ direccion: texto.trim(), ...REGION.ide })}`);
       setBusqueda({ fase: "ok", resultado: r, error: null });
       setPunto([r.lat, r.lon]);
     } catch (e) {
@@ -312,7 +376,7 @@ function BuscadorDireccion({ setPunto }) {
       <h4 className="bloque__titulo">Por dirección</h4>
       <label className="campo">
         <span className="campo__etiqueta">Calle y número</span>
-        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ej.: Buenos Aires 451" autoComplete="off" />
+        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={`Ej.: ${REGION.ejemploDireccion}`} autoComplete="off" />
       </label>
       <button type="submit" className="btn btn--secundario" disabled={!texto.trim() || fase === "cargando"}>
         {fase === "cargando" ? "Buscando…" : "Ubicar la dirección"}
@@ -334,24 +398,28 @@ function BuscadoresDePunto({ setPunto }) {
     <>
       <BuscadorDireccion setPunto={setPunto} />
       <BuscadorIntersecciones setPunto={setPunto} />
-      <p className="ayuda">Las direcciones se buscan en los números de puerta de Montevideo (capa «acceso» de GeoServer).</p>
+      <p className="ayuda">
+        {REGION.callesPropias
+          ? "Las direcciones se buscan en los números de puerta de Montevideo (capa «acceso» de GeoServer)."
+          : `Las direcciones y esquinas de ${REGION.nombre} las resuelve el servicio de direcciones de la IDE (necesita internet).`}
+      </p>
     </>
   );
 }
 
 // ---------------------------- 4: búsqueda de incidente (incidente más cercano a un punto)
 
-function PanelIncidenteCercano({ datos, punto, setPunto, setResultado }) {
+function PanelIncidenteCercano({ punto, setPunto, setResultado }) {
   const { fase, datos: dato, error } = useRuta(punto ? `/consultas/incidente-mas-cercano?lon=${punto[1]}&lat=${punto[0]}` : null);
 
   useEffect(() => {
-    const incidente = dato?.id && datos.incidentes.find((i) => i.id === dato.id);
-    if (!incidente) {
+    if (!dato?.id) {
       setResultado(RESULTADO_VACIO);
       return;
     }
-    setResultado({ ...RESULTADO_VACIO, incidentes: [incidente.id], lineas: [{ desde: punto, hasta: incidente.pos, texto: metros(dato.distanciaM) }] });
-  }, [dato, datos, punto, setResultado]);
+    const incidente = conGeometria(dato);
+    setResultado({ ...RESULTADO_VACIO, incidentes: [incidente], lineas: [{ desde: punto, hasta: incidente.pos, texto: metros(dato.distanciaM) }] });
+  }, [dato, punto, setResultado]);
 
   return (
     <>
@@ -370,19 +438,18 @@ function PanelIncidenteCercano({ datos, punto, setPunto, setResultado }) {
 
 // -------------------------------------------------- 5: búsqueda de zona (zona de un punto)
 
-function PanelZonaPunto({ datos, punto, setPunto, setResultado }) {
-  const { fase, datos: dato, error } = useRuta(punto ? `/consultas/zona-por-punto?lon=${punto[1]}&lat=${punto[0]}` : null);
+function PanelZonaPunto({ punto, setPunto, setResultado }) {
+  const { fase, datos: zona, error } = useRuta(punto ? `/consultas/zona-por-punto?lon=${punto[1]}&lat=${punto[0]}` : null);
 
   useEffect(() => {
-    setResultado(dato?.id ? { ...RESULTADO_VACIO, zonas: { [dato.id]: 1 } } : RESULTADO_VACIO);
-  }, [dato, setResultado]);
+    setResultado(zona?.id ? { ...RESULTADO_VACIO, zonas: [comoZona(zona)] } : RESULTADO_VACIO);
+  }, [zona, setResultado]);
 
-  const zona = dato?.id && datos.zonas.find((z) => z.id === dato.id);
   return (
     <>
       {!punto && <Aviso tipo="info">Hacé clic en el mapa, o escribí una dirección, para elegir el punto a ubicar.</Aviso>}
       <Estado fase={fase} error={error} />
-      {zona && (
+      {zona?.id && (
         <ul className="items">
           <li className="fila">
             <span className="item__marca item__marca--zona" style={{ "--color": COLOR_PRIORIDAD[zona.nivelPrioridad] }} aria-hidden="true" />
@@ -396,7 +463,7 @@ function PanelZonaPunto({ datos, punto, setPunto, setResultado }) {
           </li>
         </ul>
       )}
-      {fase === "ok" && !dato?.id && <Aviso tipo="info">El punto no está dentro de ninguna zona operativa.</Aviso>}
+      {fase === "ok" && !zona?.id && <Aviso tipo="info">El punto no está dentro de ninguna zona operativa.</Aviso>}
       <BuscadoresDePunto setPunto={setPunto} />
     </>
   );
@@ -404,34 +471,35 @@ function PanelZonaPunto({ datos, punto, setPunto, setResultado }) {
 
 // -------------------------------------------------------------- 7: incidentes por recurso
 
-function PanelIncidentesRecurso({ datos, setResultado }) {
-  const [recursoId, setRecursoId] = useState("");
-  const { fase, datos: filas, error } = useRuta(recursoId ? `/consultas/incidentes-por-recurso/${recursoId}` : null);
+function PanelIncidentesRecurso({ setResultado }) {
+  const [recurso, setRecurso] = useState(null);
+  const { fase, datos: r, error } = useRuta(recurso ? `/consultas/incidentes-por-recurso/${recurso.id}` : null);
 
   useEffect(() => {
-    const recurso = datos.recursos.find((r) => String(r.id) === recursoId);
-    if (!filas || !recurso) {
+    if (!r || !recurso) {
       setResultado(RESULTADO_VACIO);
       return;
     }
-    const lineas = filas
-      .map((f) => datos.incidentes.find((i) => i.id === f.id))
-      .filter(Boolean)
-      .map((i) => ({ desde: recurso.pos, hasta: i.pos, texto: i.titulo }));
-    setResultado({ ...RESULTADO_VACIO, recursos: [recurso.id], incidentes: filas.map((f) => f.id), lineas });
-  }, [filas, recursoId, datos, setResultado]);
+    const origen = deBusqueda(recurso);
+    const incidentes = r.items.map(conGeometria);
+    const lineas = incidentes.map((i) => ({ desde: origen.pos, hasta: i.pos, texto: i.titulo }));
+    setResultado({ ...RESULTADO_VACIO, recursos: [origen], incidentes, lineas });
+  }, [r, recurso, setResultado]);
 
   return (
     <>
-      <Selector etiqueta="Recurso" valor={recursoId} onChange={setRecursoId} opciones={opcionesRecurso(datos)} vacio="Elegí un recurso…" />
+      <BuscadorObjeto etiqueta="Recurso" tipo="recurso" onChange={setRecurso} placeholder="Escribí la identificación y elegí de la lista" />
       <Estado fase={fase} error={error} />
-      {filas && filas.length === 0 && <p className="ayuda">Este recurso no tiene incidentes asignados.</p>}
-      {filas && filas.length > 0 && (
-        <ul className="items">
-          {filas.map((f) => (
-            <FilaIncidente key={f.id} i={f} />
-          ))}
-        </ul>
+      {r && r.items.length === 0 && <p className="ayuda">Este recurso no tiene incidentes asignados.</p>}
+      {r && r.items.length > 0 && (
+        <>
+          <Truncado r={r} nombre="incidentes" />
+          <ul className="items">
+            {r.items.map((f) => (
+              <FilaIncidente key={f.id} i={f} />
+            ))}
+          </ul>
+        </>
       )}
     </>
   );
@@ -450,7 +518,8 @@ function PanelRankings({ setResultado }) {
   const [hasta, setHasta] = useState("");
   const { ruta, campo, unidad } = METRICAS[metrica];
 
-  const { fase, datos: filas, error } = useRuta(`/consultas/${ruta}${query({ desde, hasta: diaSiguiente(hasta) })}`);
+  const { fase, datos: r, error } = useRuta(`/consultas/${ruta}${query({ desde, hasta: diaSiguiente(hasta) })}`);
+  const filas = r?.items;
   const maximo = Math.max(0, ...(filas ?? []).map((z) => Number(z[campo])));
 
   useEffect(() => {
@@ -458,11 +527,8 @@ function PanelRankings({ setResultado }) {
       setResultado(RESULTADO_VACIO);
       return;
     }
-    const zonas = {};
-    filas.forEach((z) => {
-      const valor = Number(z[campo]);
-      if (valor > 0) zonas[z.id] = valor / maximo;
-    });
+    // Se pintan las zonas con incidentes; cuanto más oscura, más cantidad.
+    const zonas = filas.filter((z) => Number(z[campo]) > 0).map((z) => comoZona(z, Number(z[campo]) / maximo));
     setResultado({ ...RESULTADO_VACIO, zonas });
   }, [filas, campo, maximo, setResultado]);
 
@@ -489,6 +555,7 @@ function PanelRankings({ setResultado }) {
         </label>
       </div>
       <Estado fase={fase} error={error} />
+      <Truncado r={r} nombre="zonas (las de mayor valor)" />
       {filas && (
         <ol className="ranking">
           {filas.map((z, i) => {
@@ -521,12 +588,14 @@ function PanelRankings({ setResultado }) {
 
 // ------------------------------------------ reporte de incidentes por zona (filtros)
 
-function PanelReporte({ datos, setResultado }) {
+function PanelReporte({ setResultado }) {
   const [filtros, setFiltros] = useState({ zonaId: "", tipo: "", prioridad: "", estado: "", desde: "", hasta: "" });
   const cambiar = (clave) => (valor) => setFiltros((f) => ({ ...f, [clave]: valor }));
 
   const ruta = `/consultas/reportes/incidentes-por-zona${query({ ...filtros, hasta: diaSiguiente(filtros.hasta) })}`;
-  const { fase, datos: filas, error } = useRuta(ruta);
+  const { fase, datos: r, error } = useRuta(ruta);
+  const filas = r?.items;
+  const { datos: tiposIncidente } = useRuta("/consultas/tipos-incidente");
 
   const grupos = useMemo(() => {
     const porZona = new Map();
@@ -542,18 +611,21 @@ function PanelReporte({ datos, setResultado }) {
       setResultado(RESULTADO_VACIO);
       return;
     }
-    const zonas = {};
-    grupos.forEach((g) => {
-      zonas[g.zonaId] = 1;
-    });
-    setResultado({ ...RESULTADO_VACIO, zonas, incidentes: filas.map((f) => f.id) });
-  }, [filas, grupos, setResultado]);
+    // Un incidente que cruza dos zonas aparece en las dos filas del reporte: se dibuja una sola vez.
+    const unicos = new Map(filas.map((f) => [f.id, f]));
+    setResultado({ ...RESULTADO_VACIO, incidentes: [...unicos.values()].map(conGeometria) });
+  }, [filas, setResultado]);
 
-  const tipos = [...new Set(datos.incidentes.map((i) => i.tipoIncidente))].sort().map((t) => ({ valor: t, texto: t }));
+  const tipos = (tiposIncidente ?? []).map((t) => ({ valor: t, texto: t }));
 
   return (
     <>
-      <Selector etiqueta="Zona" valor={filtros.zonaId} onChange={cambiar("zonaId")} opciones={opcionesZona(datos)} vacio="Todas" />
+      <BuscadorObjeto
+        etiqueta="Zona"
+        tipo="zona"
+        onChange={(zona) => cambiar("zonaId")(zona ? zona.id : "")}
+        placeholder="Todas (escribí para elegir una)"
+      />
       <Selector etiqueta="Tipo" valor={filtros.tipo} onChange={cambiar("tipo")} opciones={tipos} vacio="Todos" />
       <div className="campos-2">
         <Selector
@@ -584,9 +656,10 @@ function PanelReporte({ datos, setResultado }) {
       <Estado fase={fase} error={error} />
       {filas && (
         <p className="ayuda">
-          {filas.length} {filas.length === 1 ? "incidente" : "incidentes"} en {grupos.length} {grupos.length === 1 ? "zona" : "zonas"}.
+          {r.total} {r.total === 1 ? "incidente" : "incidentes"} en {grupos.length} {grupos.length === 1 ? "zona" : "zonas"}.
         </p>
       )}
+      <Truncado r={r} nombre="incidentes" />
       {grupos.map((g) => (
         <section key={g.zonaId}>
           <h4 className="resultado__grupo">
@@ -594,7 +667,7 @@ function PanelReporte({ datos, setResultado }) {
           </h4>
           <ul className="items">
             {g.incidentes.map((i) => (
-              <FilaIncidente key={i.id} i={i} />
+              <FilaIncidente key={`${g.zonaId}-${i.id}`} i={i} />
             ))}
           </ul>
         </section>
@@ -649,9 +722,9 @@ function PanelFigura({ figura, setResultado }) {
     setResultado({
       ...RESULTADO_VACIO,
       area: r.area ? JSON.parse(r.area) : null,
-      zonas: Object.fromEntries(r.zonas.map((z) => [z.id, 1])),
-      incidentes: r.incidentes.filas.map((f) => f.id),
-      recursos: r.recursos.filas.map((f) => f.id),
+      zonas: r.zonas.map((z) => comoZona(z)),
+      incidentes: r.incidentes.filas.map(conGeometria),
+      recursos: r.recursos.filas.map(conGeometria),
     });
   }, [r, setResultado]);
 
@@ -714,7 +787,7 @@ export const CONSULTAS = [
     id: "incidentes-zona",
     titulo: "1. Incidentes por zona",
     descripcion: "Elegí una zona y se muestran en el mapa los incidentes que están dentro de ella.",
-    postgis: "ST_Contains(zona, incidente)",
+    postgis: "ST_Intersects(zona, incidente)",
     Panel: PanelIncidentesZona,
   },
   {
@@ -735,7 +808,7 @@ export const CONSULTAS = [
     id: "incidente-cercano",
     titulo: "4. Búsqueda de incidente (dirección, cruce o punto)",
     descripcion: "Elegí un punto con un clic en el mapa, escribí una dirección o ubicá el cruce de dos calles, y se busca el incidente más cercano.",
-    postgis: "operador <-> y ST_Distance; la dirección con la tabla de puertas; el cruce de calles con ST_Intersection",
+    postgis: "operador <-> y ST_Distance; la dirección con la tabla de puertas (Montevideo) o la IDE (resto del país); el cruce de calles con ST_Intersection",
     pideClic: true,
     Panel: PanelIncidenteCercano,
   },
@@ -743,7 +816,7 @@ export const CONSULTAS = [
     id: "zona-punto",
     titulo: "5. Búsqueda de zona (dirección, cruce o punto)",
     descripcion: "Elegí un punto con un clic en el mapa, escribí una dirección o ubicá el cruce de dos calles, y se indica a qué zona operativa pertenece.",
-    postgis: "ST_Contains(zona, punto); la dirección con la tabla de puertas; el cruce de calles con ST_Intersection",
+    postgis: "ST_Contains(zona, punto); la dirección con la tabla de puertas (Montevideo) o la IDE (resto del país); el cruce de calles con ST_Intersection",
     pideClic: true,
     Panel: PanelZonaPunto,
   },

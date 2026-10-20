@@ -1,49 +1,47 @@
--- seed.sql — datos de prueba mínimos para tener algo visualizable desde el día uno.
--- Las geometrías se definen en lon/lat (EPSG:4326, coordenadas reales de Montevideo) y se
+-- seed.sql — datos de prueba mínimos para Salto.
+-- Las geometrías se definen en lon/lat (EPSG:4326, coordenadas reales de Salto) y se
 -- transforman a EPSG:32721, el SRID que usa la base.
--- Ejecutar después de la migración V1.
+-- Ejecutar después de la migración V1. 
 
--- Zonas operativas: rectángulos que no se superponen entre sí
+-- Zonas operativas: rectángulos que no se superponen entre sí en Salto
 INSERT INTO zona_operativa (nombre, descripcion, nivel_prioridad, responsable, observaciones, geom) VALUES
-('Centro',  'Zona operativa del centro y Ciudad Vieja', 1, 'Equipo Centro',  'Alta densidad de tránsito',
- ST_Transform(ST_MakeEnvelope(-56.2170, -34.9130, -56.1990, -34.9040, 4326), 32721)),
-('Cordón',  'Zona operativa de Cordón y Parque Rodó',   2, 'Equipo Cordón',  NULL,
- ST_Transform(ST_MakeEnvelope(-56.1720, -34.9180, -56.1650, -34.9120, 4326), 32721)),
-('Pocitos', 'Zona operativa costera de Pocitos',         3, 'Equipo Costa',   NULL,
- ST_Transform(ST_MakeEnvelope(-56.1560, -34.9180, -56.1440, -34.9070, 4326), 32721));
+('Centro Salto', 'Zona operativa del centro de Salto', 1, 'Equipo Salto Centro', 'Alta circulación comercial',
+ ST_Transform(ST_MakeEnvelope(-57.9700, -31.3900, -57.9550, -31.3800, 4326), 32721)),
+('Cerro', 'Zona operativa del barrio El Cerro', 2, 'Equipo Cerro', NULL,
+ ST_Transform(ST_MakeEnvelope(-57.9850, -31.4050, -57.9720, -31.3920, 4326), 32721)),
+('Salto Nuevo', 'Zona operativa sur Salto Nuevo', 3, 'Equipo Sur', NULL,
+ ST_Transform(ST_MakeEnvelope(-57.9650, -31.4200, -57.9500, -31.4080, 4326), 32721));
 
--- Recursos (ambulancias, bomberos, patrullas), uno por zona
+-- Recursos (ambulancias, bomberos, patrullas) con formato clásico y ubicados en Salto
 INSERT INTO recurso (identificacion, nombre, tipo, estado_operativo, descripcion, geom) VALUES
-('AMB-12', 'Ambulancia 12',      'ambulancia',      'Disponible',      'Base Centro',
- ST_Transform(ST_SetSRID(ST_MakePoint(-56.2060, -34.9080), 4326), 32721)),
-('BOM-05', 'Bomberos 05',        'bomberos',        'En servicio',     'Cuartel Cordón',
- ST_Transform(ST_SetSRID(ST_MakePoint(-56.1690, -34.9155), 4326), 32721)),
-('PAT-305','Patrulla 305',       'patrulla',        'Disponible',      'Recorrida Pocitos',
- ST_Transform(ST_SetSRID(ST_MakePoint(-56.1500, -34.9120), 4326), 32721)),
-('CAT-01', 'Centro de Atención Norte', 'centro_atencion', 'Disponible', 'Centro fijo',
- ST_Transform(ST_SetSRID(ST_MakePoint(-56.2020, -34.9070), 4326), 32721));
+('AMB-12', 'Ambulancia 12',      'ambulancia',      'Disponible',      'Base Centro Salto',
+ ST_Transform(ST_SetSRID(ST_MakePoint(-57.9620, -31.3850), 4326), 32721)),
+('BOM-05', 'Bomberos 05',        'bomberos',        'En servicio',     'Cuartel Salto',
+ ST_Transform(ST_SetSRID(ST_MakePoint(-57.9780, -31.3980), 4326), 32721)),
+('PAT-305','Patrulla 305',       'patrulla',        'Disponible',      'Recorrida Cerro',
+ ST_Transform(ST_SetSRID(ST_MakePoint(-57.9580, -31.4120), 4326), 32721)),
+('CAT-01', 'Centro de Atención', 'centro_atencion', 'Disponible',      'Hospital Regional Salto',
+ ST_Transform(ST_SetSRID(ST_MakePoint(-57.9600, -31.3830), 4326), 32721));
 
--- Incidentes: se crean en 'Registrado' (el trigger deja ese primer registro en el
--- historial) y después se los hace avanzar "a mano" con UPDATE + INSERT en
--- historial_estado, simulando lo que haría la aplicación al usar /avanzar.
--- El incidente 2 se deja tal cual, recién registrado, sin avanzar.
+-- Incidentes en Salto con lenguaje natural local
 INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, equipo_responsable, geom) VALUES
-('Choque en Av. 18 de Julio',     'Accidente de tránsito con heridos leves', 'accidente_transito', 1, 'Equipo Centro',
- ST_Transform(ST_SetSRID(ST_MakePoint(-56.2010, -34.9066), 4326), 32721)),
-('Incendio en local comercial',   'Foco de incendio en Ciudad Vieja',        'incendio',           1, 'Equipo Centro',
- ST_Transform(ST_SetSRID(ST_MakePoint(-56.2034, -34.9069), 4326), 32721)),
-('Corte de suministro eléctrico', 'Corte en varias cuadras de Cordón',       'corte_servicio',     3, 'Equipo Cordón',
- ST_Transform(ST_SetSRID(ST_MakePoint(-56.1685, -34.9158), 4326), 32721)),
-('Anegamiento en rambla',         'Acumulación de agua tras la lluvia',      'inundacion',         2, 'Equipo Costa',
- ST_Transform(ST_SetSRID(ST_MakePoint(-56.1510, -34.9118), 4326), 32721));
+('Choque en Av. Uruguay', 'Accidente de tránsito en avenida principal', 'accidente_transito', 1, 'Equipo Salto Centro',
+ ST_Transform(ST_SetSRID(ST_MakePoint(-57.9610, -31.3845), 4326), 32721)),
+('Fuego en comercio', 'Incendio en local comercial', 'incendio', 1, 'Equipo Salto Centro',
+ ST_Transform(ST_SetSRID(ST_MakePoint(-57.9635, -31.3860), 4326), 32721)),
+('Falta de luz', 'Corte en red eléctrica de El Cerro', 'corte_servicio', 3, 'Equipo Cerro',
+ ST_Transform(ST_SetSRID(ST_MakePoint(-57.9800, -31.4000), 4326), 32721)),
+('Inundación en zona baja', 'Acumulación de agua tras la lluvia en Salto Nuevo', 'inundacion', 2, 'Equipo Sur',
+ ST_Transform(ST_SetSRID(ST_MakePoint(-57.9570, -31.4100), 4326), 32721));
 
 -- Asignación de recursos a incidentes (incidente_recurso)
 INSERT INTO incidente_recurso (incidente_id, recurso_id) VALUES
-(1, 1),           -- Choque en 18 de Julio -> Ambulancia 12
-(2, 2),           -- Incendio -> Bomberos 05
-(3, 3),           -- Corte de suministro -> Patrulla 305
-(4, 3);           -- Anegamiento -> Patrulla 305 (ya resuelto)
+(1, 1),           -- Choque en Av. Uruguay -> Ambulancia 12
+(2, 2),           -- Fuego en comercio -> Bomberos 05
+(3, 3),           -- Falta de luz -> Patrulla 305
+(4, 3);           -- Inundación en zona baja -> Patrulla 305 (ya resuelto)
 
+-- Avances de estado simulados:
 -- Incidente 1: Registrado -> En atención
 UPDATE incidente SET estado = 'En atención' WHERE id = 1;
 INSERT INTO historial_estado (incidente_id, estado, fecha_hora, usuario)

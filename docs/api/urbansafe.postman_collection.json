@@ -2,7 +2,17 @@
   "info": {
     "name": "UrbanSafe - API y GeoServer",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Orden sugerido: 1) Zonas, 2) Recursos (crear antes de asignar), 3) Incidentes, 4) Consultas, 5) GeoServer. Los 'Crear' guardan el id en una variable que usan los siguientes."
+    "description": "Primero la carpeta 0 (Salud e ingreso: guarda el token del administrador). Orden sugerido: 1) Zonas, 2) Recursos (crear antes de asignar), 3) Incidentes, 4) Consultas, 5) GeoServer. Los 'Crear' guardan el id en una variable que usan los siguientes."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
   },
   "variable": [
     {
@@ -42,6 +52,10 @@
       "value": "-34.9069"
     },
     {
+      "key": "token",
+      "value": ""
+    },
+    {
       "key": "nuevaZonaId",
       "value": ""
     },
@@ -56,7 +70,7 @@
   ],
   "item": [
     {
-      "name": "0. Salud",
+      "name": "0. Salud e ingreso",
       "item": [
         {
           "name": "Health",
@@ -72,6 +86,124 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ingresar como administrador (guarda el token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuario\": \"admin\",\n  \"clave\": \"urbansafe\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Correr primero: el resto de las peticiones (menos Health, tipos-incidente y GeoServer) exigen este token, que se manda solo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Ingreso correcto (200)\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"token\", pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sin token se rechaza (debe dar 401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/zonas",
+            "description": "Esta petición no manda el token (auth: noauth) para comprobar que la API está protegida.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Clave incorrecta (debe dar 401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuario\": \"admin\",\n  \"clave\": \"mala\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Quién soy",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/auth/yo"
+          }
+        },
+        {
+          "name": "Salir (cierra el token; volver a ingresar después)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base}}/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
                 ]
               }
             }
@@ -610,6 +742,14 @@
           }
         },
         {
+          "name": "C1b. Incidentes por zona con límite (responde items, total y truncado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/incidentes-por-zona/{{zonaId}}?limit=1"
+          }
+        },
+        {
           "name": "C2. Zonas con más incidentes (todo el período)",
           "request": {
             "method": "GET",
@@ -881,6 +1021,84 @@
           }
         },
         {
+          "name": "Auxiliar. Buscar una zona por texto (con geometría)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/buscar?tipo=zona&q=cen"
+          }
+        },
+        {
+          "name": "Auxiliar. Buscar un incidente por texto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/buscar?tipo=incidente&q=choque"
+          }
+        },
+        {
+          "name": "Auxiliar. Buscar un recurso por texto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/buscar?tipo=recurso&q=amb"
+          }
+        },
+        {
+          "name": "Auxiliar. Buscar con un tipo inválido (debe dar 400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/buscar?tipo=otra"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C4/C5 aux. Dirección en Salto (IDE)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/geocodificar?direccion=Uruguay 1000&departamento=salto&localidad=salto"
+          }
+        },
+        {
+          "name": "C4/C5 aux. Esquina en Salto (IDE): Uruguay y Artigas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/geocodificar?direccion=Uruguay&esquina=Artigas&departamento=salto&localidad=salto"
+          }
+        },
+        {
+          "name": "C4/C5 aux. Departamento inválido (debe dar 400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/geocodificar?direccion=Uruguay 1000&departamento=salto%26x%3D1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "C4/C5 aux. Autocompletar nombres de calle",
           "request": {
             "method": "GET",
@@ -962,6 +1180,9 @@
     },
     {
       "name": "5. GeoServer (WMS / WFS)",
+      "auth": {
+        "type": "noauth"
+      },
       "item": [
         {
           "name": "WMS GetCapabilities",

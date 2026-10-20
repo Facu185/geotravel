@@ -1,6 +1,5 @@
 -- V3__acceso.sql
--- Números de puerta de Montevideo (capa mdg_accesos del WFS de la Intendencia de Montevideo,
--- con el nombre de la calle traído de v_mdg_vias_montevideo): capa de REFERENCIA, no se edita.
+-- Números de puerta de Salto (capa de accesos, con el nombre de la calle): capa de REFERENCIA, no se edita.
 -- Sirve para ubicar una dirección "calle número" (consultas "búsqueda de incidente" y "búsqueda
 -- de zona", ver /consultas/geocodificar). Cada fila es una puerta (un acceso a un padrón).
 -- Los datos están en db/data/accesos.csv.gz y los carga infra/init/seed.sh.

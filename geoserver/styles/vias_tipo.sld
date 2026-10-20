@@ -18,6 +18,7 @@
         <Rule>
           <Name>Avenidas</Name>
           <Title>Avenida, bulevar, rambla y ruta</Title>
+          <MaxScaleDenominator>90000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:Or>
               <ogc:PropertyIsEqualTo><ogc:PropertyName>tipo</ogc:PropertyName><ogc:Literal>AVENIDA</ogc:Literal></ogc:PropertyIsEqualTo>
@@ -36,6 +37,7 @@
         <Rule>
           <Name>Calles</Name>
           <Title>Calle, camino y pasaje vehicular</Title>
+          <MaxScaleDenominator>90000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:Or>
               <ogc:PropertyIsEqualTo><ogc:PropertyName>tipo</ogc:PropertyName><ogc:Literal>CALLE</ogc:Literal></ogc:PropertyIsEqualTo>
@@ -56,6 +58,7 @@
         <Rule>
           <Name>Peatonales</Name>
           <Title>Senda, peatonal y proyectada</Title>
+          <MaxScaleDenominator>90000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:Or>
               <ogc:PropertyIsEqualTo><ogc:PropertyName>tipo</ogc:PropertyName><ogc:Literal>SENDA</ogc:Literal></ogc:PropertyIsEqualTo>
@@ -76,7 +79,7 @@
         <Rule>
           <Name>Nombres</Name>
           <Title>Nombre de la calle (solo con zoom cercano)</Title>
-          <MaxScaleDenominator>6000</MaxScaleDenominator>
+          <MaxScaleDenominator>25000</MaxScaleDenominator>
           <TextSymbolizer>
             <Label><ogc:PropertyName>nom_calle</ogc:PropertyName></Label>
             <Font>

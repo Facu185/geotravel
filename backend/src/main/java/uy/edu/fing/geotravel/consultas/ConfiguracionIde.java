@@ -43,8 +43,14 @@ public final class ConfiguracionIde {
     }
 
     public String urlBusqueda(String endpoint, String direccion) {
+        return urlBusqueda(endpoint, direccion, null);
+    }
+
+    /** Con esquina (segunda calle) el servicio ubica el cruce de las dos calles. */
+    public String urlBusqueda(String endpoint, String direccion, String esquina) {
         return endpoint
                 + "?calle=" + codificar(direccion.trim())
+                + (esquina != null ? "&esquina=" + codificar(esquina) : "")
                 + "&departamento=" + codificar(departamento)
                 + "&localidad=" + codificar(localidad);
     }

@@ -1,6 +1,7 @@
 package uy.edu.fing.geotravel.consultas;
 
 import uy.edu.fing.geotravel.db.DataSourceProvider;
+import uy.edu.fing.geotravel.mapa.Bbox;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,52 +39,106 @@ import java.util.*;
  * ST_Distance y el operador <->, que sirven igual para puntos, líneas y polígonos.
  *
  * "Búsqueda de incidente/zona por dirección o intersección de calles" recibe ya resuelta
- * la coordenada (x, y o lon, lat). /consultas/geocodificar usa las puertas locales de Montevideo
- * solo cuando el backend está configurado para esa localidad; en otro caso consulta la IDE.
- * /consultas/interseccion usa la tabla via, cuya cobertura local actual es Montevideo.
+ * la coordenada (x, y o lon, lat). Esa resolución la hacen /consultas/geocodificar (calle y
+ * número, con la tabla acceso de Montevideo o con la IDE según el lugar), /consultas/interseccion
+ * (cruce de dos calles, con la tabla via) y, en el frontend, el clic en el mapa. El departamento y
+ * la localidad se piden por parámetro; sin ellos se usan los del backend (IDE_DEPARTAMENTO e
+ * IDE_LOCALIDAD, por defecto Salto).
  */
 @Path("/consultas")
 public class ConsultaResource {
 
+    // ------------------------------------------------------------------ resultados "a demanda"
+    // Para que el navegador no tenga que cargar todos los objetos, cada consulta devuelve ya la
+    // geometría de lo que encontró (GeoJSON en lon/lat, como texto) y, las que pueden dar muchas
+    // filas, un límite y el total real: {items, total, truncado} (el mismo formato que /zonas?bbox).
+    private static String geomIncidente(String alias) {
+        return "ST_AsGeoJSON(ST_Transform(" + alias + ".geom, 4326), 6) AS geom";
+    }
+
+    /** Las zonas se simplifican (3 m): alcanza para dibujarlas y pesa mucho menos. */
+    private static String geomZona(String alias) {
+        return "ST_AsGeoJSON(ST_Transform(ST_SimplifyPreserveTopology(" + alias + ".geom, 3), 4326), 6) AS geom";
+    }
+
+    /** Lee las filas de una consulta que trae la columna "total" (count(*) OVER ()) y arma {items, total, truncado}. */
+    private static Map<String, Object> conTotal(ResultSet rs, String... columnas) throws SQLException {
+        List<Map<String, Object>> items = new ArrayList<>();
+        int total = 0;
+        while (rs.next()) {
+            total = rs.getInt("total");
+            Map<String, Object> fila = new LinkedHashMap<>();
+            for (String columna : columnas) fila.put(toCamelCase(columna), texto(rs.getObject(columna)));
+            items.add(fila);
+        }
+        return Bbox.resultado(items, total);
+    }
+
+    /** Las fechas viajan como texto (como en rowsToMaps), no como número. */
+    private static Object texto(Object valor) {
+        return valor instanceof Timestamp ? valor.toString() : valor;
+    }
+
+    private static int limiteDe(Integer pedido) {
+        try {
+            return Bbox.limite(pedido);
+        } catch (IllegalArgumentException e) {
+            throw peticionInvalida(e.getMessage());
+        }
+    }
+
     // ---------------------------------------------------------- 1. Incidentes por zona
-    /** Incidentes que caen dentro de la zona dada. */
+    /** Incidentes que tocan la zona dada (puntos, líneas o zonas), con su geometría. */
     @GET
     @Path("/incidentes-por-zona/{zonaId}")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<Map<String, Object>> incidentesPorZona(@PathParam("zonaId") int zonaId) throws SQLException {
+    public Map<String, Object> incidentesPorZona(@PathParam("zonaId") int zonaId,
+                                                 @QueryParam("limit") Integer limit) throws SQLException {
         String sql =
-            "SELECT i.id, i.titulo, i.tipo_incidente, i.estado, i.prioridad " +
+            "SELECT i.id, i.titulo, i.tipo_incidente, i.estado, i.prioridad, i.fecha_hora_registro, " +
+            "       " + geomIncidente("i") + ", count(*) OVER () AS total " +
             "FROM incidente i, zona_operativa z " +
             "WHERE z.id = ? AND ST_Intersects(z.geom, i.geom) " +
-            "ORDER BY i.fecha_hora_registro DESC";
+            "ORDER BY i.fecha_hora_registro DESC LIMIT ?";
         try (Connection conn = DataSourceProvider.get().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, zonaId);
-            return rowsToMaps(ps.executeQuery(), "id", "titulo", "tipo_incidente", "estado", "prioridad");
+            ps.setInt(2, limiteDe(limit));
+            return conTotal(ps.executeQuery(), "id", "titulo", "tipo_incidente", "estado", "prioridad", "fecha_hora_registro", "geom");
         }
     }
 
     // --------------------------------------------- 2. Zonas con mayor cantidad de incidentes
-    /** Zonas ordenadas por cantidad de incidentes registrados en el período dado (ambos opcionales). */
+    /**
+     * Zonas ordenadas por cantidad de incidentes registrados en el período dado (ambos opcionales).
+     * Devuelve las primeras "limit" (50 por defecto), con su geometría para pintarlas en el mapa.
+     */
     @GET
     @Path("/zonas-mas-incidentes")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<Map<String, Object>> zonasMasIncidentes(@QueryParam("desde") String desde,
-                                                          @QueryParam("hasta") String hasta) throws SQLException {
+    public Map<String, Object> zonasMasIncidentes(@QueryParam("desde") String desde,
+                                                  @QueryParam("hasta") String hasta,
+                                                  @QueryParam("limit") Integer limit) throws SQLException {
         String sql =
-            "SELECT z.id, z.nombre, count(i.id) AS cantidad_incidentes " +
+            "SELECT z.id, z.nombre, z.nivel_prioridad, count(i.id) AS cantidad_incidentes, " +
+            "       " + geomZona("z") + ", count(*) OVER () AS total " +
             "FROM zona_operativa z " +
             "LEFT JOIN incidente i ON ST_Intersects(z.geom, i.geom) " +
             "  AND (?::timestamp IS NULL OR i.fecha_hora_registro >= ?::timestamp) " +
             "  AND (?::timestamp IS NULL OR i.fecha_hora_registro <  ?::timestamp) " +
-            "GROUP BY z.id, z.nombre " +
-            "ORDER BY cantidad_incidentes DESC";
+            "GROUP BY z.id, z.nombre, z.nivel_prioridad, z.geom " +
+            "ORDER BY cantidad_incidentes DESC, z.nombre LIMIT ?";
         try (Connection conn = DataSourceProvider.get().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, desde); ps.setString(2, desde);
             ps.setString(3, hasta); ps.setString(4, hasta);
-            return rowsToMaps(ps.executeQuery(), "id", "nombre", "cantidad_incidentes");
+            ps.setInt(5, limiteRanking(limit));
+            return conTotal(ps.executeQuery(), "id", "nombre", "nivel_prioridad", "cantidad_incidentes", "geom");
         }
+    }
+
+    private static int limiteRanking(Integer pedido) {
+        return pedido == null ? 50 : limiteDe(pedido);
     }
 
     // ------------------------------------------- Extra: zonas por incidentes por km²
@@ -95,28 +150,31 @@ public class ConsultaResource {
     @GET
     @Path("/zonas-mayor-concentracion")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<Map<String, Object>> zonasMayorConcentracion(@QueryParam("desde") String desde,
-                                                               @QueryParam("hasta") String hasta) throws SQLException {
+    public Map<String, Object> zonasMayorConcentracion(@QueryParam("desde") String desde,
+                                                       @QueryParam("hasta") String hasta,
+                                                       @QueryParam("limit") Integer limit) throws SQLException {
         String sql =
-            "SELECT z.id, z.nombre, count(i.id) AS cantidad_incidentes, " +
-            "       round((count(i.id) / (ST_Area(z.geom) / 1e6))::numeric, 3) AS incidentes_por_km2 " +
+            "SELECT z.id, z.nombre, z.nivel_prioridad, count(i.id) AS cantidad_incidentes, " +
+            "       round((count(i.id) / (ST_Area(z.geom) / 1e6))::numeric, 3) AS incidentes_por_km2, " +
+            "       " + geomZona("z") + ", count(*) OVER () AS total " +
             "FROM zona_operativa z " +
             "LEFT JOIN incidente i ON ST_Intersects(z.geom, i.geom) " +
             "  AND (?::timestamp IS NULL OR i.fecha_hora_registro >= ?::timestamp) " +
             "  AND (?::timestamp IS NULL OR i.fecha_hora_registro <  ?::timestamp) " +
-            "GROUP BY z.id, z.nombre, z.geom " +
-            "ORDER BY incidentes_por_km2 DESC";
+            "GROUP BY z.id, z.nombre, z.nivel_prioridad, z.geom " +
+            "ORDER BY incidentes_por_km2 DESC, z.nombre LIMIT ?";
         try (Connection conn = DataSourceProvider.get().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, desde); ps.setString(2, desde);
             ps.setString(3, hasta); ps.setString(4, hasta);
-            return rowsToMaps(ps.executeQuery(), "id", "nombre", "cantidad_incidentes", "incidentes_por_km2");
+            ps.setInt(5, limiteRanking(limit));
+            return conTotal(ps.executeQuery(), "id", "nombre", "nivel_prioridad", "cantidad_incidentes", "incidentes_por_km2", "geom");
         }
     }
 
     // ---------------------------------------------------- 3. Recursos cercanos a un incidente
     /**
-     * Los recursos más cercanos al incidente dado, ordenados por distancia. Con
+     * Los recursos más cercanos al incidente dado, ordenados por distancia, con su geometría. Con
      * soloDisponibles=true se consideran únicamente los recursos en estado "Disponible"
      * (la letra pide los recursos *operativos* más cercanos).
      */
@@ -127,10 +185,10 @@ public class ConsultaResource {
                                                         @QueryParam("limite") @DefaultValue("5") int limite,
                                                         @QueryParam("soloDisponibles") @DefaultValue("false") boolean soloDisponibles)
             throws SQLException {
-        int max = limite < 1 ? 5 : limite;
+        int max = limite < 1 ? 5 : Math.min(limite, 50);
         String sql =
             "SELECT r.id, r.identificacion, r.tipo, r.estado_operativo, " +
-            "       ST_Distance(r.geom, i.geom) AS distancia_m " +
+            "       ST_Distance(r.geom, i.geom) AS distancia_m, " + geomIncidente("r") + " " +
             "FROM recurso r, incidente i " +
             "WHERE i.id = ? " +
             (soloDisponibles ? "  AND r.estado_operativo = 'Disponible' " : "") +
@@ -140,15 +198,15 @@ public class ConsultaResource {
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, incidenteId);
             ps.setInt(2, max);
-            return rowsToMaps(ps.executeQuery(), "id", "identificacion", "tipo", "estado_operativo", "distancia_m");
+            return rowsToMaps(ps.executeQuery(), "id", "identificacion", "tipo", "estado_operativo", "distancia_m", "geom");
         }
     }
 
     // ------------------------------------------------------------- 4. Búsqueda de incidente
     /**
-     * Incidente más cercano al punto (x, y en EPSG:32721). Para "una dirección o
-     * intersección de calles": resolvé antes la coordenada (geocoder, o el mismo patrón
-     * del ejercicio 6 del Práctico 2 para el cruce de dos calles) y pasala acá.
+     * Incidente más cercano al punto (x, y en EPSG:32721, o lon, lat en EPSG:4326), con su geometría.
+     * Para "una dirección o intersección de calles": resolvé antes la coordenada (/consultas/geocodificar
+     * o /consultas/interseccion) y pasala acá.
      */
     @GET
     @Path("/incidente-mas-cercano")
@@ -161,10 +219,10 @@ public class ConsultaResource {
         double b = enGrados ? lat : y;
         String punto = enGrados ? PUNTO_LON_LAT : PUNTO_X_Y;
         String sql =
-            "SELECT id, titulo, estado, " +
-            "       ST_Distance(geom, " + punto + ") AS distancia_m " +
-            "FROM incidente " +
-            "ORDER BY geom <-> " + punto + " " +
+            "SELECT i.id, i.titulo, i.tipo_incidente, i.estado, i.prioridad, i.fecha_hora_registro, " +
+            "       ST_Distance(i.geom, " + punto + ") AS distancia_m, " + geomIncidente("i") + " " +
+            "FROM incidente i " +
+            "ORDER BY i.geom <-> " + punto + " " +
             "LIMIT 1";
         try (Connection conn = DataSourceProvider.get().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -173,17 +231,16 @@ public class ConsultaResource {
             try (ResultSet rs = ps.executeQuery()) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 if (!rs.next()) return row;
-                row.put("id", rs.getInt("id"));
-                row.put("titulo", rs.getString("titulo"));
-                row.put("estado", rs.getString("estado"));
-                row.put("distanciaM", rs.getDouble("distancia_m"));
+                for (String columna : new String[] {"id", "titulo", "tipo_incidente", "estado", "prioridad", "fecha_hora_registro", "distancia_m", "geom"}) {
+                    row.put(columna.equals("distancia_m") ? "distanciaM" : toCamelCase(columna), texto(rs.getObject(columna)));
+                }
                 return row;
             }
         }
     }
 
     // ----------------------------------------------------------------- 5. Búsqueda de zona
-    /** Zona que contiene el punto dado (x, y en EPSG:32721) -- ya geocodificada la dirección. */
+    /** Zona que contiene el punto dado (x, y en EPSG:32721, o lon, lat en EPSG:4326), con su geometría. */
     @GET
     @Path("/zona-por-punto")
     @Produces(MediaType.APPLICATION_JSON)
@@ -194,8 +251,9 @@ public class ConsultaResource {
         double a = enGrados ? lon : x;
         double b = enGrados ? lat : y;
         String sql =
-            "SELECT id, nombre FROM zona_operativa " +
-            "WHERE ST_Contains(geom, " + (enGrados ? PUNTO_LON_LAT : PUNTO_X_Y) + ") " +
+            "SELECT z.id, z.nombre, z.nivel_prioridad, z.responsable, " + geomZona("z") + " " +
+            "FROM zona_operativa z " +
+            "WHERE ST_Contains(z.geom, " + (enGrados ? PUNTO_LON_LAT : PUNTO_X_Y) + ") " +
             "LIMIT 1";
         try (Connection conn = DataSourceProvider.get().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -206,46 +264,104 @@ public class ConsultaResource {
                     row.put("zona", null);
                     return row;
                 }
-                row.put("id", rs.getInt("id"));
-                row.put("nombre", rs.getString("nombre"));
+                for (String columna : new String[] {"id", "nombre", "nivel_prioridad", "responsable", "geom"}) {
+                    row.put(toCamelCase(columna), texto(rs.getObject(columna)));
+                }
                 return row;
             }
         }
     }
 
     // --------------------------------------------------------------- 6. Recursos por zona
-    /** Recursos ubicados dentro de la zona dada. */
+    /** Recursos ubicados dentro de la zona dada, con su geometría. */
     @GET
     @Path("/recursos-por-zona/{zonaId}")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<Map<String, Object>> recursosPorZona(@PathParam("zonaId") int zonaId) throws SQLException {
+    public Map<String, Object> recursosPorZona(@PathParam("zonaId") int zonaId,
+                                               @QueryParam("limit") Integer limit) throws SQLException {
         String sql =
-            "SELECT r.id, r.identificacion, r.tipo, r.estado_operativo " +
+            "SELECT r.id, r.identificacion, r.tipo, r.estado_operativo, " + geomIncidente("r") + ", count(*) OVER () AS total " +
             "FROM recurso r, zona_operativa z " +
             "WHERE z.id = ? AND ST_Contains(z.geom, r.geom) " +
-            "ORDER BY r.id";
+            "ORDER BY r.id LIMIT ?";
         try (Connection conn = DataSourceProvider.get().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, zonaId);
-            return rowsToMaps(ps.executeQuery(), "id", "identificacion", "tipo", "estado_operativo");
+            ps.setInt(2, limiteDe(limit));
+            return conTotal(ps.executeQuery(), "id", "identificacion", "tipo", "estado_operativo", "geom");
         }
     }
 
     // ----------------------------------------------------------- 7. Incidentes por recurso
-    /** Incidentes atendidos/asociados a un recurso (tabla incidente_recurso). */
+    /** Incidentes atendidos/asociados a un recurso (tabla incidente_recurso), con su geometría. */
     @GET
     @Path("/incidentes-por-recurso/{recursoId}")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<Map<String, Object>> incidentesPorRecurso(@PathParam("recursoId") int recursoId) throws SQLException {
+    public Map<String, Object> incidentesPorRecurso(@PathParam("recursoId") int recursoId,
+                                                    @QueryParam("limit") Integer limit) throws SQLException {
         String sql =
-            "SELECT i.id, i.titulo, i.estado, ir.fecha_asignacion " +
+            "SELECT i.id, i.titulo, i.tipo_incidente, i.estado, i.prioridad, i.fecha_hora_registro, ir.fecha_asignacion, " +
+            "       " + geomIncidente("i") + ", count(*) OVER () AS total " +
             "FROM incidente i JOIN incidente_recurso ir ON ir.incidente_id = i.id " +
             "WHERE ir.recurso_id = ? " +
-            "ORDER BY ir.fecha_asignacion DESC";
+            "ORDER BY ir.fecha_asignacion DESC LIMIT ?";
         try (Connection conn = DataSourceProvider.get().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, recursoId);
-            return rowsToMaps(ps.executeQuery(), "id", "titulo", "estado", "fecha_asignacion");
+            ps.setInt(2, limiteDe(limit));
+            return conTotal(ps.executeQuery(), "id", "titulo", "tipo_incidente", "estado", "prioridad", "fecha_hora_registro", "fecha_asignacion", "geom");
+        }
+    }
+
+    // ------------------------------------------------------------------------ Buscar un objeto
+    /**
+     * Búsqueda por texto de una zona, un incidente o un recurso, para elegirlo sin cargar la lista
+     * completa (los selectores de las consultas). Devuelve hasta "limite" resultados con su
+     * etiqueta y geometría. Sin texto, devuelve los primeros.
+     */
+    @GET
+    @Path("/buscar")
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<Map<String, Object>> buscar(@QueryParam("tipo") String tipo,
+                                            @QueryParam("q") String q,
+                                            @QueryParam("limite") @DefaultValue("10") int limite) throws SQLException {
+        int max = limite < 1 ? 10 : Math.min(limite, 25);
+        String texto = q == null ? "" : q.trim().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        String patron = "%" + texto + "%";
+        String sql;
+        String[] columnas;
+        boolean porNumero = false;
+        switch (tipo == null ? "" : tipo) {
+            case "zona":
+                sql = "SELECT z.id, z.nombre || ' (prioridad ' || z.nivel_prioridad || ')' AS etiqueta, z.nivel_prioridad, " + geomZona("z") + " " +
+                      "FROM zona_operativa z WHERE z.nombre ILIKE ? ORDER BY z.nombre LIMIT ?";
+                columnas = new String[] {"id", "etiqueta", "nivel_prioridad", "geom"};
+                break;
+            case "incidente":
+                columnas = new String[] {"id", "etiqueta", "estado", "geom"};
+                sql = "SELECT i.id, '#' || i.id || ' ' || i.titulo || ' — ' || i.estado AS etiqueta, i.estado, " + geomIncidente("i") + " " +
+                      "FROM incidente i WHERE i.titulo ILIKE ? OR i.id::text = ? ORDER BY i.fecha_hora_registro DESC LIMIT ?";
+                porNumero = true;
+                break;
+            case "recurso":
+                columnas = new String[] {"id", "etiqueta", "estado_operativo", "geom"};
+                sql = "SELECT r.id, r.identificacion || ' — ' || r.tipo AS etiqueta, r.estado_operativo, " + geomIncidente("r") + " " +
+                      "FROM recurso r WHERE r.identificacion ILIKE ? OR r.nombre ILIKE ? ORDER BY r.identificacion LIMIT ?";
+                porNumero = true;
+                break;
+            default:
+                throw peticionInvalida("El tipo tiene que ser zona, incidente o recurso");
+        }
+        try (Connection conn = DataSourceProvider.get().getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, patron);
+            if (porNumero) {
+                ps.setString(2, "recurso".equals(tipo) ? patron : q == null ? "" : q.trim());
+                ps.setInt(3, max);
+            } else {
+                ps.setInt(2, max);
+            }
+            return rowsToMaps(ps.executeQuery(), columnas);
         }
     }
 
@@ -258,14 +374,16 @@ public class ConsultaResource {
     @GET
     @Path("/reportes/incidentes-por-zona")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<Map<String, Object>> reporteIncidentesPorZona(@QueryParam("zonaId") Integer zonaId,
+    public Map<String, Object> reporteIncidentesPorZona(@QueryParam("zonaId") Integer zonaId,
                                                                 @QueryParam("tipo") String tipo,
                                                                 @QueryParam("prioridad") Integer prioridad,
                                                                 @QueryParam("estado") String estado,
                                                                 @QueryParam("desde") String desde,
-                                                                @QueryParam("hasta") String hasta) throws SQLException {
+                                                                @QueryParam("hasta") String hasta,
+                                                                @QueryParam("limit") Integer limit) throws SQLException {
         String sql =
-            "SELECT z.id AS zona_id, z.nombre AS zona_nombre, i.id, i.titulo, i.tipo_incidente, i.prioridad, i.estado, i.fecha_hora_registro " +
+            "SELECT z.id AS zona_id, z.nombre AS zona_nombre, i.id, i.titulo, i.tipo_incidente, i.prioridad, i.estado, i.fecha_hora_registro, " +
+            "       " + geomIncidente("i") + ", count(*) OVER () AS total " +
             "FROM zona_operativa z " +
             "JOIN incidente i ON ST_Intersects(z.geom, i.geom) " +
             "WHERE (?::int  IS NULL OR z.id = ?) " +
@@ -274,7 +392,7 @@ public class ConsultaResource {
             "  AND (?::text IS NULL OR i.estado = ?) " +
             "  AND (?::timestamp IS NULL OR i.fecha_hora_registro >= ?::timestamp) " +
             "  AND (?::timestamp IS NULL OR i.fecha_hora_registro <  ?::timestamp) " +
-            "ORDER BY z.nombre, i.fecha_hora_registro DESC";
+            "ORDER BY z.nombre, i.fecha_hora_registro DESC LIMIT ?";
         try (Connection conn = DataSourceProvider.get().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             if (zonaId == null) { ps.setNull(1, Types.INTEGER); ps.setNull(2, Types.INTEGER); }
@@ -285,8 +403,9 @@ public class ConsultaResource {
             ps.setString(7, estado); ps.setString(8, estado);
             ps.setString(9, desde); ps.setString(10, desde);
             ps.setString(11, hasta); ps.setString(12, hasta);
-            return rowsToMaps(ps.executeQuery(),
-                    "zona_id", "zona_nombre", "id", "titulo", "tipo_incidente", "prioridad", "estado", "fecha_hora_registro");
+            ps.setInt(13, limiteDe(limit));
+            return conTotal(ps.executeQuery(),
+                    "zona_id", "zona_nombre", "id", "titulo", "tipo_incidente", "prioridad", "estado", "fecha_hora_registro", "geom");
         }
     }
 
@@ -402,20 +521,20 @@ public class ConsultaResource {
 
             respuesta.put("incidentes", buscarCerca(conn,
                 base + "SELECT i.id, i.titulo, i.tipo_incidente, i.estado, i.prioridad, " +
-                "       round(ST_Distance(i.geom, g.geom)::numeric, 1) AS distancia_m, count(*) OVER () AS total " +
+                "       round(ST_Distance(i.geom, g.geom)::numeric, 1) AS distancia_m, " + geomIncidente("i") + ", count(*) OVER () AS total " +
                 "FROM incidente i, g WHERE ST_DWithin(i.geom, g.geom, ?) " +
                 "ORDER BY ST_Distance(i.geom, g.geom), i.id LIMIT " + MAX_POR_FIGURA,
-                in.geomGeoJson, distancia, "id", "titulo", "tipo_incidente", "estado", "prioridad", "distancia_m"));
+                in.geomGeoJson, distancia, "id", "titulo", "tipo_incidente", "estado", "prioridad", "distancia_m", "geom"));
             respuesta.put("recursos", buscarCerca(conn,
                 base + "SELECT r.id, r.identificacion, r.tipo, r.estado_operativo, " +
-                "       round(ST_Distance(r.geom, g.geom)::numeric, 1) AS distancia_m, count(*) OVER () AS total " +
+                "       round(ST_Distance(r.geom, g.geom)::numeric, 1) AS distancia_m, " + geomIncidente("r") + ", count(*) OVER () AS total " +
                 "FROM recurso r, g WHERE ST_DWithin(r.geom, g.geom, ?) " +
                 "ORDER BY ST_Distance(r.geom, g.geom), r.id LIMIT " + MAX_POR_FIGURA,
-                in.geomGeoJson, distancia, "id", "identificacion", "tipo", "estado_operativo", "distancia_m"));
+                in.geomGeoJson, distancia, "id", "identificacion", "tipo", "estado_operativo", "distancia_m", "geom"));
             respuesta.put("zonas", buscarCerca(conn,
-                base + "SELECT z.id, z.nombre, z.nivel_prioridad, count(*) OVER () AS total " +
+                base + "SELECT z.id, z.nombre, z.nivel_prioridad, " + geomZona("z") + ", count(*) OVER () AS total " +
                 "FROM zona_operativa z, g WHERE ST_DWithin(z.geom, g.geom, ?) ORDER BY z.nombre LIMIT " + MAX_POR_FIGURA,
-                in.geomGeoJson, distancia, "id", "nombre", "nivel_prioridad").get("filas"));
+                in.geomGeoJson, distancia, "id", "nombre", "nivel_prioridad", "geom").get("filas"));
             return respuesta;
         }
     }
@@ -432,7 +551,7 @@ public class ConsultaResource {
                 while (rs.next()) {
                     total = rs.getLong("total");
                     Map<String, Object> fila = new LinkedHashMap<>();
-                    for (String columna : columnas) fila.put(toCamelCase(columna), rs.getObject(columna));
+                    for (String columna : columnas) fila.put(toCamelCase(columna), texto(rs.getObject(columna)));
                     filas.add(fila);
                 }
             }
@@ -480,22 +599,48 @@ public class ConsultaResource {
      * Se busca en la tabla acceso (los números de puerta de Montevideo, capa mdg_accesos de la
      * Intendencia; la capa "acceso" de GeoServer es esa misma tabla). La calle se compara por
      * nombre tolerando abreviaturas y errores de tipeo. Si el número no existe se usa la puerta más
-     * cercana de esa calle y se marca "aproximada". Lo que no se resuelve acá ("calle esquina
-     * calle", calles que no están en la base) se pasa al servicio de direcciones de la IDE.
+     * cercana de esa calle y se marca "aproximada". Esa tabla es solo de Montevideo. En otro departamento
+     * (parámetros departamento y localidad, por ejemplo salto y salto), y para las esquinas (parámetro
+     * esquina: dos calles que se cruzan), se usa el servicio de direcciones de la IDE, que cubre el país.
      */
     @GET
     @Path("/geocodificar")
     @Produces(MediaType.APPLICATION_JSON)
-    public Map<String, Object> geocodificar(@QueryParam("direccion") String direccion) throws SQLException {
+    public Map<String, Object> geocodificar(@QueryParam("direccion") String direccion,
+                                            @QueryParam("esquina") String esquina,
+                                            @QueryParam("departamento") String departamento,
+                                            @QueryParam("localidad") String localidad) throws SQLException {
         if (direccion == null || direccion.trim().isEmpty()) {
             throw peticionInvalida("Falta la dirección (por ejemplo: Buenos Aires 451)");
         }
-        java.util.regex.Matcher m = coincidenciaPuertaLocal(direccion, CONFIGURACION_IDE);
+        boolean hayDepartamento = departamento != null && !departamento.trim().isEmpty();
+        // Sin parámetros se usa el lugar configurado en el backend (IDE_DEPARTAMENTO / IDE_LOCALIDAD).
+        // Con solo el departamento, la localidad es la del mismo nombre.
+        String dep = lugar(departamento, CONFIGURACION_IDE.getDepartamento());
+        String loc = lugar(localidad, hayDepartamento ? dep : CONFIGURACION_IDE.getLocalidad());
+        boolean hayEsquina = esquina != null && !esquina.trim().isEmpty();
+        // La tabla de puertas propia es solo de Montevideo: en otro lugar, o con esquina, va directo a la IDE.
+        java.util.regex.Matcher m = hayEsquina ? null : coincidenciaPuertaLocal(direccion, new ConfiguracionIde(dep, loc));
         if (m != null) {
             Map<String, Object> propio = buscarPuerta(m.group(1), Integer.parseInt(m.group(2)), m.group(3));
             if (propio != null) return propio;
         }
-        return geocodificarConIde(direccion);
+        return geocodificarConIde(direccion, hayEsquina ? esquina.trim() : null, dep, loc);
+    }
+
+    /**
+     * Nombre de departamento o localidad para el servicio de direcciones: minúsculas, solo letras,
+     * espacios, punto, apóstrofo y guion, hasta 40 caracteres. Sin valor usa el de por defecto.
+     */
+    static String lugar(String valor, String porDefecto) {
+        if (valor == null || valor.trim().isEmpty()) {
+            return porDefecto;
+        }
+        String limpio = valor.trim().toLowerCase(Locale.ROOT);
+        if (!limpio.matches("[\\p{L} .'-]{2,40}")) {
+            throw peticionInvalida("El departamento o la localidad no es válido");
+        }
+        return limpio;
     }
 
     static java.util.regex.Matcher coincidenciaPuertaLocal(
@@ -569,8 +714,9 @@ public class ConsultaResource {
      * Único de Direcciones Geográficas), por internet. Si el número no existe el servicio ubica la
      * calle y se marca "aproximada". Sin internet o con el servicio caído responde 502 con un mensaje.
      */
-    private Map<String, Object> geocodificarConIde(String direccion) {
-        String url = CONFIGURACION_IDE.urlBusqueda(IDE_BUSQUEDA_DIRECCION, direccion);
+    private Map<String, Object> geocodificarConIde(String direccion, String esquinaPedida, String departamento, String localidad) {
+        String url = new ConfiguracionIde(departamento, localidad)
+            .urlBusqueda(IDE_BUSQUEDA_DIRECCION, direccion, esquinaPedida);
         JsonNode lista;
         try {
             HttpResponse<String> respuesta = HTTP.send(
@@ -593,14 +739,14 @@ public class ConsultaResource {
         if (sinCalle) {
             throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
                 .type(MediaType.APPLICATION_JSON)
-                .entity(Map.of("error", "No se encontró esa dirección. Probá con el formato \"calle número\", por ejemplo: Buenos Aires 451"))
+                .entity(Map.of("error", "No se encontró esa dirección. Probá con el formato \"calle número\" (por ejemplo: Buenos Aires 451) o con otra calle"))
                 .build());
         }
         JsonNode mejor = lista.get(0);
         JsonNode datos = mejor.path("direccion");
         String calle = datos.path("calle").path("nombre_normalizado").asText("");
         String numero = datos.path("numero").path("nro_puerta").asText("");
-        String esquina = datos.path("esquina").path("nombre_normalizado").asText("");
+        String esquina = esquinaPedida != null ? esquinaPedida : datos.path("esquina").path("nombre_normalizado").asText("");
         String texto = !esquina.isEmpty() ? calle + " esq. " + esquina
             : !numero.isEmpty() ? calle + " " + numero
             : direccion.trim();
@@ -609,6 +755,8 @@ public class ConsultaResource {
         Map<String, Object> resultado = new LinkedHashMap<>();
         resultado.put("direccion", texto);
         resultado.put("fuente", "IDE");
+        resultado.put("departamento", departamento);
+        resultado.put("localidad", localidad);
         resultado.put("lon", mejor.get("puntoX").asDouble());
         resultado.put("lat", mejor.get("puntoY").asDouble());
         resultado.put("aproximada", !error.isEmpty());

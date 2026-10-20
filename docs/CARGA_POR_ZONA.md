@@ -68,3 +68,41 @@ curl -u admin:geoserver -X PUT -H "Content-Type: application/json" \
 
 La solución definitiva es que `infra/init/geoserver-init.sh` declare para todas las capas una
 extensión fija que cubra Uruguay, así no depende de los datos que haya al publicar.
+
+## Consultas (P5)
+
+La pantalla Consultas tampoco carga todos los objetos al abrirse:
+
+- **Fondo:** todo lo que existe lo dibuja GeoServer (WMS), como en el mapa público.
+- **Resultado:** cada consulta de `/consultas/...` devuelve ya la geometría de lo que encontró (`geom`) y, las que
+  pueden dar muchas filas (C1, C2, C6, C7 y el reporte), `?limit=` y `{items, total, truncado}`. Las geometrías
+  de las zonas se simplifican (3 m) para pesar menos. El ranking de zonas devuelve las 50 primeras.
+- **Elegir un objeto:** en vez de un desplegable con todas las zonas, incidentes o recursos, un buscador por texto
+  (`GET /consultas/buscar?tipo=zona|incidente|recurso&q=`) que devuelve pocas opciones.
+- **Vista:** al terminar la consulta el mapa se encuadra solo en el resultado (puede estar en cualquier parte del país).
+
+Probado con `db/pruebas/carga-masiva.sql` (700 zonas, 3.000 recursos): las consultas responden en 10 a 30 ms.
+
+## Mapa público (P5)
+
+El mapa público ya dibujaba todo con GeoServer (imágenes), así que escala. Lo que faltaba eran los números:
+
+- **Conteos de lo que se ve:** al terminar de mover o hacer zoom (con una espera de 400 ms), el mapa lee el rectángulo
+  visible y lo suma al filtro de cada capa como `BBOX(geom, oeste, sur, este, norte, 'EPSG:4326')`. GeoServer cuenta con
+  `resultType=hits` usando el índice espacial, sin descargar objetos. Los filtros de incidentes y recursos se combinan
+  con ese rectángulo.
+- **Detalle al tocar:** `GetFeatureInfo` trae como máximo 10 objetos.
+- **Región:** el mapa abre centrado en Salto (`region.js`); los datos de prueba están en Montevideo, así que en Salto
+  los conteos dan 0 hasta cargar datos de esa zona.
+
+## Direcciones por región (P5)
+
+Las consultas 4 y 5 aceptan una dirección y una esquina. Según la región (`REGION.ide` en `region.js`):
+
+| | Montevideo | Resto del país (Salto) |
+|---|---|---|
+| Calle y número | Tabla propia `acceso` (números de puerta de la Intendencia) | Servicio de direcciones de la IDE (`?departamento=salto&localidad=salto`) |
+| Esquina | Cruce calculado con PostGIS sobre `via` (con autocompletado de calles) | IDE, con el parámetro `esquina` (sin autocompletado: no hay calles propias) |
+
+Para sumar otro departamento alcanza con agregar una entrada en `region.js`. Probado con "Uruguay 1000" y la esquina
+"Uruguay y Artigas" de Salto.

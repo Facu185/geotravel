@@ -152,6 +152,24 @@ npm run dev
 
 Abre en `http://localhost:5173`.
 
+## Ingreso y vistas
+
+Hay dos vistas, separadas por un login básico:
+
+| Vista | Cómo se entra | Qué ve |
+|---|---|---|
+| **Invitado** | Sin ingresar: es la pantalla inicial | El mapa público, con filtros, conteos y detalle |
+| **Administrador** | `/login` (botón "Ingresar") | Todo lo anterior, más zonas, recursos, incidentes y consultas |
+
+- **Usuario de prueba:** `admin` / `urbansafe`. Se cambian con `ADMIN_USUARIO` y `ADMIN_CLAVE` en `infra/.env`
+  (ver `infra/.env.example`). Hay un único usuario; no hay ABM de usuarios.
+- **Cómo funciona:** `POST /auth/login` devuelve un token (vale 8 horas, vive en la memoria del backend: si se
+  reinicia hay que ingresar de nuevo) que el frontend manda en `Authorization: Bearer ...`. Un filtro del backend
+  (`auth/AuthFilter.java`) **protege toda la API por defecto**: solo son públicos `/health`, `/auth/login`,
+  `/auth/logout`, `GET /consultas/tipos-incidente` y `GET /fotos/...`. El mapa público dibuja con GeoServer.
+- **En el frontend:** `frontend/src/auth/` (sesión, pantalla de ingreso y `RutaAdmin`, que manda al ingreso si no
+  hay sesión). En Postman, correr primero la carpeta 0, que guarda el token.
+
 ## Módulos y dueños
 
 | Módulo | Carpetas | Responsable |
@@ -181,16 +199,16 @@ documentado en el código (buscar "SUPUESTO").
   cantidad de incidentes; el orden por incidentes/km² quedó como extra.
 - **Ubicación de los recursos:** es la ubicación geográfica del recurso, que se elige en el mapa al
   registrarlo y se ve en el mapa en las consultas del invitado.
-- **Líneas:** la ubicación de un incidente puede ser un punto, una línea (por ejemplo una calle cortada) o una zona.
+- **Líneas:** la ubicación de un incidente puede ser un punto, una línea (por ejemplo una calle cortada) o un polígono (la letra dice "zona": un área, no una zona operativa).
 - **Histórico:** historial de estados de cada incidente, con estado, fecha, hora y usuario.
 
 **Siguen abiertas:**
 
 - **Guardado de las geografías:** se guarda por el backend (REST) y GeoServer solo publica y dibuja
   (WMS/WFS de lectura). No se usa WFS-T; falta confirmar que sea lo esperado.
-- **Direcciones** (consultas 4 y 5): se buscan en la tabla de puertas `acceso` (capa de GeoServer);
-  lo que no resuelve ("calle esquina calle") pasa al servicio de direcciones de la IDE (internet). El mapa
-  de fondo (Esri/OpenStreetMap) también usa internet.
+- **Direcciones** (consultas 4 y 5): en Montevideo se buscan en la tabla de puertas `acceso` (capa de GeoServer);
+  en el resto del país, por departamento y localidad de la región configurada, y las esquinas, las resuelve el
+  servicio de direcciones de la IDE (internet). El mapa de fondo (Esri/OpenStreetMap) también usa internet.
 - **Diagrama de estados de un incidente** (`IncidenteResource.java`): solo se da un ejemplo lineal y se
   menciona que existen derivación y cancelación, sin dibujar el diagrama completo.
 - **Relación incidente–recurso** (`incidente_recurso`): se modeló N a M con fecha de asignación; podría ser
