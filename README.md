@@ -44,7 +44,7 @@ docker compose up -d --build
 ```
 
 Un solo comando levanta y deja configurado todo: la base (con sus migraciones, la red vial de
-Montevideo de `db/data/vias.sql.gz`, los 378 mil números de puerta de `db/data/accesos.csv.gz` y los datos de prueba, una sola vez), GeoServer (workspace,
+Salto de `db/data/vias.csv.gz`, los números de puerta de `db/data/accesos.csv.gz` y los datos de prueba, una sola vez), GeoServer (workspace,
 store, capas y estilos) y el backend en Tomcat con el `.war` ya adentro. La primera vez tarda unos minutos (compila el backend y GeoServer arranca
 lento); cuando termina quedan en `Exited (0)` `flyway`, `seed` y `geoserver-init`, es lo esperado.
 Después, solo el frontend: `cd frontend && npm install && npm run dev`.
@@ -107,7 +107,11 @@ que hayas puesto en `.env`). `geoserver-init` hace por la API REST lo que se har
 
 Son capas de consulta, no se editan desde la aplicación:
 
-- **Calles** (`via`, 33.325 tramos): ejes de calle del curso (`v_sig_vias`). Archivo `db/data/vias.sql.gz`.
+- **Calles** (`via`, 3.239 tramos de Salto): ejes de calle de OpenStreetMap (© colaboradores de OpenStreetMap,
+  licencia ODbL), bajados con Overpass API (`way["highway"]["name"]` en el rectángulo de Salto, recortados a él).
+  El tipo de vía (`tipo`) se deriva de la etiqueta `highway` para que lo reconozca el estilo `vias_tipo.sld`.
+  Archivo `db/data/vias.csv.gz` (nombre, tipo y geometría en WKT lon/lat; `seed.sh` la pasa a EPSG:32721).
+  Si la base ya tenía calles de otra ciudad, `seed.sh` no las pisa: ver "Cambiar las calles" más abajo.
 - **Números de puerta** (`acceso`, 377.883 puertas): capa `mdg_accesos` del WFS de la Intendencia de
   Montevideo (datos abiertos), con el nombre de la calle tomado de `v_mdg_vias_montevideo`. Archivo
   `db/data/accesos.csv.gz`. Con ella `/consultas/geocodificar` ubica una dirección ("calle número").
@@ -117,6 +121,18 @@ Son capas de consulta, no se editan desde la aplicación:
   con su calle por `gid_tramo_via = gid` de `v_mdg_vias_montevideo`, y volver a armar el CSV
   (`num_puerta, letra, nom_calle, cod_nombre, x, y`, en EPSG:32721). Después, `docker compose down -v` y
   volver a levantar para que se carguen.
+
+**Cambiar las calles en una base que ya existe** (por ejemplo, la que tenía las de Montevideo), sin perder
+zonas, recursos ni incidentes. Desde `infra/`:
+
+```bash
+docker compose exec db psql -U geotravel -d geotravel -c "TRUNCATE via RESTART IDENTITY"
+docker compose run --rm seed
+# GeoServer guarda la extensión de cada capa al publicarla: se recalcula para que dibuje Salto
+curl -u admin:geoserver -X PUT -H "Content-Type: application/json" \
+  -d '{"featureType":{"name":"via","enabled":true}}' \
+  "http://localhost:8082/geoserver/rest/workspaces/geotravel/datastores/geotravel/featuretypes/via?recalculate=nativebbox,latlonbbox"
+```
 
 ### 2. Backend
 
