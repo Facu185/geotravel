@@ -62,6 +62,22 @@ public class BboxTest {
     }
 
     @Test
+    public void limiteDesdeTextoUsaDefaultYAplicaMaximo() {
+        assertEquals(500, Bbox.limiteDesdeTexto(null));
+        assertEquals(2000, Bbox.limiteDesdeTexto("5000"));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void limiteDesdeTextoRechazaNoEnteros() {
+        Bbox.limiteDesdeTexto("1.5");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void limiteDesdeTextoRechazaVacio() {
+        Bbox.limiteDesdeTexto("  ");
+    }
+
+    @Test
     public void resultadoMarcaTruncado() {
         Map<String, Object> parcial = Bbox.resultado(Arrays.asList("a", "b"), 5);
         assertEquals(5, parcial.get("total"));

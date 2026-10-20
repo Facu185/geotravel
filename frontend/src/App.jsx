@@ -4,6 +4,7 @@ import RecursosPage from "./modules/recursos/RecursosPage.jsx";
 import IncidentesPage from "./modules/incidentes/IncidentesPage.jsx";
 import ConsultasPage from "./modules/consultas/ConsultasPage.jsx";
 import InvitadoPage from "./modules/invitado/InvitadoPage.jsx";
+import EtaPage from "./modules/eta/EtaPage.jsx";
 import LoginPage from "./auth/LoginPage.jsx";
 import RutaAdmin from "./auth/RutaAdmin.jsx";
 import { AuthProvider, useAuth } from "./auth/AuthContext.jsx";
@@ -14,10 +15,11 @@ const NAV = [
   { to: "/zonas", label: "Zonas operativas", module: "P3", admin: true },
   { to: "/recursos", label: "Recursos", module: "P3", admin: true },
   { to: "/incidentes", label: "Incidentes", module: "P4", admin: true },
+  { to: "/eta", label: "Tiempo de llegada", module: "P2", admin: true },
   { to: "/consultas", label: "Consultas", module: "P5", admin: true },
 ];
 
-const RUTAS_CON_MAPA = ["/invitado", "/zonas", "/recursos", "/incidentes", "/consultas"];
+const RUTAS_CON_MAPA = ["/invitado", "/zonas", "/recursos", "/incidentes", "/consultas", "/eta"];
 
 /** Marca: un "ping" de radar, con el punto en el rojo de máxima prioridad. */
 function LogoMarca() {
@@ -90,6 +92,7 @@ function Aplicacion() {
             <Route path="/recursos" element={<RecursosPage />} />
             <Route path="/incidentes" element={<IncidentesPage />} />
             <Route path="/consultas" element={<ConsultasPage />} />
+            <Route path="/eta" element={<EtaPage />} />
           </Route>
         </Routes>
       </main>

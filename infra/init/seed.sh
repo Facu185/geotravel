@@ -2,9 +2,10 @@
 # Carga datos al levantar, sin duplicar nada:
 #   1. La red vial (db/data/vias.sql.gz) y los números de puerta (db/data/accesos.csv.gz): datos
 #      de referencia, cada uno solo si su tabla está vacía.
-#   2. Los datos de prueba (db/seed/seed.sql): UNA sola vez; no hace nada si la base ya tiene
-#      datos o si el seed ya se cargó antes (la tabla _seed_aplicado lo recuerda), para no
-#      duplicar ni resucitar datos que alguien borró a propósito.
+#   2. Los datos generales (db/seed/seed.sql): una sola vez.
+#   3. El escenario ETA en Salto (db/seed/seed_salto_eta.sql): una sola vez, incluso
+#      en bases que ya existian. Tiene marcador independiente y no duplica registros.
+# No se vuelven a crear datos que alguien elimine luego de aplicar el seed.
 set -e
 export PGPASSWORD="$POSTGRES_PASSWORD"
 PSQL="psql -h db -U $POSTGRES_USER -d $POSTGRES_DB -v ON_ERROR_STOP=1 -tA"
@@ -33,15 +34,24 @@ fi
 $PSQL -c "CREATE TABLE IF NOT EXISTS _seed_aplicado (fecha timestamptz NOT NULL DEFAULT now())"
 
 if [ "$($PSQL -c 'SELECT count(*) FROM _seed_aplicado')" != "0" ]; then
-  echo "seed: ya se cargó antes, no se repite"
-  exit 0
+  echo "seed: datos generales ya cargados; no se repiten"
+else
+  CANTIDAD=$($PSQL -c 'SELECT (SELECT count(*) FROM zona_operativa) + (SELECT count(*) FROM recurso) + (SELECT count(*) FROM incidente)')
+  if [ "$CANTIDAD" != "0" ]; then
+    echo "seed: la base ya tiene datos generales; no se carga el seed inicial"
+  else
+    psql -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q -f /seed/seed.sql
+    echo "seed: datos generales de prueba cargados"
+  fi
+  $PSQL -c "INSERT INTO _seed_aplicado DEFAULT VALUES" > /dev/null
 fi
 
-CANTIDAD=$($PSQL -c 'SELECT (SELECT count(*) FROM zona_operativa) + (SELECT count(*) FROM recurso) + (SELECT count(*) FROM incidente)')
-if [ "$CANTIDAD" != "0" ]; then
-  echo "seed: la base ya tiene datos, no se carga"
+# --- 3. Escenario ETA Salto: se aplica UNA vez, aun sobre una base existente.
+$PSQL -c "CREATE TABLE IF NOT EXISTS _seed_salto_eta_aplicado (fecha timestamptz NOT NULL DEFAULT now())" > /dev/null
+if [ "$($PSQL -c 'SELECT count(*) FROM _seed_salto_eta_aplicado')" = "0" ]; then
+  psql -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q -f /seed/seed_salto_eta.sql
+  $PSQL -c "INSERT INTO _seed_salto_eta_aplicado DEFAULT VALUES" > /dev/null
+  echo "seed ETA Salto: escenario disponible"
 else
-  psql -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q -f /seed/seed.sql
-  echo "seed: datos de prueba cargados"
+  echo "seed ETA Salto: ya aplicado; no se repite"
 fi
-$PSQL -c "INSERT INTO _seed_aplicado DEFAULT VALUES" > /dev/null

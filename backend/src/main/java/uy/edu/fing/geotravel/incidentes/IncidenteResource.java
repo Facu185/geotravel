@@ -1,6 +1,7 @@
 package uy.edu.fing.geotravel.incidentes;
 
 import uy.edu.fing.geotravel.db.DataSourceProvider;
+import uy.edu.fing.geotravel.mapa.Bbox;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
@@ -52,6 +53,18 @@ public class IncidenteResource {
           + "       ST_AsGeoJSON(ST_Transform(geom, 4326)) AS geom_json "
           + "FROM incidente ORDER BY fecha_hora_registro DESC";
 
+        private static final String SELECT_BBOX =
+                        "WITH rectangulo AS ("
+                    + " SELECT ST_Transform(ST_MakeEnvelope(?, ?, ?, ?, 4326), 32721) AS envelope"
+                    + ") "
+                    + "SELECT i.id, i.titulo, i.descripcion, i.tipo_incidente, i.prioridad, i.estado, "
+                    + "       i.fecha_hora_registro, i.equipo_responsable, "
+                    + "       ST_AsGeoJSON(ST_Transform(i.geom, 4326)) AS geom_json, "
+                    + "       count(*) OVER () AS total "
+                    + "FROM incidente i CROSS JOIN rectangulo r "
+                    + "WHERE i.geom && r.envelope AND ST_Intersects(i.geom, r.envelope) "
+                    + "ORDER BY i.fecha_hora_registro DESC, i.id DESC LIMIT ?";
+
     public static class IncidenteInput {
         public String titulo;
         public String descripcion;
@@ -68,7 +81,44 @@ public class IncidenteResource {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public List<Map<String, Object>> listar() throws SQLException {
+    public Response listar(@QueryParam("bbox") String bbox,
+                           @QueryParam("limit") String limit) throws SQLException {
+        int limite;
+        try {
+            limite = Bbox.limiteDesdeTexto(limit);
+        } catch (IllegalArgumentException e) {
+            return error(400, e.getMessage());
+        }
+
+        if (bbox == null) {
+            return Response.ok(listarTodos()).build();
+        }
+
+        Bbox rectangulo;
+        try {
+            rectangulo = Bbox.parse(bbox);
+        } catch (IllegalArgumentException e) {
+            return error(400, e.getMessage());
+        }
+
+        List<Map<String, Object>> incidentes = new ArrayList<>();
+        int total = 0;
+        if (!rectangulo.vacio()) {
+            try (Connection conn = DataSourceProvider.get().getConnection();
+                 PreparedStatement ps = conn.prepareStatement(SELECT_BBOX)) {
+                ps.setInt(rectangulo.enlazar(ps, 1), limite);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        total = rs.getInt("total");
+                        incidentes.add(filaAMapa(rs));
+                    }
+                }
+            }
+        }
+        return Response.ok(Bbox.resultado(incidentes, total)).build();
+    }
+
+    private static List<Map<String, Object>> listarTodos() throws SQLException {
         List<Map<String, Object>> incidentes = new ArrayList<>();
         try (Connection conn = DataSourceProvider.get().getConnection();
              Statement stmt = conn.createStatement();

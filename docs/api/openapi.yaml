@@ -29,6 +29,92 @@ paths:
       responses:
         "200": { description: OK }
 
+  # ------------------------------------------------------------ ETA / OSRM
+  /eta/recursos/{recursoId}/incidentes/{incidenteId}:
+    get:
+      summary: Calcular tiempo estimado de llegada
+      description: >
+        Obtiene las ubicaciones del recurso y del incidente desde PostGIS.
+        Consulta OSRM con perfil driving para obtener distancia, duración y
+        recorrido vial. La geometría se devuelve como GeoJSON en EPSG:4326.
+        No incorpora tráfico en tiempo real.
+      tags: [eta]
+      parameters:
+        - name: recursoId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: incidenteId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: ETA calculada correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - recursoId
+                  - incidenteId
+                  - distanciaMetros
+                  - duracionSegundos
+                  - tiempoEstimadoMinutos
+                  - geometriaRuta
+                  - motor
+                  - aclaracion
+                properties:
+                  recursoId:
+                    type: integer
+                  incidenteId:
+                    type: integer
+                  distanciaMetros:
+                    type: integer
+                    minimum: 0
+                  duracionSegundos:
+                    type: integer
+                    minimum: 0
+                  tiempoEstimadoMinutos:
+                    type: integer
+                    minimum: 0
+                  geometriaRuta:
+                    type: object
+                    description: >
+                      Recorrido vial GeoJSON LineString. Coordenadas en orden
+                      lon, lat, sistema EPSG:4326.
+                    required: [type, coordinates]
+                    properties:
+                      type:
+                        type: string
+                        enum: [LineString]
+                      coordinates:
+                        type: array
+                        minItems: 2
+                        items:
+                          type: array
+                          minItems: 2
+                          items:
+                            type: number
+                  motor:
+                    type: string
+                    example: OSRM driving
+                  aclaracion:
+                    type: string
+                    example: Estimacion sin trafico en tiempo real
+        "400":
+          $ref: "#/components/responses/DatosInvalidos"
+        "404":
+          $ref: "#/components/responses/NoExiste"
+        "422":
+          description: OSRM no encontró una ruta vial
+        "503":
+          description: Servicio OSRM no disponible
+
   # ------------------------------------------------------------ Ingreso del administrador
   /auth/login:
     post:
@@ -190,12 +276,28 @@ paths:
   # -------------------------------------------------------------------- Incidentes
   /incidentes:
     get:
-      summary: Lista de incidentes (geom en GeoJSON lon/lat)
+      summary: Lista incidentes, opcionalmente filtrados por bbox
+      description: >
+        Sin bbox devuelve el arreglo tradicional. Con bbox devuelve {items, total, truncado}.
+        El bbox usa EPSG:4326 y el orden oeste,sur,este,norte (minLon,minLat,maxLon,maxLat);
+        PostGIS filtra las geometrías almacenadas en EPSG:32721. geom contiene GeoJSON serializado
+        como texto y puede ser Point, LineString o Polygon en EPSG:4326.
       tags: [incidentes]
+      parameters:
+        - $ref: "#/components/parameters/Bbox"
+        - $ref: "#/components/parameters/Limit"
       responses:
         "200":
           description: OK
-          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Incidente" } } } }
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { type: array, items: { $ref: "#/components/schemas/Incidente" } }
+                  - allOf:
+                      - $ref: "#/components/schemas/ListadoPorZona"
+                      - { properties: { items: { type: array, items: { $ref: "#/components/schemas/Incidente" } } } }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
     post:
       summary: Registrar incidente (siempre nace en estado "Registrado")
       tags: [incidentes]
@@ -428,7 +530,8 @@ paths:
     get:
       summary: >
         Auxiliar de C4 y C5. Nombres de calle que contienen el texto dado (mínimo 2 letras; vacío si es menos), con
-        los que empiezan por él primero. Máximo 10. Para el autocompletado de intersecciones.
+        los que empiezan por él primero. Máximo 10. Para el autocompletado de intersecciones. Usa la red vial local,
+        actualmente de Montevideo; no representa cobertura de Salto.
       tags: [consultas]
       parameters:
         - { name: q, in: query, required: true, schema: { type: string } }
@@ -443,7 +546,7 @@ paths:
     get:
       summary: >
         Auxiliar de C4 y C5. Puntos donde se cruzan dos calles (lon/lat, EPSG:4326), calculados en PostGIS sobre la
-        red vial (tabla via). Lista vacía si no se cruzan o algún nombre no existe; varios
+        red vial local (tabla via, actualmente Montevideo). Lista vacía si no se cruzan o algún nombre no existe; varios
         elementos si hay nombres repetidos en la ciudad. El resultado se usa como lon/lat en
         /consultas/incidente-mas-cercano y /consultas/zona-por-punto.
       tags: [consultas]
@@ -472,15 +575,17 @@ paths:
         Montevideo (capa mdg_accesos de la Intendencia; es también la capa "acceso" de GeoServer),
         tolerando abreviaturas ("Camino" = CNO, "Avenida" = AV) y errores de tipeo. Si el número no
         existe se devuelve la puerta más cercana de la calle y se marca "aproximada". La tabla de puertas es
-        solo de Montevideo: con otro departamento, o con el parámetro esquina, se usa el servicio de
-        direcciones de la IDE de Uruguay, que cubre todo el país (requiere internet). El resultado se usa como lon/lat en
+        solo de Montevideo: con otro departamento o localidad, o con el parámetro esquina, se usa el servicio de
+        direcciones de la IDE de Uruguay, que cubre todo el país (requiere internet). Sin departamento ni
+        localidad se usan los configurados en el backend (IDE_DEPARTAMENTO e IDE_LOCALIDAD, por defecto Salto).
+        El resultado se usa como lon/lat en
         /consultas/incidente-mas-cercano y /consultas/zona-por-punto.
       tags: [consultas]
       parameters:
         - { name: direccion, in: query, required: true, schema: { type: string }, description: "Por ejemplo: Buenos Aires 451" }
         - { name: esquina, in: query, required: false, schema: { type: string }, description: "Segunda calle: ubica la esquina de direccion y esquina (siempre con la IDE)" }
-        - { name: departamento, in: query, required: false, schema: { type: string, default: montevideo }, description: "Departamento donde buscar. Fuera de Montevideo se usa la IDE, que cubre todo el país" }
-        - { name: localidad, in: query, required: false, schema: { type: string }, description: "Localidad (por defecto, igual al departamento)" }
+        - { name: departamento, in: query, required: false, schema: { type: string }, description: "Departamento donde buscar (por defecto, el de IDE_DEPARTAMENTO: salto). Fuera de Montevideo se usa la IDE, que cubre todo el país" }
+        - { name: localidad, in: query, required: false, schema: { type: string }, description: "Localidad (por defecto, igual al departamento si se indicó; si no, la de IDE_LOCALIDAD)" }
       responses:
         "200":
           description: OK
@@ -494,7 +599,7 @@ paths:
                   lat: { type: number }
                   aproximada: { type: boolean }
                   aviso: { type: string, nullable: true }
-                  fuente: { type: string, description: "Puertas de Montevideo, o IDE si se usó el respaldo" }
+                  fuente: { type: string, description: "Puertas locales solo para Montevideo; IDE para otras localidades" }
         "400": { description: Falta la dirección }
         "404": { description: No se encontró la calle (solo con el respaldo de la IDE) }
         "502": { description: Respaldo de la IDE no disponible (sin internet) }
@@ -648,7 +753,7 @@ components:
         tipo: { type: string, enum: [ambulancia, bomberos, patrulla, centro_atencion, otro] }
         estadoOperativo: { type: string, enum: [Disponible, "En servicio", "Fuera de servicio"] }
         descripcion: { type: string }
-        geom: { type: string, description: "GeoJSON Point en lon/lat (EPSG:4326), como texto" }
+        geom: { type: string, description: "GeoJSON Point, LineString o Polygon en lon/lat (EPSG:4326), como texto" }
     RecursoInput:
       type: object
       required: [identificacion, tipo, estadoOperativo, geomGeoJson]
