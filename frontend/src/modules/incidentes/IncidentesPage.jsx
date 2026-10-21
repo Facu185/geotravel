@@ -8,6 +8,7 @@ import EditorGeometria, { cargarGeometria, formaDe, geometriaDelGrupo } from "..
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Insignia, Segmentado } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, OPCIONES_PRIORIDAD } from "../../components/colores.js";
 import { api } from "../../api/client.js";
+import { CARGA_POR_ZONA } from "../../components/region.js";
 
 /**
  * Módulo Incidentes (dueño: P4): ABM + avanzar estado (con ramas) + histórico.
@@ -290,7 +291,7 @@ export default function IncidentesPage() {
       etiquetaBoton="Incidentes"
       hijosMapa={hijosMapa}
       // Alejado, los incidentes se ven igual: los dibuja GeoServer (imagen, no objetos en memoria).
-      mapaProps={{ layers: lejos ? ["geotravel:incidente"] : [], wmsExtra: { actualizado: recarga } }}
+      mapaProps={{ layers: lejos ? ["geotravel:incidente"] : [], wmsExtra: { actualizado: recarga }, mostrarZoom: true, zoomMinimo: CARGA_POR_ZONA.zoomMinimo }}
       aviso={<AvisoCarga carga={carga} nombre="incidentes" />}
     >
       {vista === "lista" && (

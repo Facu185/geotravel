@@ -14,6 +14,7 @@ import MapView, { ENCUADRE_REGION } from "./MapView.jsx";
  *   abiertoEnMovil    si el panel arranca abierto en pantallas chicas (en escritorio siempre abre)
  *   hijosMapa         lo que se dibuja DENTRO del mapa (marcadores, polígonos, controles)
  *   mapaProps         props extra para MapView (p. ej. layers y wmsExtra)
+ *   (todas llevan, dentro del mapa, los botones "Ir a" Salto / Montevideo)
  *   aviso             elemento que se superpone al mapa (p. ej. "todas las capas ocultas")
  *   pie               contenido fijo al pie del panel
  *   children          contenido del panel (scrollea si no entra)
@@ -46,6 +47,7 @@ export default function PaginaMapa({
         height="100%"
         bounds={ENCUADRE_REGION}
         boundsOptions={{ paddingTopLeft: [margen.izquierda, 32], paddingBottomRight: [16, margen.abajo] }}
+        irARegion
         {...mapaProps}
       >
         {hijosMapa}

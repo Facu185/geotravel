@@ -913,6 +913,14 @@
           }
         },
         {
+          "name": "C2c. Zonas con más incidentes en la parte visible del mapa (bbox)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/zonas-mas-incidentes?bbox=-57.99,-31.41,-57.93,-31.37&limit=50"
+          }
+        },
+        {
           "name": "C3. Recursos cercanos a un incidente",
           "request": {
             "method": "GET",
@@ -1012,154 +1020,6 @@
           }
         },
         {
-          "name": "Extra. Zonas por incidentes/km² (la consulta 8 se unificó con la 2)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{base}}/consultas/zonas-mayor-concentracion"
-          }
-        },
-        {
-          "name": "Extra. Línea: qué hay a lo largo de una línea (pasillo de 200 m por defecto)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base}}/consultas/por-figura",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"LineString\\\", \\\"coordinates\\\": [[-56.206, -34.9072], [-56.199, -34.9066], [-56.19, -34.9057]]}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Extra b. Incidentes/km² en un rango de fechas",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{base}}/consultas/zonas-mayor-concentracion?desde=2026-01-01&hasta=2027-01-01"
-          }
-        },
-        {
-          "name": "Extra b. Polígono: qué hay dentro de un polígono (0 m: solo lo de adentro)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base}}/consultas/por-figura",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Polygon\\\", \\\"coordinates\\\": [[[-56.22, -34.915], [-56.19, -34.915], [-56.19, -34.9], [-56.22, -34.9], [-56.22, -34.915]]]}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Extra c. Línea con pasillo de 1000 m",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base}}/consultas/por-figura",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"LineString\\\", \\\"coordinates\\\": [[-56.206, -34.9072], [-56.19, -34.9057]]}\",\n  \"distanciaM\": 1000\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Extra d. Un punto no es una figura válida (debe dar 400)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base}}/consultas/por-figura",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Point\\\", \\\"coordinates\\\": [-56.2, -34.9]}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
-                ]
-              }
-            }
-          ]
-        },
-        {
           "name": "Auxiliar. Tipos de incidente que existen (DISTINCT, para armar filtros)",
           "request": {
             "method": "GET",
@@ -1246,19 +1106,19 @@
           ]
         },
         {
-          "name": "C4/C5 aux. Autocompletar nombres de calle",
+          "name": "C4/C5 aux. Autocompletar nombres de calle (de Salto)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/calles?q=mag"
+            "url": "{{base}}/consultas/calles?q=urug"
           }
         },
         {
-          "name": "C4/C5 aux. Cruce de dos calles (Magallanes y Colonia: el ejercicio 6 del Práctico 2)",
+          "name": "C4/C5 aux. Cruce de dos calles (Uruguay y Yatay)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/interseccion?calle1=MAGALLANES&calle2=COLONIA"
+            "url": "{{base}}/consultas/interseccion?calle1=URUGUAY&calle2=YATAY"
           }
         },
         {
@@ -1266,7 +1126,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/interseccion?calle1=MAGALLANES&calle2=MERCEDES"
+            "url": "{{base}}/consultas/interseccion?calle1=URUGUAY&calle2=BRASIL"
           }
         },
         {
@@ -1274,7 +1134,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/interseccion?calle1=COLONIA"
+            "url": "{{base}}/consultas/interseccion?calle1=URUGUAY"
           },
           "event": [
             {
@@ -1289,19 +1149,19 @@
           ]
         },
         {
-          "name": "C4/C5 aux. Ubicar una dirección (tabla de puertas de Montevideo)",
+          "name": "C4/C5 aux. Ubicar una dirección (tabla de puertas de Salto)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/geocodificar?direccion=Av 18 de Julio 1000"
+            "url": "{{base}}/consultas/geocodificar?direccion=Uruguay 1000"
           }
         },
         {
-          "name": "C4/C5 aux. Dirección con abreviatura y número aproximado",
+          "name": "C4/C5 aux. Dirección con abreviatura (Gral = GENERAL)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/geocodificar?direccion=Camino Carrasco 4680"
+            "url": "{{base}}/consultas/geocodificar?direccion=Gral Fructuoso Rivera 500"
           }
         },
         {

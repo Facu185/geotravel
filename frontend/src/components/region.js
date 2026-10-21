@@ -15,7 +15,7 @@
  *     (cruce de calles y autocompletado, sin internet). En el resto la dirección y la esquina las resuelve la IDE.
  *   ejemploDireccion: texto de ayuda del campo.
  */
-const REGIONES = {
+export const REGIONES = {
   salto: {
     nombre: "Salto",
     ide: { departamento: "salto", localidad: "salto" },
@@ -32,10 +32,10 @@ const REGIONES = {
     ide: { departamento: "montevideo", localidad: "montevideo" },
     callesPropias: false,
     ejemploDireccion: "Buenos Aires 451",
-    centro: [-34.9011, -56.1645],
+    centro: [-34.88, -56.16],
     encuadre: [
-      [-34.9205, -56.2215],
-      [-34.9005, -56.1395],
+      [-34.915, -56.205],
+      [-34.845, -56.115],
     ],
   },
 };

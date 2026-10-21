@@ -97,15 +97,30 @@ extensión fija que cubra Uruguay, así no depende de los datos que haya al publ
 
 ## Consultas (P5)
 
-La pantalla Consultas tampoco carga todos los objetos al abrirse:
+La pantalla Consultas tampoco carga todos los objetos al abrirse. En el mapa hay tres clases de cosas:
 
-- **Fondo:** todo lo que existe lo dibuja GeoServer (WMS), como en el mapa público.
+- **Fondo:** GeoServer (WMS) dibuja de fondo solo el tipo de objeto con el que trabaja la consulta (zonas, incidentes o recursos), no todo lo que existe. El navegador recibe imágenes.
+- **Objetos para elegir (consultas 1, 2, 3, 6 y 7):** las zonas, incidentes o recursos de la parte visible del mapa,
+  hasta un límite (`CargaPorZona`, desde el zoom 11; en los ABM se pide desde el 13). El front los dibuja, los lista en el
+  panel y se elige uno con un clic en el mapa o en la lista. Mientras están dibujados así, GeoServer no dibuja ese mismo
+  tipo (para que no se vea doble). Elegir otro es un clic más.
 - **Resultado:** cada consulta de `/consultas/...` devuelve ya la geometría de lo que encontró (`geom`) y, las que
   pueden dar muchas filas (C1, C2, C6, C7 y el reporte), `?limit=` y `{items, total, truncado}`. Las geometrías
-  de las zonas se simplifican (3 m) para pesar menos. El ranking de zonas devuelve las 50 primeras.
-- **Elegir un objeto:** en vez de un desplegable con todas las zonas, incidentes o recursos, un buscador por texto
-  (`GET /consultas/buscar?tipo=zona|incidente|recurso&q=`) que devuelve pocas opciones.
-- **Vista:** al terminar la consulta el mapa se encuadra solo en el resultado (puede estar en cualquier parte del país).
+  de las zonas se simplifican (3 m) para pesar menos.
+
+Qué hace cada consulta:
+
+| Consulta | Se ven en el mapa | Al elegir |
+|---|---|---|
+| 1. Incidentes por zona | Las zonas de la vista | Sus incidentes, dibujados y listados |
+| 2. Zonas con más incidentes | Las zonas de la vista, más oscuras cuantos más incidentes (`?bbox=` en `/consultas/zonas-mas-incidentes`) | Una zona: sus incidentes |
+| 3. Recursos cercanos | Los incidentes de la vista | Sus recursos más cercanos, con la distancia |
+| 4. Incidente más cercano a un punto | De fondo, los incidentes (GeoServer, imagen); se busca con un clic, una dirección o un cruce | El incidente encontrado y la línea hasta el punto. No se cargan los de la vista porque el más cercano puede quedar afuera |
+| 5. Zona de un punto | De fondo, las zonas (GeoServer, imagen) | La zona que contiene al punto |
+| 6. Recursos por zona | Las zonas de la vista | Sus recursos |
+| 7. Incidentes por recurso | Los recursos de la vista | Sus incidentes, con una línea desde el recurso |
+
+Se sacaron los dos extras (incidentes por km² y dibujar una línea o un polígono para buscar alrededor).
 
 Probado con `db/pruebas/carga-masiva.sql` (700 zonas, 3.000 recursos): las consultas responden en 10 a 30 ms.
 
@@ -118,8 +133,9 @@ El mapa público ya dibujaba todo con GeoServer (imágenes), así que escala. Lo
   `resultType=hits` usando el índice espacial, sin descargar objetos. Los filtros de incidentes y recursos se combinan
   con ese rectángulo.
 - **Detalle al tocar:** `GetFeatureInfo` trae como máximo 10 objetos.
-- **Región:** el mapa abre centrado en Salto (`region.js`); los datos de prueba están en Montevideo, así que en Salto
-  los conteos dan 0 hasta cargar datos de esa zona.
+- **Región:** el mapa abre centrado en Salto (`region.js`). El seed trae datos en Salto y también en Montevideo (30 zonas,
+  40 recursos y 114 incidentes), para comprobar que el sistema atiende todo el país: al mover el mapa a Montevideo los
+  conteos y las capas cambian.
 
 ## Direcciones por región (P5)
 

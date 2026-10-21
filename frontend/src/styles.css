@@ -1059,6 +1059,66 @@ body {
   background: #f5f8fa;
 }
 
+/* El objeto elegido en la lista (consultas: la zona, el incidente o el recurso con el que se trabaja). */
+.ir-a-region {
+  position: absolute;
+  right: 64px;
+  bottom: 56px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(19, 32, 44, 0.18);
+  font-size: 0.8rem;
+}
+
+.ir-a-region__titulo {
+  font-weight: 600;
+  color: #4b5b69;
+}
+
+.ir-a-region__boton {
+  padding: 3px 10px;
+  border: 1px solid #c3ccd4;
+  border-radius: 4px;
+  background: #fff;
+  color: #13202c;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ir-a-region__boton:hover {
+  background: #eaf1f6;
+}
+
+.indicador-zoom {
+  position: absolute;
+  right: 64px;
+  bottom: 24px;
+  z-index: 1000;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(19, 32, 44, 0.18);
+  font-size: 0.8rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.indicador-zoom small {
+  font-weight: 400;
+  color: #4b5b69;
+}
+
+.item--activo {
+  background: #eaf1f6;
+  box-shadow: inset 3px 0 0 #13202c;
+}
+
 .item__marca {
   flex: none;
   width: 14px;
@@ -1321,6 +1381,18 @@ body {
   grid-template-columns: minmax(0, 7.5rem) 1fr auto;
   align-items: center;
   gap: 12px;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ranking__fila:hover {
+  background: #f5f8fa;
 }
 
 .ranking__nombre {

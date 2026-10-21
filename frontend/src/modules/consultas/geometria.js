@@ -26,12 +26,3 @@ export const conGeometria = (objeto) => {
   const geometria = JSON.parse(objeto.geom);
   return { ...objeto, geometria, pos: posicion(geometria) };
 };
-
-/** Lo que devuelve /consultas/buscar (una opción elegida) como zona, incidente o recurso para dibujar. */
-export const deBusqueda = (opcion) =>
-  conGeometria({
-    ...opcion,
-    nombre: opcion.etiqueta,
-    titulo: opcion.etiqueta,
-    identificacion: opcion.etiqueta,
-  });

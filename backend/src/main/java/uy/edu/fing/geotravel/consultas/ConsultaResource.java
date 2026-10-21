@@ -111,14 +111,27 @@ public class ConsultaResource {
     // --------------------------------------------- 2. Zonas con mayor cantidad de incidentes
     /**
      * Zonas ordenadas por cantidad de incidentes registrados en el período dado (ambos opcionales).
-     * Devuelve las primeras "limit" (50 por defecto), con su geometría para pintarlas en el mapa.
+     * Con bbox (oeste,sur,este,norte en lon/lat) solo cuenta las zonas que están en esa parte del mapa, la
+     * que se está viendo. Devuelve las primeras "limit" (50 por defecto), con su geometría para pintarlas.
      */
     @GET
     @Path("/zonas-mas-incidentes")
     @Produces(MediaType.APPLICATION_JSON)
     public Map<String, Object> zonasMasIncidentes(@QueryParam("desde") String desde,
                                                   @QueryParam("hasta") String hasta,
+                                                  @QueryParam("bbox") String bbox,
                                                   @QueryParam("limit") Integer limit) throws SQLException {
+        Bbox rectangulo = null;
+        if (bbox != null) {
+            try {
+                rectangulo = Bbox.parse(bbox);
+            } catch (IllegalArgumentException e) {
+                throw peticionInvalida(e.getMessage());
+            }
+            if (rectangulo.vacio()) {
+                return Bbox.resultado(new ArrayList<>(), 0);
+            }
+        }
         String sql =
             "SELECT z.id, z.nombre, z.nivel_prioridad, count(i.id) AS cantidad_incidentes, " +
             "       " + geomZona("z") + ", count(*) OVER () AS total " +
@@ -126,50 +139,21 @@ public class ConsultaResource {
             "LEFT JOIN incidente i ON ST_Intersects(z.geom, i.geom) " +
             "  AND (?::timestamp IS NULL OR i.fecha_hora_registro >= ?::timestamp) " +
             "  AND (?::timestamp IS NULL OR i.fecha_hora_registro <  ?::timestamp) " +
+            (rectangulo != null ? "WHERE z.geom && ST_Transform(ST_MakeEnvelope(?, ?, ?, ?, 4326), 32721) " : "") +
             "GROUP BY z.id, z.nombre, z.nivel_prioridad, z.geom " +
             "ORDER BY cantidad_incidentes DESC, z.nombre LIMIT ?";
         try (Connection conn = DataSourceProvider.get().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, desde); ps.setString(2, desde);
             ps.setString(3, hasta); ps.setString(4, hasta);
-            ps.setInt(5, limiteRanking(limit));
+            int siguiente = rectangulo != null ? rectangulo.enlazar(ps, 5) : 5;
+            ps.setInt(siguiente, limiteRanking(limit));
             return conTotal(ps.executeQuery(), "id", "nombre", "nivel_prioridad", "cantidad_incidentes", "geom");
         }
     }
 
     private static int limiteRanking(Integer pedido) {
         return pedido == null ? 50 : limiteDe(pedido);
-    }
-
-    // ------------------------------------------- Extra: zonas por incidentes por km²
-    /**
-     * Extra de la consulta 2 (la letra actualizada unificó "mayor cantidad" y "mayor concentración"):
-     * la misma cuenta de incidentes por zona, pero normalizada por el área (incidentes / km²), para
-     * que una zona chica con pocos incidentes pueda salir más cargada que una grande.
-     */
-    @GET
-    @Path("/zonas-mayor-concentracion")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Map<String, Object> zonasMayorConcentracion(@QueryParam("desde") String desde,
-                                                       @QueryParam("hasta") String hasta,
-                                                       @QueryParam("limit") Integer limit) throws SQLException {
-        String sql =
-            "SELECT z.id, z.nombre, z.nivel_prioridad, count(i.id) AS cantidad_incidentes, " +
-            "       round((count(i.id) / (ST_Area(z.geom) / 1e6))::numeric, 3) AS incidentes_por_km2, " +
-            "       " + geomZona("z") + ", count(*) OVER () AS total " +
-            "FROM zona_operativa z " +
-            "LEFT JOIN incidente i ON ST_Intersects(z.geom, i.geom) " +
-            "  AND (?::timestamp IS NULL OR i.fecha_hora_registro >= ?::timestamp) " +
-            "  AND (?::timestamp IS NULL OR i.fecha_hora_registro <  ?::timestamp) " +
-            "GROUP BY z.id, z.nombre, z.nivel_prioridad, z.geom " +
-            "ORDER BY incidentes_por_km2 DESC, z.nombre LIMIT ?";
-        try (Connection conn = DataSourceProvider.get().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, desde); ps.setString(2, desde);
-            ps.setString(3, hasta); ps.setString(4, hasta);
-            ps.setInt(5, limiteRanking(limit));
-            return conTotal(ps.executeQuery(), "id", "nombre", "nivel_prioridad", "cantidad_incidentes", "incidentes_por_km2", "geom");
-        }
     }
 
     // ---------------------------------------------------- 3. Recursos cercanos a un incidente
@@ -427,139 +411,6 @@ public class ConsultaResource {
                 .type(MediaType.APPLICATION_JSON)
                 .entity(Map.of("error", mensaje))
                 .build());
-    }
-
-    // ------------------------------------------------------- Figura dibujada en el mapa
-    /** Cuerpo de POST /consultas/por-figura. geomGeoJson: la figura en lon/lat, como texto. */
-    public static class FiguraInput {
-        public String geomGeoJson;
-        public Double distanciaM;
-    }
-
-    private static final String FIGURA = "ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326), 32721)";
-    private static final int MAX_POR_FIGURA = 200;
-    private static final double MAX_DISTANCIA_M = 10000;
-
-    /**
-     * Qué hay dentro de, o cerca de, una línea o un polígono dibujado en el mapa. Para un polígono
-     * (distancia 0 por defecto) son los puntos que caen adentro; para una línea (200 m por defecto)
-     * los que están a menos de esa distancia, como un pasillo a lo largo de ella. Con una distancia
-     * mayor a 0 se agranda la figura (ST_Buffer), y esa área se devuelve para dibujarla.
-     * Todo lo resuelve PostGIS: ST_DWithin usa los índices espaciales, y se devuelven las medidas
-     * de la figura (ST_Length, ST_Area, ST_Perimeter) y las zonas que toca. Cada lista trae como
-     * máximo MAX_POR_FIGURA filas, las más cercanas, y el total real.
-     */
-    @POST
-    @Path("/por-figura")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    public Map<String, Object> porFigura(FiguraInput in) throws SQLException {
-        if (in == null || in.geomGeoJson == null || in.geomGeoJson.trim().isEmpty()) {
-            throw peticionInvalida("Falta la figura: dibujá una línea o un polígono");
-        }
-        try (Connection conn = DataSourceProvider.get().getConnection()) {
-            String tipo;
-            boolean valida;
-            double largo;
-            double area;
-            double perimetro;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT GeometryType(g), ST_IsValid(g), ST_Length(g), ST_Area(g), ST_Perimeter(g) " +
-                    "FROM (SELECT " + FIGURA + " AS g) t")) {
-                ps.setString(1, in.geomGeoJson);
-                try (ResultSet rs = ps.executeQuery()) {
-                    rs.next();
-                    tipo = rs.getString(1);
-                    valida = rs.getBoolean(2);
-                    largo = rs.getDouble(3);
-                    area = rs.getDouble(4);
-                    perimetro = rs.getDouble(5);
-                }
-            } catch (SQLException e) {
-                throw peticionInvalida("La figura no es un GeoJSON válido");
-            }
-            boolean esLinea = "LINESTRING".equals(tipo);
-            if (!esLinea && !"POLYGON".equals(tipo)) {
-                throw peticionInvalida("La figura tiene que ser una línea o un polígono");
-            }
-            if (!valida) {
-                throw peticionInvalida("La figura no es válida (¿se cruza consigo misma?)");
-            }
-
-            double distancia = in.distanciaM != null ? in.distanciaM : (esLinea ? 200 : 0);
-            if (distancia < 0 || distancia > MAX_DISTANCIA_M) {
-                throw peticionInvalida("La distancia tiene que estar entre 0 y " + (int) MAX_DISTANCIA_M + " metros");
-            }
-            if (esLinea && distancia <= 0) {
-                throw peticionInvalida("Para una línea indicá a cuántos metros buscar (mayor que 0)");
-            }
-
-            String base = "WITH g AS (SELECT " + FIGURA + " AS geom) ";
-            Map<String, Object> respuesta = new LinkedHashMap<>();
-            respuesta.put("tipo", esLinea ? "LineString" : "Polygon");
-            respuesta.put("distanciaM", distancia);
-            if (esLinea) {
-                respuesta.put("largoM", Math.round(largo * 10) / 10.0);
-            } else {
-                respuesta.put("areaM2", Math.round(area));
-                respuesta.put("perimetroM", Math.round(perimetro * 10) / 10.0);
-            }
-
-            // El área buscada: la figura agrandada por la distancia (solo si hay algo que dibujar).
-            String areaBuscada = null;
-            if (distancia > 0) {
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "SELECT ST_AsGeoJSON(ST_Transform(ST_Buffer(g, ?), 4326)) FROM (SELECT " + FIGURA + " AS g) t")) {
-                    ps.setDouble(1, distancia);
-                    ps.setString(2, in.geomGeoJson);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (rs.next()) areaBuscada = rs.getString(1);
-                    }
-                }
-            }
-            respuesta.put("area", areaBuscada);
-
-            respuesta.put("incidentes", buscarCerca(conn,
-                base + "SELECT i.id, i.titulo, i.tipo_incidente, i.estado, i.prioridad, " +
-                "       round(ST_Distance(i.geom, g.geom)::numeric, 1) AS distancia_m, " + geomIncidente("i") + ", count(*) OVER () AS total " +
-                "FROM incidente i, g WHERE ST_DWithin(i.geom, g.geom, ?) " +
-                "ORDER BY ST_Distance(i.geom, g.geom), i.id LIMIT " + MAX_POR_FIGURA,
-                in.geomGeoJson, distancia, "id", "titulo", "tipo_incidente", "estado", "prioridad", "distancia_m", "geom"));
-            respuesta.put("recursos", buscarCerca(conn,
-                base + "SELECT r.id, r.identificacion, r.tipo, r.estado_operativo, " +
-                "       round(ST_Distance(r.geom, g.geom)::numeric, 1) AS distancia_m, " + geomIncidente("r") + ", count(*) OVER () AS total " +
-                "FROM recurso r, g WHERE ST_DWithin(r.geom, g.geom, ?) " +
-                "ORDER BY ST_Distance(r.geom, g.geom), r.id LIMIT " + MAX_POR_FIGURA,
-                in.geomGeoJson, distancia, "id", "identificacion", "tipo", "estado_operativo", "distancia_m", "geom"));
-            respuesta.put("zonas", buscarCerca(conn,
-                base + "SELECT z.id, z.nombre, z.nivel_prioridad, " + geomZona("z") + ", count(*) OVER () AS total " +
-                "FROM zona_operativa z, g WHERE ST_DWithin(z.geom, g.geom, ?) ORDER BY z.nombre LIMIT " + MAX_POR_FIGURA,
-                in.geomGeoJson, distancia, "id", "nombre", "nivel_prioridad", "geom").get("filas"));
-            return respuesta;
-        }
-    }
-
-    /** Ejecuta una consulta "base + distancia" y devuelve {total, filas}; total viene de count(*) OVER (). */
-    private static Map<String, Object> buscarCerca(Connection conn, String sql, String geoJson, double distancia, String... columnas)
-            throws SQLException {
-        List<Map<String, Object>> filas = new ArrayList<>();
-        long total = 0;
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, geoJson);
-            ps.setDouble(2, distancia);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    total = rs.getLong("total");
-                    Map<String, Object> fila = new LinkedHashMap<>();
-                    for (String columna : columnas) fila.put(toCamelCase(columna), texto(rs.getObject(columna)));
-                    filas.add(fila);
-                }
-            }
-        }
-        Map<String, Object> resultado = new LinkedHashMap<>();
-        resultado.put("total", total);
-        resultado.put("filas", filas);
-        return resultado;
     }
 
     // -------------------------------------------------------- Dirección (calle y número)

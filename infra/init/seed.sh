@@ -2,7 +2,8 @@
 # Carga datos al levantar, sin duplicar nada:
 #   1. La red vial de Salto (db/data/vias.csv.gz) y los números de puerta (db/data/accesos.csv.gz): datos
 #      de referencia, cada uno solo si su tabla está vacía.
-#   2. Los datos generales (db/seed/seed.sql): una sola vez.
+#   2. Los datos generales (db/seed/seed.sql: unos pocos a mano y un conjunto grande de zonas, recursos
+#      e incidentes de Salto para recorrer las consultas): una sola vez.
 #   3. El escenario ETA en Salto (db/seed/seed_salto_eta.sql): una sola vez, incluso
 #      en bases que ya existian. Tiene marcador independiente y no duplica registros.
 # No se vuelven a crear datos que alguien elimine luego de aplicar el seed.

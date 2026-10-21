@@ -1,9 +1,9 @@
-import { useEffect, useId, useMemo, useState } from "react";
-import { Aviso, Insignia, Segmentado, Selector } from "../../components/ui.jsx";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Aviso, Insignia, Selector } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
 import { api } from "../../api/client.js";
 import { REGION } from "../../components/region.js";
-import { conGeometria, deBusqueda } from "./geometria.js";
+import { conGeometria } from "./geometria.js";
 
 /**
  * Las consultas geográficas de la letra, un panel por consulta. Todas siguen el mismo patrón:
@@ -14,7 +14,11 @@ import { conGeometria, deBusqueda } from "./geometria.js";
  * Las consultas son "a demanda": cada una devuelve ya la geometría de lo que encontró (campo "geom",
  * GeoJSON en lon/lat) y, las que pueden dar muchas filas, un límite y el total real. La página no
  * carga todos los objetos: lo demás lo dibuja GeoServer de fondo. Para elegir una zona, un incidente
- * o un recurso se busca por texto (BuscadorObjeto) en vez de listar todos.
+ * o un recurso (consultas 1, 2, 3, 6 y 7) se usan los de la parte visible del mapa: la página los carga
+ * (CargaPorZona), el mapa los dibuja y el panel los lista; se elige con un clic en cualquiera de los dos.
+ *
+ * Cada panel recibe de la página: setResultado (lo que se dibuja como resultado), setElegibles (los objetos
+ * del mapa que se pueden elegir), carga (los objetos de la vista) y vista (el bbox visible).
  */
 
 /** Lo que un panel le pide dibujar al mapa: objetos con su geometría ya leída (ver geometria.js). */
@@ -23,7 +27,6 @@ export const RESULTADO_VACIO = {
   incidentes: [], // [{ id, titulo, estado, geometria, pos }]
   recursos: [], // [{ id, identificacion, estadoOperativo, geometria, pos }]
   lineas: [], // [{ desde: [lat, lng], hasta: [lat, lng], texto }]
-  area: null, // GeoJSON (lon/lat) de un área buscada, p. ej. el pasillo alrededor de una línea
 };
 
 /** Una zona de la API (o de una búsqueda) lista para dibujar, con la intensidad con la que se pinta. */
@@ -162,25 +165,71 @@ function FilaRecurso({ r, dato }) {
   );
 }
 
-// ------------------------------------------ 1 y 6: incidentes y recursos por zona
+// --------------------------------------- elegir un objeto de la vista (zona, incidente o recurso)
 
-/** Incidentes o recursos que están dentro de una zona elegida. */
-function PanelPorZona({ setResultado, tipo }) {
-  const [zona, setZona] = useState(null);
-  const { fase, datos: r, error } = useRuta(zona ? `/consultas/${tipo}-por-zona/${zona.id}` : null);
+const NOMBRE_OBJETO = { zona: "zonas", incidente: "incidentes", recurso: "recursos" };
 
+/** Los objetos de la parte visible del mapa (con la geometría ya leída), o null si no hay nada para elegir todavía. */
+function useObjetosDeLaVista(carga) {
+  return useMemo(() => {
+    if (carga.estado === "lejos" || (carga.estado === "cargando" && carga.items.length === 0)) return null;
+    return carga.items.map(conGeometria);
+  }, [carga]);
+}
+
+/** Le pide a la página que dibuje estos objetos en el mapa y deje elegirlos con un clic; null los saca. */
+function useElegibles(setElegibles, tipo, items, elegido, elegir) {
   useEffect(() => {
-    if (!r || !zona) {
-      setResultado(RESULTADO_VACIO);
-      return;
-    }
-    setResultado({ ...RESULTADO_VACIO, zonas: [comoZona({ ...zona, nombre: zona.etiqueta })], [tipo]: r.items.map(conGeometria) });
-  }, [r, zona, tipo, setResultado]);
+    setElegibles(items ? { tipo, items, elegidoId: elegido?.id ?? null, elegir } : null);
+  }, [setElegibles, tipo, items, elegido, elegir]);
+  useEffect(() => () => setElegibles(null), [setElegibles]);
+}
 
-  const nombre = tipo === "incidentes" ? "incidentes" : "recursos";
+/** La lista de los objetos de la vista: se elige uno con un clic (igual que en el mapa). */
+function ListaElegible({ carga, tipo, objetos, elegido, onElegir }) {
+  const nombre = NOMBRE_OBJETO[tipo];
+  if (carga.estado === "lejos") return <Aviso tipo="info">Acercá el mapa para ver y elegir {nombre}.</Aviso>;
+  if (carga.estado === "error") return <Aviso tipo="error">No se pudieron cargar {nombre}: {carga.error}</Aviso>;
+  if (!objetos) return <p className="ayuda">Cargando {nombre}…</p>;
+  if (objetos.length === 0) return <p className="ayuda">No hay {nombre} en esta parte del mapa. Movelo o alejalo para ver otras.</p>;
+
   return (
     <>
-      <BuscadorObjeto etiqueta="Zona operativa" tipo="zona" onChange={setZona} placeholder="Escribí el nombre y elegí de la lista" />
+      <p className="ayuda">
+        {carga.truncado ? `Mostrando ${objetos.length} de ${carga.total} ${nombre}: acercá el mapa para ver el resto.` : `${objetos.length} ${nombre} en esta parte del mapa.`}{" "}
+        Elegí uno con un clic, acá o en el mapa.
+      </p>
+      <ul className="items">
+        {objetos.map((o) => (
+          <li key={o.id}>
+            <button type="button" className={elegido?.id === o.id ? "item item--activo" : "item"} onClick={() => onElegir(o)}>
+              {tipo === "zona" && <span className="item__marca item__marca--zona" style={{ "--color": COLOR_PRIORIDAD[o.nivelPrioridad] }} aria-hidden="true" />}
+              {tipo === "incidente" && <span className="item__marca item__marca--circulo" style={{ "--color": COLOR_ESTADO_INCIDENTE[o.estado] }} aria-hidden="true" />}
+              {tipo === "recurso" && <span className="item__marca item__marca--cuadrado" style={{ "--color": COLOR_ESTADO_RECURSO[o.estadoOperativo] }} aria-hidden="true" />}
+              <span className="item__texto">
+                <span className="item__titulo">{tipo === "zona" ? o.nombre : tipo === "incidente" ? o.titulo : o.identificacion}</span>
+                <span className="item__detalle">
+                  {tipo === "zona" && `Prioridad ${o.nivelPrioridad}`}
+                  {tipo === "incidente" && `${o.estado} · prioridad ${o.prioridad}`}
+                  {tipo === "recurso" && `${o.tipo} · ${o.estadoOperativo}`}
+                </span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+// ------------------------------------------ 1 y 6: incidentes y recursos por zona
+
+/** Lo que hay dentro de una zona elegida: encabezado, cantidad y lista (incidentes o recursos). */
+function ResultadoPorZona({ zona, tipo, fase, datos: r, error, onQuitar }) {
+  const nombre = tipo === "incidentes" ? "incidentes" : "recursos";
+  return (
+    <section className="bloque">
+      <h4 className="resultado__grupo">{zona.nombre}</h4>
       <Estado fase={fase} error={error} />
       {r && (
         <>
@@ -193,6 +242,32 @@ function PanelPorZona({ setResultado, tipo }) {
           </ul>
         </>
       )}
+      <button type="button" className="btn btn--secundario" onClick={onQuitar}>
+        Elegir otra zona
+      </button>
+    </section>
+  );
+}
+
+/** Incidentes o recursos que están dentro de una zona elegida entre las que se ven en el mapa. */
+function PanelPorZona({ setResultado, setElegibles, carga, tipo }) {
+  const [zona, setZona] = useState(null);
+  const zonas = useObjetosDeLaVista(carga);
+  useElegibles(setElegibles, "zona", zonas, zona, setZona);
+  const { fase, datos: r, error } = useRuta(zona ? `/consultas/${tipo}-por-zona/${zona.id}` : null);
+
+  useEffect(() => {
+    if (!r || !zona) {
+      setResultado(RESULTADO_VACIO);
+      return;
+    }
+    setResultado({ ...RESULTADO_VACIO, zonas: [comoZona(zona)], [tipo]: r.items.map(conGeometria) });
+  }, [r, zona, tipo, setResultado]);
+
+  return (
+    <>
+      {zona && <ResultadoPorZona zona={zona} tipo={tipo} fase={fase} datos={r} error={error} onQuitar={() => setZona(null)} />}
+      {!zona && <ListaElegible carga={carga} tipo="zona" objetos={zonas} elegido={zona} onElegir={setZona} />}
     </>
   );
 }
@@ -202,11 +277,14 @@ const PanelRecursosZona = (props) => <PanelPorZona {...props} tipo="recursos" />
 
 // ------------------------------------------------------ 3: recursos cercanos a un incidente
 
-function PanelRecursosCercanos({ setResultado }) {
+function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   const [incidente, setIncidente] = useState(null);
   const [limite, setLimite] = useState(3);
   const [soloDisponibles, setSoloDisponibles] = useState(true);
   const cantidad = Math.min(10, Math.max(1, Number(limite) || 3));
+
+  const incidentes = useObjetosDeLaVista(carga);
+  useElegibles(setElegibles, "incidente", incidentes, incidente, setIncidente);
 
   const ruta = incidente ? `/consultas/recursos-cercanos/${incidente.id}${query({ limite: cantidad, soloDisponibles })}` : null;
   const { fase, datos: filas, error } = useRuta(ruta);
@@ -216,15 +294,13 @@ function PanelRecursosCercanos({ setResultado }) {
       setResultado(RESULTADO_VACIO);
       return;
     }
-    const origen = deBusqueda(incidente);
     const recursos = filas.map(conGeometria);
-    const lineas = recursos.map((r) => ({ desde: origen.pos, hasta: r.pos, texto: `${r.identificacion}: ${metros(r.distanciaM)}` }));
-    setResultado({ ...RESULTADO_VACIO, incidentes: [origen], recursos, lineas });
+    const lineas = recursos.map((r) => ({ desde: incidente.pos, hasta: r.pos, texto: `${r.identificacion}: ${metros(r.distanciaM)}` }));
+    setResultado({ ...RESULTADO_VACIO, incidentes: [incidente], recursos, lineas });
   }, [filas, incidente, setResultado]);
 
   return (
     <>
-      <BuscadorObjeto etiqueta="Incidente" tipo="incidente" onChange={setIncidente} placeholder="Escribí el título y elegí de la lista" />
       <label className="campo">
         <span className="campo__etiqueta">Cuántos recursos</span>
         <input type="number" min="1" max="10" value={limite} onChange={(e) => setLimite(e.target.value)} />
@@ -233,15 +309,24 @@ function PanelRecursosCercanos({ setResultado }) {
         <input type="checkbox" checked={soloDisponibles} onChange={(e) => setSoloDisponibles(e.target.checked)} />
         Solo recursos disponibles
       </label>
-      <Estado fase={fase} error={error} />
-      {filas && filas.length === 0 && <p className="ayuda">No hay recursos que cumplan.</p>}
-      {filas && filas.length > 0 && (
-        <ul className="items">
-          {filas.map((f) => (
-            <FilaRecurso key={f.id} r={f} dato={metros(f.distanciaM)} />
-          ))}
-        </ul>
+      {incidente && (
+        <section className="bloque">
+          <h4 className="resultado__grupo">{incidente.titulo}</h4>
+          <Estado fase={fase} error={error} />
+          {filas && filas.length === 0 && <p className="ayuda">No hay recursos que cumplan.</p>}
+          {filas && filas.length > 0 && (
+            <ul className="items">
+              {filas.map((f) => (
+                <FilaRecurso key={f.id} r={f} dato={metros(f.distanciaM)} />
+              ))}
+            </ul>
+          )}
+          <button type="button" className="btn btn--secundario" onClick={() => setIncidente(null)}>
+            Elegir otro incidente
+          </button>
+        </section>
       )}
+      {!incidente && <ListaElegible carga={carga} tipo="incidente" objetos={incidentes} elegido={incidente} onElegir={setIncidente} />}
     </>
   );
 }
@@ -487,8 +572,10 @@ function PanelZonaPunto({ punto, setPunto, setResultado }) {
 
 // -------------------------------------------------------------- 7: incidentes por recurso
 
-function PanelIncidentesRecurso({ setResultado }) {
+function PanelIncidentesRecurso({ setResultado, setElegibles, carga }) {
   const [recurso, setRecurso] = useState(null);
+  const recursos = useObjetosDeLaVista(carga);
+  useElegibles(setElegibles, "recurso", recursos, recurso, setRecurso);
   const { fase, datos: r, error } = useRuta(recurso ? `/consultas/incidentes-por-recurso/${recurso.id}` : null);
 
   useEffect(() => {
@@ -496,70 +583,75 @@ function PanelIncidentesRecurso({ setResultado }) {
       setResultado(RESULTADO_VACIO);
       return;
     }
-    const origen = deBusqueda(recurso);
     const incidentes = r.items.map(conGeometria);
-    const lineas = incidentes.map((i) => ({ desde: origen.pos, hasta: i.pos, texto: i.titulo }));
-    setResultado({ ...RESULTADO_VACIO, recursos: [origen], incidentes, lineas });
+    const lineas = incidentes.map((i) => ({ desde: recurso.pos, hasta: i.pos, texto: i.titulo }));
+    setResultado({ ...RESULTADO_VACIO, recursos: [recurso], incidentes, lineas });
   }, [r, recurso, setResultado]);
 
   return (
     <>
-      <BuscadorObjeto etiqueta="Recurso" tipo="recurso" onChange={setRecurso} placeholder="Escribí la identificación y elegí de la lista" />
-      <Estado fase={fase} error={error} />
-      {r && r.items.length === 0 && <p className="ayuda">Este recurso no tiene incidentes asignados.</p>}
-      {r && r.items.length > 0 && (
-        <>
-          <Truncado r={r} nombre="incidentes" />
-          <ul className="items">
-            {r.items.map((f) => (
-              <FilaIncidente key={f.id} i={f} />
-            ))}
-          </ul>
-        </>
+      {recurso && (
+        <section className="bloque">
+          <h4 className="resultado__grupo">{recurso.identificacion}</h4>
+          <Estado fase={fase} error={error} />
+          {r && r.items.length === 0 && <p className="ayuda">Este recurso no tiene incidentes asignados.</p>}
+          {r && r.items.length > 0 && (
+            <>
+              <Truncado r={r} nombre="incidentes" />
+              <ul className="items">
+                {r.items.map((f) => (
+                  <FilaIncidente key={f.id} i={f} />
+                ))}
+              </ul>
+            </>
+          )}
+          <button type="button" className="btn btn--secundario" onClick={() => setRecurso(null)}>
+            Elegir otro recurso
+          </button>
+        </section>
       )}
+      {!recurso && <ListaElegible carga={carga} tipo="recurso" objetos={recursos} elegido={recurso} onElegir={setRecurso} />}
     </>
   );
 }
 
 // ------------------------------------------------ 2: zonas con mayor cantidad de incidentes
 
-const METRICAS = {
-  cantidad: { ruta: "zonas-mas-incidentes", campo: "cantidadIncidentes", unidad: ["incidente", "incidentes"] },
-  km2: { ruta: "zonas-mayor-concentracion", campo: "incidentesPorKm2", unidad: [" / km²", " / km²"] },
-};
-
-function PanelRankings({ setResultado }) {
-  const [metrica, setMetrica] = useState("cantidad");
+/**
+ * Ranking de las zonas que se ven en el mapa (el backend cuenta solo las del bbox visible). En el mapa, cuanto
+ * más oscura la zona, más incidentes. Elegir una zona (en el ranking o con un clic en el mapa) muestra sus incidentes.
+ */
+function PanelRankings({ setResultado, setElegibles, vista }) {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
-  const { ruta, campo, unidad } = METRICAS[metrica];
+  const [zona, setZona] = useState(null);
 
-  const { fase, datos: r, error } = useRuta(`/consultas/${ruta}${query({ desde, hasta: diaSiguiente(hasta) })}`);
+  const ruta = vista ? `/consultas/zonas-mas-incidentes${query({ desde, hasta: diaSiguiente(hasta), bbox: vista.bbox })}` : null;
+  const { fase, datos, error } = useRuta(ruta);
+  // Mientras se pide el de la vista nueva se sigue mostrando el anterior (sin parpadeos al mover el mapa).
+  const anterior = useRef(null);
+  if (datos) anterior.current = datos;
+  const r = datos ?? anterior.current;
   const filas = r?.items;
-  const maximo = Math.max(0, ...(filas ?? []).map((z) => Number(z[campo])));
+  const maximo = Math.max(0, ...(filas ?? []).map((z) => Number(z.cantidadIncidentes)));
 
+  const zonas = useMemo(
+    () => (filas ? filas.map((z) => comoZona(z, maximo > 0 ? Number(z.cantidadIncidentes) / maximo : 0)) : null),
+    [filas, maximo],
+  );
+  useElegibles(setElegibles, "zona", zonas, zona, setZona);
+
+  const { fase: faseZona, datos: incidentesZona, error: errorZona } = useRuta(zona ? `/consultas/incidentes-por-zona/${zona.id}` : null);
   useEffect(() => {
-    if (!filas || maximo <= 0) {
+    if (!zona || !incidentesZona) {
       setResultado(RESULTADO_VACIO);
       return;
     }
-    // Se pintan las zonas con incidentes; cuanto más oscura, más cantidad.
-    const zonas = filas.filter((z) => Number(z[campo]) > 0).map((z) => comoZona(z, Number(z[campo]) / maximo));
-    setResultado({ ...RESULTADO_VACIO, zonas });
-  }, [filas, campo, maximo, setResultado]);
+    setResultado({ ...RESULTADO_VACIO, zonas: [comoZona(zona)], incidentes: incidentesZona.items.map(conGeometria) });
+  }, [zona, incidentesZona, setResultado]);
 
   return (
     <>
-      <Segmentado
-        leyenda="Ordenar por"
-        nombre="metrica"
-        valor={metrica}
-        onChange={setMetrica}
-        opciones={[
-          { valor: "cantidad", etiqueta: "Cantidad", color: "#2b6b9e" },
-          { valor: "km2", etiqueta: "Extra: por km²", color: "#9a5a12" },
-        ]}
-      />
       <div className="campos-2">
         <label className="campo">
           <span className="campo__etiqueta">Desde</span>
@@ -570,34 +662,40 @@ function PanelRankings({ setResultado }) {
           <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
         </label>
       </div>
-      <Estado fase={fase} error={error} />
-      <Truncado r={r} nombre="zonas (las de mayor valor)" />
-      {filas && (
-        <ol className="ranking">
-          {filas.map((z, i) => {
-            const valor = Number(z[campo]);
-            const porcentaje = maximo > 0 ? Math.max((valor / maximo) * 100, valor > 0 ? 3 : 0) : 0;
-            return (
-              <li key={z.id} className={i === 0 && valor > 0 ? "ranking__fila ranking__fila--primero" : "ranking__fila"}>
-                <span className="ranking__nombre">{z.nombre}</span>
-                <span className="ranking__barra" aria-hidden="true">
-                  <span style={{ width: `${porcentaje}%` }} />
-                </span>
-                <span className="ranking__valor">
-                  {valor}
-                  <small>{metrica === "km2" ? unidad[0] : ` ${valor === 1 ? unidad[0] : unidad[1]}`}</small>
-                </span>
-              </li>
-            );
-          })}
-        </ol>
+      <p className="ayuda">Incidentes registrados dentro de cada zona que se ve en el mapa, en el período. Sin fechas se cuenta todo el historial.</p>
+      {zona && <ResultadoPorZona zona={zona} tipo="incidentes" fase={faseZona} datos={incidentesZona} error={errorZona} onQuitar={() => setZona(null)} />}
+      {!zona && (
+        <>
+          <Estado fase={fase === "error" ? "error" : !r ? "cargando" : "ok"} error={error} />
+          <Truncado r={r} nombre="zonas (las de mayor valor)" />
+          {filas && filas.length === 0 && <p className="ayuda">No hay zonas operativas en esta parte del mapa.</p>}
+          {filas && filas.length > 0 && (
+            <>
+              <p className="ayuda">Elegí una zona con un clic, acá o en el mapa, para ver sus incidentes.</p>
+              <ol className="ranking">
+                {filas.map((z, i) => {
+                  const valor = Number(z.cantidadIncidentes);
+                  const porcentaje = maximo > 0 ? Math.max((valor / maximo) * 100, valor > 0 ? 3 : 0) : 0;
+                  return (
+                    <li key={z.id}>
+                      <button type="button" className={i === 0 && valor > 0 ? "ranking__fila ranking__fila--primero" : "ranking__fila"} onClick={() => setZona(zonas[i])}>
+                        <span className="ranking__nombre">{z.nombre}</span>
+                        <span className="ranking__barra" aria-hidden="true">
+                          <span style={{ width: `${porcentaje}%` }} />
+                        </span>
+                        <span className="ranking__valor">
+                          {valor}
+                          <small> {valor === 1 ? "incidente" : "incidentes"}</small>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </>
+          )}
+        </>
       )}
-      <p className="ayuda">
-        {metrica === "cantidad"
-          ? "Incidentes registrados dentro de cada zona en el período."
-          : "Incidentes por kilómetro cuadrado: una zona chica con pocos incidentes puede estar más cargada que una grande."}{" "}
-        Sin fechas se cuenta todo el historial.
-      </p>
     </>
   );
 }
@@ -692,136 +790,47 @@ function PanelReporte({ setResultado }) {
   );
 }
 
-// --------------------------------------- extra: una línea o un polígono dibujado en el mapa
-
-const formatoArea = (m2) => (m2 >= 1e6 ? `${(m2 / 1e6).toFixed(2)} km²` : `${Math.round(m2)} m²`);
-
-/** Pide qué hay cerca de la figura dibujada; se repite si cambia la figura o la distancia. */
-function useFigura(figura, distanciaM) {
-  const [estado, setEstado] = useState({ clave: null, fase: "quieto", datos: null, error: null });
-  const clave = figura ? JSON.stringify([figura, distanciaM]) : null;
-
-  useEffect(() => {
-    if (!figura) return undefined;
-    let vigente = true;
-    const cuerpo = { geomGeoJson: JSON.stringify(figura), ...(distanciaM !== "" ? { distanciaM: Number(distanciaM) } : {}) };
-    api
-      .post("/consultas/por-figura", cuerpo)
-      .then((datos) => vigente && setEstado({ clave, fase: "ok", datos, error: null }))
-      .catch((e) => vigente && setEstado({ clave, fase: "error", datos: null, error: e.message }));
-    return () => {
-      vigente = false;
-    };
-  }, [clave, figura, distanciaM]);
-
-  if (!figura) return { fase: "quieto", datos: null, error: null };
-  if (estado.clave !== clave) return { fase: "cargando", datos: null, error: null };
-  return estado;
-}
-
-function PanelFigura({ figura, setResultado }) {
-  const [distanciaTexto, setDistanciaTexto] = useState("");
-  const [distancia, setDistancia] = useState(""); // la que se aplica: espera a que se deje de escribir
-  useEffect(() => {
-    const espera = setTimeout(() => setDistancia(distanciaTexto), 400);
-    return () => clearTimeout(espera);
-  }, [distanciaTexto]);
-
-  const esLinea = figura?.type === "LineString";
-  const { fase, datos: r, error } = useFigura(figura, distancia);
-
-  useEffect(() => {
-    if (!r) {
-      setResultado(RESULTADO_VACIO);
-      return;
-    }
-    setResultado({
-      ...RESULTADO_VACIO,
-      area: r.area ? JSON.parse(r.area) : null,
-      zonas: r.zonas.map((z) => comoZona(z)),
-      incidentes: r.incidentes.filas.map(conGeometria),
-      recursos: r.recursos.filas.map(conGeometria),
-    });
-  }, [r, setResultado]);
-
-  const dentro = (m) => (m === 0 ? "adentro" : metros(m));
-  const resumen = (lista, nombre) => (
-    <p className="ayuda">
-      {lista.total} {nombre}
-      {lista.total > lista.filas.length && ` (se muestran los ${lista.filas.length} más cercanos)`}
-    </p>
-  );
-
-  return (
-    <>
-      {!figura && <Aviso tipo="info">Dibujá una línea o un polígono con las herramientas de arriba a la derecha del mapa.</Aviso>}
-      {figura && (
-        <label className="campo">
-          <span className="campo__etiqueta">{esLinea ? "Buscar a menos de (metros)" : "Agrandar el área (metros)"}</span>
-          <input type="number" min="0" max="10000" step="50" value={distanciaTexto} placeholder={esLinea ? "200" : "0 = solo lo de adentro"} onChange={(e) => setDistanciaTexto(e.target.value)} />
-        </label>
-      )}
-      <Estado fase={fase} error={error} />
-      {r && (
-        <>
-          <p className="ayuda">
-            {r.tipo === "LineString" ? `Línea de ${metros(r.largoM)}` : `Polígono de ${formatoArea(r.areaM2)} (perímetro ${metros(r.perimetroM)})`}
-            {r.distanciaM > 0 && `, buscando a menos de ${metros(r.distanciaM)}`}.
-          </p>
-          {r.zonas.length > 0 && <p className="ayuda">Zonas que toca: {r.zonas.map((z) => z.nombre).join(", ")}.</p>}
-
-          <h4 className="resultado__grupo">Incidentes</h4>
-          {resumen(r.incidentes, r.incidentes.total === 1 ? "incidente" : "incidentes")}
-          <ul className="items">
-            {r.incidentes.filas.map((f) => (
-              <FilaIncidente key={f.id} i={f} extra={<span className="resultado__dato">{dentro(f.distanciaM)}</span>} />
-            ))}
-          </ul>
-
-          <h4 className="resultado__grupo">Recursos</h4>
-          {resumen(r.recursos, r.recursos.total === 1 ? "recurso" : "recursos")}
-          <ul className="items">
-            {r.recursos.filas.map((f) => (
-              <FilaRecurso key={f.id} r={f} dato={dentro(f.distanciaM)} />
-            ))}
-          </ul>
-        </>
-      )}
-    </>
-  );
-}
-
 // ------------------------------------------------------------------------ el catálogo
 
 /**
- * Orden y textos del selector de la página. Los números son los de las "Consultas geográficas" de la letra. `pideClic`: la consulta usa un punto del mapa,
- * así que la página escucha los clics. `dibuja`: usa una línea o un polígono dibujado en el
- * mapa, así que la página muestra la barra de dibujo. `postgis`: qué función espacial la resuelve.
+ * Orden y textos del selector de la página. Los números son los de las "Consultas geográficas" de la letra.
+ *   pideClic     la consulta usa un punto del mapa, así que la página escucha los clics.
+ *   objetos      ruta de los objetos que se eligen (se cargan los de la vista, ver CargaPorZona): "/zonas", "/incidentes" o "/recursos".
+ *   sobreVista   la consulta pide al backend solo lo de la vista (bbox), como el ranking de zonas.
+ *   fondo        el único tipo de objeto que GeoServer dibuja de fondo: "zona", "incidente" o "recurso".
+ *   postgis      qué función espacial la resuelve.
  */
 export const CONSULTAS = [
   {
     id: "incidentes-zona",
+    fondo: "zona", // lo que GeoServer dibuja de fondo
     titulo: "1. Incidentes por zona",
-    descripcion: "Elegí una zona y se muestran en el mapa los incidentes que están dentro de ella.",
+    descripcion: "Se ven las zonas de esta parte del mapa. Elegí una (con un clic en el mapa o en la lista) y se muestran los incidentes que están dentro de ella.",
     postgis: "ST_Intersects(zona, incidente)",
+    objetos: "/zonas",
     Panel: PanelIncidentesZona,
   },
   {
     id: "rankings",
+    fondo: "zona", // lo que GeoServer dibuja de fondo
     titulo: "2. Zonas con mayor cantidad de incidentes",
-    descripcion: "Ranking de zonas por cantidad de incidentes en un período. En el mapa, más oscura = más incidentes. Extra: también se puede ordenar por incidentes por km².",
-    postgis: "ST_Intersects + COUNT; ST_Area para el extra por km²",
+    descripcion: "Ranking de las zonas que se ven en el mapa por cantidad de incidentes en un período. En el mapa, más oscura = más incidentes. Elegí una zona para ver sus incidentes.",
+    postgis: "ST_Intersects + COUNT, solo para las zonas del rectángulo visible",
+    sobreVista: true,
     Panel: PanelRankings,
   },
   {
     id: "recursos-cercanos",
+    fondo: "incidente", // lo que GeoServer dibuja de fondo
     titulo: "3. Recursos cercanos a un incidente",
-    descripcion: "Dado un incidente, los recursos más cercanos, ordenados por distancia en línea recta.",
+    descripcion: "Se ven los incidentes de esta parte del mapa. Elegí uno y se muestran sus recursos más cercanos, con la distancia en línea recta.",
     postgis: "operador <-> (vecino más cercano) y ST_Distance",
+    objetos: "/incidentes",
     Panel: PanelRecursosCercanos,
   },
   {
     id: "incidente-cercano",
+    fondo: "incidente", // lo que GeoServer dibuja de fondo
     titulo: "4. Búsqueda de incidente (dirección, cruce o punto)",
     descripcion: "Elegí un punto con un clic en el mapa, escribí una dirección o ubicá el cruce de dos calles, y se busca el incidente más cercano.",
     postgis: "operador <-> y ST_Distance; la dirección con la tabla de puertas (Salto) o la IDE (resto del país); el cruce de calles con ST_Intersection",
@@ -830,6 +839,7 @@ export const CONSULTAS = [
   },
   {
     id: "zona-punto",
+    fondo: "zona", // lo que GeoServer dibuja de fondo
     titulo: "5. Búsqueda de zona (dirección, cruce o punto)",
     descripcion: "Elegí un punto con un clic en el mapa, escribí una dirección o ubicá el cruce de dos calles, y se indica a qué zona operativa pertenece.",
     postgis: "ST_Contains(zona, punto); la dirección con la tabla de puertas (Salto) o la IDE (resto del país); el cruce de calles con ST_Intersection",
@@ -838,32 +848,28 @@ export const CONSULTAS = [
   },
   {
     id: "recursos-zona",
+    fondo: "zona", // lo que GeoServer dibuja de fondo
     titulo: "6. Recursos por zona",
-    descripcion: "Elegí una zona y se muestran los recursos de emergencia que están dentro de ella.",
+    descripcion: "Se ven las zonas de esta parte del mapa. Elegí una (con un clic en el mapa o en la lista) y se muestran los recursos de emergencia que están dentro de ella.",
     postgis: "ST_Contains(zona, recurso)",
+    objetos: "/zonas",
     Panel: PanelRecursosZona,
   },
   {
     id: "incidentes-recurso",
+    fondo: "recurso", // lo que GeoServer dibuja de fondo
     titulo: "7. Incidentes por recurso",
-    descripcion: "Elegí un recurso y se muestran los incidentes que tiene asignados.",
+    descripcion: "Se ven los recursos de esta parte del mapa. Elegí uno y se muestran los incidentes que tiene asignados.",
     postgis: "tabla incidente_recurso (relación recurso-incidente)",
+    objetos: "/recursos",
     Panel: PanelIncidentesRecurso,
   },
   {
     id: "reporte",
+    fondo: "zona", // lo que GeoServer dibuja de fondo
     titulo: "Reporte de incidentes por zona",
     descripcion: "Listado filtrable por zona, tipo, prioridad, estado y fechas, agrupado por zona.",
     postgis: "ST_Contains(zona, incidente) con filtros",
     Panel: PanelReporte,
-  },
-  {
-    id: "figura",
-    titulo: "Extra: dibujar una línea o un polígono",
-    descripcion:
-      "Dibujá una línea (por ejemplo, una avenida) o un polígono (un área) y se muestra qué incidentes, recursos y zonas hay adentro o a lo largo de ella.",
-    postgis: "ST_DWithin y ST_Buffer; ST_Length y ST_Area de la figura",
-    dibuja: true,
-    Panel: PanelFigura,
   },
 ];
