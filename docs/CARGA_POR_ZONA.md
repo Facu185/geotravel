@@ -99,10 +99,11 @@ El mapa público ya dibujaba todo con GeoServer (imágenes), así que escala. Lo
 
 Las consultas 4 y 5 aceptan una dirección y una esquina. Según la región (`REGION.ide` en `region.js`):
 
-| | Montevideo | Resto del país (Salto) |
+| | Salto (`callesPropias: true`) | Resto del país (por ejemplo Montevideo) |
 |---|---|---|
-| Calle y número | Tabla propia `acceso` (números de puerta de la Intendencia) | Servicio de direcciones de la IDE (`?departamento=salto&localidad=salto`) |
+| Calle y número | Tabla propia `acceso` (números de puerta de Salto) | Servicio de direcciones de la IDE (`?departamento=montevideo&localidad=montevideo`) |
 | Esquina | Cruce calculado con PostGIS sobre `via` (con autocompletado de calles) | IDE, con el parámetro `esquina` (sin autocompletado: no hay calles propias) |
 
-Para sumar otro departamento alcanza con agregar una entrada en `region.js`. Probado con "Uruguay 1000" y la esquina
-"Uruguay y Artigas" de Salto.
+Para sumar otro departamento alcanza con agregar una entrada en `region.js`. En Salto, la dirección y el cruce
+funcionan sin internet; la IDE queda de respaldo si la calle no está en la base. Probado con "Uruguay 1000" y la
+esquina "Uruguay y Artigas".

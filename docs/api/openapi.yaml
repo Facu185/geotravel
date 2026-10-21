@@ -530,8 +530,8 @@ paths:
     get:
       summary: >
         Auxiliar de C4 y C5. Nombres de calle que contienen el texto dado (mínimo 2 letras; vacío si es menos), con
-        los que empiezan por él primero. Máximo 10. Para el autocompletado de intersecciones. Usa la red vial local,
-        actualmente de Montevideo; no representa cobertura de Salto.
+        los que empiezan por él primero. Máximo 10. Para el autocompletado de intersecciones. Usa la red vial local
+        (tabla via, de Salto).
       tags: [consultas]
       parameters:
         - { name: q, in: query, required: true, schema: { type: string } }
@@ -546,7 +546,7 @@ paths:
     get:
       summary: >
         Auxiliar de C4 y C5. Puntos donde se cruzan dos calles (lon/lat, EPSG:4326), calculados en PostGIS sobre la
-        red vial local (tabla via, actualmente Montevideo). Lista vacía si no se cruzan o algún nombre no existe; varios
+        red vial local (tabla via, de Salto). Lista vacía si no se cruzan o algún nombre no existe; varios
         elementos si hay nombres repetidos en la ciudad. El resultado se usa como lon/lat en
         /consultas/incidente-mas-cercano y /consultas/zona-por-punto.
       tags: [consultas]
@@ -572,10 +572,10 @@ paths:
       summary: >
         Auxiliar de C4 y C5. Ubica una dirección "calle número" (por ejemplo "Camino Carrasco 4680")
         y devuelve lon/lat (EPSG:4326). Se busca en la tabla acceso, los números de puerta de
-        Montevideo (capa mdg_accesos de la Intendencia; es también la capa "acceso" de GeoServer),
-        tolerando abreviaturas ("Camino" = CNO, "Avenida" = AV) y errores de tipeo. Si el número no
+        Salto (es también la capa "acceso" de GeoServer), sin tildes, con las palabras completas
+        ("Av." = AVENIDA, "Gral" = GENERAL, "Dr" = DOCTOR) y tolerando errores de tipeo. Si el número no
         existe se devuelve la puerta más cercana de la calle y se marca "aproximada". La tabla de puertas es
-        solo de Montevideo: con otro departamento o localidad, o con el parámetro esquina, se usa el servicio de
+        solo de Salto: con otro departamento o localidad, o con el parámetro esquina, se usa el servicio de
         direcciones de la IDE de Uruguay, que cubre todo el país (requiere internet). Sin departamento ni
         localidad se usan los configurados en el backend (IDE_DEPARTAMENTO e IDE_LOCALIDAD, por defecto Salto).
         El resultado se usa como lon/lat en
@@ -584,7 +584,7 @@ paths:
       parameters:
         - { name: direccion, in: query, required: true, schema: { type: string }, description: "Por ejemplo: Buenos Aires 451" }
         - { name: esquina, in: query, required: false, schema: { type: string }, description: "Segunda calle: ubica la esquina de direccion y esquina (siempre con la IDE)" }
-        - { name: departamento, in: query, required: false, schema: { type: string }, description: "Departamento donde buscar (por defecto, el de IDE_DEPARTAMENTO: salto). Fuera de Montevideo se usa la IDE, que cubre todo el país" }
+        - { name: departamento, in: query, required: false, schema: { type: string }, description: "Departamento donde buscar (por defecto, el de IDE_DEPARTAMENTO: salto). Fuera de Salto se usa la IDE, que cubre todo el país" }
         - { name: localidad, in: query, required: false, schema: { type: string }, description: "Localidad (por defecto, igual al departamento si se indicó; si no, la de IDE_LOCALIDAD)" }
       responses:
         "200":
@@ -599,7 +599,7 @@ paths:
                   lat: { type: number }
                   aproximada: { type: boolean }
                   aviso: { type: string, nullable: true }
-                  fuente: { type: string, description: "Puertas locales solo para Montevideo; IDE para otras localidades" }
+                  fuente: { type: string, description: "Puertas de Salto (tabla local) o IDE para otras localidades" }
         "400": { description: Falta la dirección }
         "404": { description: No se encontró la calle (solo con el respaldo de la IDE) }
         "502": { description: Respaldo de la IDE no disponible (sin internet) }

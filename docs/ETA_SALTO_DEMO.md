@@ -112,10 +112,8 @@ elimina los volumenes de la base y GeoServer.
 
 - OSRM publico y los mapas base requieren **internet**; la app no incluye un
   servidor OSRM local ni un paquete offline del mapa de Salto.
-- El conjunto original de calles y puertas en `db/data/` sigue siendo de
-  **Montevideo**, asi que la busqueda de direcciones del curso no constituye
-  un callejero de Salto. La ruta ETA si funciona porque OSRM calcula el
-  recorrido con las coordenadas del recurso y el incidente.
+- Las calles y puertas de `db/data/` son de **Salto**. La ruta ETA se calcula
+  con OSRM, a partir de las coordenadas del recurso y el incidente.
 - Para acceder desde un telefono u otra PC a una instancia alojada en un
   equipo distinto, configurar `VITE_API_URL`, `VITE_GEOSERVER_WMS_URL` y
   la direccion de escucha de Vite segun la red. `localhost` corresponde

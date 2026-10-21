@@ -254,7 +254,7 @@ function CampoCalle({ etiqueta, valor, onChange }) {
   const id = useId();
 
   useEffect(() => {
-    // Las calles propias son solo de Montevideo: en otra región no hay sugerencias, se escribe el nombre.
+    // Las calles propias son solo de Salto: en otra región no hay sugerencias, se escribe el nombre.
     if (!REGION.callesPropias || valor.trim().length < 2) {
       setSugerencias([]);
       return undefined;
@@ -287,25 +287,41 @@ function CampoCalle({ etiqueta, valor, onChange }) {
 
 /**
  * Alternativa al clic en el mapa: ubica el punto donde se cruzan dos calles y lo deja como punto de búsqueda.
- * En Montevideo lo calcula PostGIS con los tramos de cada calle (/consultas/interseccion); en el resto
- * del país lo resuelve el servicio de direcciones de la IDE como "esquina" (/consultas/geocodificar).
+ * En Salto lo calcula PostGIS con los tramos de cada calle (/consultas/interseccion); si esas calles no
+ * se cruzan en la base (los tramos pueden estar incompletos) y en el resto del país, lo resuelve el servicio
+ * de direcciones de la IDE como "esquina" (/consultas/geocodificar).
  */
 function BuscadorIntersecciones({ setPunto }) {
   const [calle1, setCalle1] = useState("");
   const [calle2, setCalle2] = useState("");
-  const [busqueda, setBusqueda] = useState({ fase: "quieto", cruces: [], elegido: 0, error: null });
+  const [busqueda, setBusqueda] = useState({ fase: "quieto", cruces: [], elegido: 0, error: null, ide: false });
+
+  const esquinaPorIde = async () => [
+    await api.get(`/consultas/geocodificar${query({ direccion: calle1.trim(), esquina: calle2.trim(), ...REGION.ide })}`),
+  ];
 
   const buscar = async (evento) => {
     evento.preventDefault();
-    setBusqueda({ fase: "cargando", cruces: [], elegido: 0, error: null });
+    setBusqueda({ fase: "cargando", cruces: [], elegido: 0, error: null, ide: false });
     try {
-      const cruces = REGION.callesPropias
-        ? await api.get(`/consultas/interseccion${query({ calle1: calle1.trim(), calle2: calle2.trim() })}`)
-        : [await api.get(`/consultas/geocodificar${query({ direccion: calle1.trim(), esquina: calle2.trim(), ...REGION.ide })}`)];
-      setBusqueda({ fase: "ok", cruces, elegido: 0, error: null });
+      let cruces = [];
+      let ide = !REGION.callesPropias;
+      if (REGION.callesPropias) {
+        cruces = await api.get(`/consultas/interseccion${query({ calle1: calle1.trim(), calle2: calle2.trim() })}`);
+      }
+      if (cruces.length === 0) {
+        // Sin cruce en las calles propias (o sin calles propias): se prueba con el servicio de la IDE.
+        try {
+          cruces = await esquinaPorIde();
+          ide = true;
+        } catch (e) {
+          if (!REGION.callesPropias) throw e;
+        }
+      }
+      setBusqueda({ fase: "ok", cruces, elegido: 0, error: null, ide });
       if (cruces.length > 0) setPunto([cruces[0].lat, cruces[0].lon]);
     } catch (e) {
-      setBusqueda({ fase: "error", cruces: [], elegido: 0, error: e.message });
+      setBusqueda({ fase: "error", cruces: [], elegido: 0, error: e.message, ide: false });
     }
   };
 
@@ -326,7 +342,7 @@ function BuscadorIntersecciones({ setPunto }) {
       {busqueda.fase === "ok" && busqueda.cruces.length === 0 && (
         <Aviso tipo="info">Esas calles no se cruzan, o algún nombre no existe. Elegí los nombres de la lista de sugerencias.</Aviso>
       )}
-      {busqueda.fase === "ok" && !REGION.callesPropias && busqueda.cruces.length === 1 && (
+      {busqueda.fase === "ok" && busqueda.ide && busqueda.cruces.length === 1 && (
         <Aviso tipo="ok">
           Esquina ubicada (servicio de la IDE): <strong>{busqueda.cruces[0].direccion}</strong>
         </Aviso>
@@ -351,7 +367,7 @@ function BuscadorIntersecciones({ setPunto }) {
 
 /**
  * Ubica una dirección ("calle número") y la deja como punto de búsqueda (ver /consultas/geocodificar).
- * En Montevideo la busca en los números de puerta propios; en el resto del país, en la IDE, según el
+ * En Salto la busca en los números de puerta propios; en el resto del país, en la IDE, según el
  * departamento y la localidad de la región configurada (components/region.js).
  */
 function BuscadorDireccion({ setPunto }) {
@@ -400,7 +416,7 @@ function BuscadoresDePunto({ setPunto }) {
       <BuscadorIntersecciones setPunto={setPunto} />
       <p className="ayuda">
         {REGION.callesPropias
-          ? "Las direcciones se buscan en los números de puerta de Montevideo (capa «acceso» de GeoServer)."
+          ? "Las direcciones se buscan en los números de puerta de Salto (capa «acceso» de GeoServer)."
           : `Las direcciones y esquinas de ${REGION.nombre} las resuelve el servicio de direcciones de la IDE (necesita internet).`}
       </p>
     </>
@@ -808,7 +824,7 @@ export const CONSULTAS = [
     id: "incidente-cercano",
     titulo: "4. Búsqueda de incidente (dirección, cruce o punto)",
     descripcion: "Elegí un punto con un clic en el mapa, escribí una dirección o ubicá el cruce de dos calles, y se busca el incidente más cercano.",
-    postgis: "operador <-> y ST_Distance; la dirección con la tabla de puertas (Montevideo) o la IDE (resto del país); el cruce de calles con ST_Intersection",
+    postgis: "operador <-> y ST_Distance; la dirección con la tabla de puertas (Salto) o la IDE (resto del país); el cruce de calles con ST_Intersection",
     pideClic: true,
     Panel: PanelIncidenteCercano,
   },
@@ -816,7 +832,7 @@ export const CONSULTAS = [
     id: "zona-punto",
     titulo: "5. Búsqueda de zona (dirección, cruce o punto)",
     descripcion: "Elegí un punto con un clic en el mapa, escribí una dirección o ubicá el cruce de dos calles, y se indica a qué zona operativa pertenece.",
-    postgis: "ST_Contains(zona, punto); la dirección con la tabla de puertas (Montevideo) o la IDE (resto del país); el cruce de calles con ST_Intersection",
+    postgis: "ST_Contains(zona, punto); la dirección con la tabla de puertas (Salto) o la IDE (resto del país); el cruce de calles con ST_Intersection",
     pideClic: true,
     Panel: PanelZonaPunto,
   },

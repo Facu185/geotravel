@@ -40,7 +40,7 @@ import java.util.*;
  *
  * "Búsqueda de incidente/zona por dirección o intersección de calles" recibe ya resuelta
  * la coordenada (x, y o lon, lat). Esa resolución la hacen /consultas/geocodificar (calle y
- * número, con la tabla acceso de Montevideo o con la IDE según el lugar), /consultas/interseccion
+ * número, con la tabla acceso de Salto o con la IDE según el lugar), /consultas/interseccion
  * (cruce de dos calles, con la tabla via) y, en el frontend, el clic en el mapa. El departamento y
  * la localidad se piden por parámetro; sin ellos se usan los del backend (IDE_DEPARTAMENTO e
  * IDE_LOCALIDAD, por defecto Salto).
@@ -568,27 +568,30 @@ public class ConsultaResource {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final ConfiguracionIde CONFIGURACION_IDE = ConfiguracionIde.desdeEntorno();
 
-    /** Cómo se abrevian en los nombres de calle de la base ("AV 18 DE JULIO", "CNO CARRASCO"). */
-    private static final Map<String, String> ABREVIATURAS = Map.ofEntries(
-        Map.entry("AVENIDA", "AV"), Map.entry("AVDA", "AV"), Map.entry("CAMINO", "CNO"),
-        Map.entry("BULEVAR", "BV"), Map.entry("BOULEVARD", "BV"), Map.entry("PASAJE", "PSJE"),
-        Map.entry("GENERAL", "GRAL"), Map.entry("DOCTOR", "DR"), Map.entry("DOCTORA", "DRA"),
-        Map.entry("INGENIERO", "ING"), Map.entry("RAMBLA", "RBLA"), Map.entry("CIRCUITO", "CIRC"),
-        Map.entry("CAPITAN", "CAP"), Map.entry("CORONEL", "CNEL"), Map.entry("ALMIRANTE", "ALM"),
-        Map.entry("ARQUITECTO", "ARQ"), Map.entry("PROFESOR", "PROF"), Map.entry("TENIENTE", "TTE"),
-        Map.entry("SARGENTO", "SGTO"), Map.entry("COMANDANTE", "CTE"), Map.entry("PRESIDENTE", "PTE"));
+    /**
+     * Cómo se escriben completas las palabras de los nombres de calle de la base ("AVENIDA", "GENERAL",
+     * "DOCTOR"): quien busca puede escribir "Av.", "Gral" o "Dr" y se compara con el nombre completo.
+     */
+    private static final Map<String, String> PALABRAS_COMPLETAS = Map.ofEntries(
+        Map.entry("AV", "AVENIDA"), Map.entry("AVDA", "AVENIDA"), Map.entry("CNO", "CAMINO"),
+        Map.entry("BV", "BULEVAR"), Map.entry("BOULEVARD", "BULEVAR"), Map.entry("PSJE", "PASAJE"),
+        Map.entry("GRAL", "GENERAL"), Map.entry("DR", "DOCTOR"), Map.entry("DRA", "DOCTORA"),
+        Map.entry("ING", "INGENIERO"), Map.entry("RBLA", "RAMBLA"), Map.entry("CIRC", "CIRCUITO"),
+        Map.entry("CAP", "CAPITAN"), Map.entry("CNEL", "CORONEL"), Map.entry("ALM", "ALMIRANTE"),
+        Map.entry("ARQ", "ARQUITECTO"), Map.entry("PROF", "PROFESOR"), Map.entry("TTE", "TENIENTE"),
+        Map.entry("SGTO", "SARGENTO"), Map.entry("CTE", "COMANDANTE"), Map.entry("PTE", "PRESIDENTE"));
 
     private static final java.util.regex.Pattern CALLE_Y_NUMERO =
         java.util.regex.Pattern.compile("^(.+?)\\s+(\\d{1,6})\\s*([A-Z])?$");
 
-    /** Mayúsculas, sin tildes ni puntuación y con las palabras abreviadas como en la base. */
+    /** Mayúsculas, sin tildes ni puntuación y con las palabras completas, como en la base. */
     private static String normalizarCalle(String texto) {
         String limpio = java.text.Normalizer.normalize(texto, java.text.Normalizer.Form.NFD)
             .replaceAll("\\p{M}", "").toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9 ]", " ").trim();
         StringBuilder sb = new StringBuilder();
         for (String palabra : limpio.split("\\s+")) {
             if (sb.length() > 0) sb.append(' ');
-            sb.append(ABREVIATURAS.getOrDefault(palabra, palabra));
+            sb.append(PALABRAS_COMPLETAS.getOrDefault(palabra, palabra));
         }
         return sb.toString();
     }
@@ -596,11 +599,11 @@ public class ConsultaResource {
     /**
      * Ubica una dirección "calle número" (por ejemplo "Camino Carrasco 4680" o "18 de Julio 1000")
      * y devuelve lon/lat (EPSG:4326), que se usan en "incidente más cercano" y "zona de un punto".
-     * Se busca en la tabla acceso (los números de puerta de Montevideo, capa mdg_accesos de la
-     * Intendencia; la capa "acceso" de GeoServer es esa misma tabla). La calle se compara por
+     * Se busca en la tabla acceso (los números de puerta de Salto; la capa "acceso" de GeoServer es
+     * esa misma tabla). La calle se compara por
      * nombre tolerando abreviaturas y errores de tipeo. Si el número no existe se usa la puerta más
-     * cercana de esa calle y se marca "aproximada". Esa tabla es solo de Montevideo. En otro departamento
-     * (parámetros departamento y localidad, por ejemplo salto y salto), y para las esquinas (parámetro
+     * cercana de esa calle y se marca "aproximada". Esa tabla es solo de Salto. En otro departamento
+     * (parámetros departamento y localidad, por ejemplo montevideo y montevideo), y para las esquinas (parámetro
      * esquina: dos calles que se cruzan), se usa el servicio de direcciones de la IDE, que cubre el país.
      */
     @GET
@@ -619,7 +622,7 @@ public class ConsultaResource {
         String dep = lugar(departamento, CONFIGURACION_IDE.getDepartamento());
         String loc = lugar(localidad, hayDepartamento ? dep : CONFIGURACION_IDE.getLocalidad());
         boolean hayEsquina = esquina != null && !esquina.trim().isEmpty();
-        // La tabla de puertas propia es solo de Montevideo: en otro lugar, o con esquina, va directo a la IDE.
+        // La tabla de puertas propia es solo de Salto: en otro lugar, o con esquina, va directo a la IDE.
         java.util.regex.Matcher m = hayEsquina ? null : coincidenciaPuertaLocal(direccion, new ConfiguracionIde(dep, loc));
         if (m != null) {
             Map<String, Object> propio = buscarPuerta(m.group(1), Integer.parseInt(m.group(2)), m.group(3));
@@ -702,7 +705,7 @@ public class ConsultaResource {
                         : encontrado == numero
                             ? "No existe esa letra en la base: se ubicó la puerta " + numero + "."
                             : "No existe esa puerta en la base: se ubicó la más cercana (" + encontrado + ").");
-                    resultado.put("fuente", "Puertas de Montevideo");
+                    resultado.put("fuente", "Puertas de Salto");
                     return resultado;
                 }
             }

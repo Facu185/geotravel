@@ -53,6 +53,8 @@ Después, solo el frontend: `cd frontend && npm install && npm run dev`.
 - **Cambió código del backend:** `docker compose up -d --build`.
 - **Cambió un estilo SLD** de `geoserver/styles/`: `docker compose up -d` (se vuelve a subir solo).
 - **Empezar de cero** (borra la base y la config de GeoServer): `docker compose down -v` y de nuevo `up -d --build`.
+- **Flyway falla con "Migration checksum mismatch"** (la base se creó con migraciones que después se modificaron, por ejemplo V2 y V3 al pasar a Salto):
+  `docker compose down -v` y de nuevo `up -d --build`. Una migración ya aplicada no se edita: los cambios van en una migración nueva (`V5__...sql`).
 
 Todo es repetible: el seed no duplica datos y la configuración de GeoServer deja como está lo que
 ya existe. Los pasos de abajo son el mismo proceso, a mano, por si hace falta hacer uno solo.
@@ -64,7 +66,7 @@ para **Salto, Uruguay** (`db/seed/seed_salto_eta.sql`). Funciona tanto en una
 instalacion nueva como en una base Docker que ya tenga datos; nunca se asignan
 IDs fijos. La pantalla `/eta` muestra distancia, duracion y la ruta vial
 GeoJSON sobre Leaflet. El calculo de rutas utiliza un servicio OSRM con acceso
-a internet. Los datos historicos de calles y puertas siguen siendo de Montevideo.
+a internet.
 
 **Guia de instalacion en otra computadora y verificaciones:**
 [docs/ETA_SALTO_DEMO.md](docs/ETA_SALTO_DEMO.md).
@@ -73,11 +75,11 @@ a internet. Los datos historicos de calles y puertas siguen siendo de Montevideo
 
 `VITE_REGION` solo controla el encuadre del mapa en React. El backend configura por separado
 el servicio de direcciones IDE mediante `IDE_DEPARTAMENTO` e `IDE_LOCALIDAD` en `infra/.env`;
-ambos usan `salto` por defecto en esta rama y pueden fijarse explícitamente en `montevideo`.
-La tabla local `acceso` y la red vial `via` disponibles en `db/data/` corresponden a Montevideo.
-Por eso `/consultas/geocodificar` omite `acceso` fuera de Montevideo y usa IDE; `/consultas/calles`
-y `/consultas/interseccion` siguen limitadas a la cobertura local de `via` y no deben presentarse
-como búsquedas de calles de Salto.
+ambos usan `salto` por defecto y pueden fijarse en otro lugar (por ejemplo `montevideo`).
+La tabla local `acceso` (números de puerta) y la red vial `via` disponibles en `db/data/` son de Salto.
+Por eso con Salto `/consultas/geocodificar` busca primero en `acceso` y recién después en la IDE (que se usa
+siempre para las esquinas pedidas con `esquina` y para cualquier otro departamento o localidad), y
+`/consultas/calles` y `/consultas/interseccion` trabajan sobre las calles de Salto.
 
 ### 1. Datos: PostGIS + GeoServer (a mano)
 
@@ -112,15 +114,11 @@ Son capas de consulta, no se editan desde la aplicación:
   El tipo de vía (`tipo`) se deriva de la etiqueta `highway` para que lo reconozca el estilo `vias_tipo.sld`.
   Archivo `db/data/vias.csv.gz` (nombre, tipo y geometría en WKT lon/lat; `seed.sh` la pasa a EPSG:32721).
   Si la base ya tenía calles de otra ciudad, `seed.sh` no las pisa: ver "Cambiar las calles" más abajo.
-- **Números de puerta** (`acceso`, 377.883 puertas): capa `mdg_accesos` del WFS de la Intendencia de
-  Montevideo (datos abiertos), con el nombre de la calle tomado de `v_mdg_vias_montevideo`. Archivo
-  `db/data/accesos.csv.gz`. Con ella `/consultas/geocodificar` ubica una dirección ("calle número").
-  El archivo ya viene en el repo y no hace falta tocarlo. Si hiciera falta bajar los datos de nuevo: el
-  servicio no deja pedir la capa entera de una vez, hay que pedirla por tramos con un filtro CQL sobre
-  `gid_tramo_via` (por ejemplo `visible=true AND gid_tramo_via BETWEEN 6800000 AND 6899999`), unir cada puerta
-  con su calle por `gid_tramo_via = gid` de `v_mdg_vias_montevideo`, y volver a armar el CSV
-  (`num_puerta, letra, nom_calle, cod_nombre, x, y`, en EPSG:32721). Después, `docker compose down -v` y
-  volver a levantar para que se carguen.
+- **Números de puerta** (`acceso`, 31.007 puertas de Salto): archivo `db/data/accesos.csv.gz`
+  (`num_puerta, letra, nom_calle, cod_nombre, x, y`, en EPSG:32721). Con ella `/consultas/geocodificar` ubica
+  una dirección ("calle número"), comparando el nombre de la calle sin tildes y con las palabras completas
+  (`Av.` = AVENIDA, `Gral` = GENERAL, `Dr` = DOCTOR). El archivo ya viene en el repo y no hace falta tocarlo;
+  para cambiarlo, `docker compose down -v` y volver a levantar.
 
 **Cambiar las calles en una base que ya existe** (por ejemplo, la que tenía las de Montevideo), sin perder
 zonas, recursos ni incidentes. Desde `infra/`:
@@ -222,7 +220,7 @@ documentado en el código (buscar "SUPUESTO").
 
 - **Guardado de las geografías:** se guarda por el backend (REST) y GeoServer solo publica y dibuja
   (WMS/WFS de lectura). No se usa WFS-T; falta confirmar que sea lo esperado.
-- **Direcciones** (consultas 4 y 5): en Montevideo se buscan en la tabla de puertas `acceso` (capa de GeoServer);
+- **Direcciones** (consultas 4 y 5): en Salto se buscan en la tabla de puertas `acceso` (capa de GeoServer);
   en el resto del país, por departamento y localidad de la región configurada, y las esquinas, las resuelve el
   servicio de direcciones de la IDE (internet). El mapa de fondo (Esri/OpenStreetMap) también usa internet.
 - **Diagrama de estados de un incidente** (`IncidenteResource.java`): solo se da un ejemplo lineal y se
