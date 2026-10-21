@@ -13,7 +13,7 @@ export const CAPAS = [
     id: "calles",
     capa: "geotravel:via",
     nombre: "Calles",
-    descripcion: "Red vial de Montevideo, como referencia",
+    descripcion: "Red vial de Salto, como referencia",
     forma: "linea",
     activaPorDefecto: false,
     leyenda: [

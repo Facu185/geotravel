@@ -523,6 +523,153 @@
           ]
         },
         {
+          "name": "Crear incidente de tipo LÍNEA (una calle cortada)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/incidentes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Calle cortada (Postman)\",\n  \"descripcion\": \"Un tramo de calle\",\n  \"tipoIncidente\": \"calle_cortada\",\n  \"prioridad\": 2,\n  \"equipoResponsable\": \"Equipo Centro\",\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"LineString\\\", \\\"coordinates\\\": [[-56.194, -34.9065], [-56.1925, -34.906], [-56.191, -34.9062]]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Respuesta correcta (201)\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"nuevoIncidenteLineaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear incidente de tipo POLÍGONO (un área afectada)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/incidentes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Área inundada (Postman)\",\n  \"descripcion\": \"Un área\",\n  \"tipoIncidente\": \"inundacion\",\n  \"prioridad\": 3,\n  \"equipoResponsable\": \"Equipo Centro\",\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Polygon\\\", \\\"coordinates\\\": [[[-56.195, -34.907], [-56.193, -34.907], [-56.193, -34.9055], [-56.195, -34.9055], [-56.195, -34.907]]]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Respuesta correcta (201)\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"nuevoIncidentePoligonoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear incidente con un polígono que se cruza a sí mismo (debe dar 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/incidentes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Polígono inválido\",\n  \"tipoIncidente\": \"otro\",\n  \"prioridad\": 3,\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Polygon\\\", \\\"coordinates\\\": [[[0, 0], [1, 1], [1, 0], [0, 1], [0, 0]]]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar incidentes visibles (bbox y limit: responde items, total y truncado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/incidentes?bbox=-56.21,-34.92,-56.17,-34.89&limit=500"
+          }
+        },
+        {
+          "name": "Eliminar el incidente de línea",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base}}/incidentes/{{nuevoIncidenteLineaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar el incidente de polígono",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base}}/incidentes/{{nuevoIncidentePoligonoId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Editar incidente (no cambia el estado)",
           "request": {
             "method": "PUT",
@@ -766,6 +913,14 @@
           }
         },
         {
+          "name": "C2c. Zonas con más incidentes en la parte visible del mapa (bbox)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/consultas/zonas-mas-incidentes?bbox=-57.99,-31.41,-57.93,-31.37&limit=50"
+          }
+        },
+        {
           "name": "C3. Recursos cercanos a un incidente",
           "request": {
             "method": "GET",
@@ -865,154 +1020,6 @@
           }
         },
         {
-          "name": "Extra. Zonas por incidentes/km² (la consulta 8 se unificó con la 2)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{base}}/consultas/zonas-mayor-concentracion"
-          }
-        },
-        {
-          "name": "Extra. Línea: qué hay a lo largo de una línea (pasillo de 200 m por defecto)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base}}/consultas/por-figura",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"LineString\\\", \\\"coordinates\\\": [[-56.206, -34.9072], [-56.199, -34.9066], [-56.19, -34.9057]]}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Extra b. Incidentes/km² en un rango de fechas",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{base}}/consultas/zonas-mayor-concentracion?desde=2026-01-01&hasta=2027-01-01"
-          }
-        },
-        {
-          "name": "Extra b. Polígono: qué hay dentro de un polígono (0 m: solo lo de adentro)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base}}/consultas/por-figura",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Polygon\\\", \\\"coordinates\\\": [[[-56.22, -34.915], [-56.19, -34.915], [-56.19, -34.9], [-56.22, -34.9], [-56.22, -34.915]]]}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Extra c. Línea con pasillo de 1000 m",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base}}/consultas/por-figura",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"LineString\\\", \\\"coordinates\\\": [[-56.206, -34.9072], [-56.19, -34.9057]]}\",\n  \"distanciaM\": 1000\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Extra d. Un punto no es una figura válida (debe dar 400)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base}}/consultas/por-figura",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Point\\\", \\\"coordinates\\\": [-56.2, -34.9]}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
-                ]
-              }
-            }
-          ]
-        },
-        {
           "name": "Auxiliar. Tipos de incidente que existen (DISTINCT, para armar filtros)",
           "request": {
             "method": "GET",
@@ -1099,19 +1106,19 @@
           ]
         },
         {
-          "name": "C4/C5 aux. Autocompletar nombres de calle",
+          "name": "C4/C5 aux. Autocompletar nombres de calle (de Salto)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/calles?q=mag"
+            "url": "{{base}}/consultas/calles?q=urug"
           }
         },
         {
-          "name": "C4/C5 aux. Cruce de dos calles (Magallanes y Colonia: el ejercicio 6 del Práctico 2)",
+          "name": "C4/C5 aux. Cruce de dos calles (Uruguay y Yatay)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/interseccion?calle1=MAGALLANES&calle2=COLONIA"
+            "url": "{{base}}/consultas/interseccion?calle1=URUGUAY&calle2=YATAY"
           }
         },
         {
@@ -1119,7 +1126,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/interseccion?calle1=MAGALLANES&calle2=MERCEDES"
+            "url": "{{base}}/consultas/interseccion?calle1=URUGUAY&calle2=BRASIL"
           }
         },
         {
@@ -1127,7 +1134,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/interseccion?calle1=COLONIA"
+            "url": "{{base}}/consultas/interseccion?calle1=URUGUAY"
           },
           "event": [
             {
@@ -1142,19 +1149,19 @@
           ]
         },
         {
-          "name": "C4/C5 aux. Ubicar una dirección (tabla de puertas de Montevideo)",
+          "name": "C4/C5 aux. Ubicar una dirección (tabla de puertas de Salto)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/geocodificar?direccion=Av 18 de Julio 1000"
+            "url": "{{base}}/consultas/geocodificar?direccion=Uruguay 1000"
           }
         },
         {
-          "name": "C4/C5 aux. Dirección con abreviatura y número aproximado",
+          "name": "C4/C5 aux. Dirección con abreviatura (Gral = GENERAL)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/geocodificar?direccion=Camino Carrasco 4680"
+            "url": "{{base}}/consultas/geocodificar?direccion=Gral Fructuoso Rivera 500"
           }
         },
         {

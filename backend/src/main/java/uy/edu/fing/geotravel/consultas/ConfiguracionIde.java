@@ -29,9 +29,10 @@ public final class ConfiguracionIde {
         );
     }
 
+    /** Las tablas propias de calles (via) y puertas (acceso) son de Salto: solo ahí se usan en vez de la IDE. */
     public boolean usaPuertasLocales() {
-        return "montevideo".equalsIgnoreCase(departamento)
-                && "montevideo".equalsIgnoreCase(localidad);
+        return "salto".equalsIgnoreCase(departamento)
+                && "salto".equalsIgnoreCase(localidad);
     }
 
     public String getDepartamento() {

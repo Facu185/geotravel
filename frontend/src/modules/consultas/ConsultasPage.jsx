@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import L from "leaflet";
-import { CircleMarker, FeatureGroup, GeoJSON, Marker, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet";
-import { EditControl } from "react-leaflet-draw";
-import "leaflet-draw/dist/leaflet.draw.css";
+import { CircleMarker, GeoJSON, Marker, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
+import CargaPorZona, { SIN_CARGAR } from "../../components/CargaPorZona.jsx";
+import { CARGA_POR_ZONA } from "../../components/region.js";
 import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
 import { CONSULTAS, RESULTADO_VACIO } from "./paneles.jsx";
 
@@ -15,63 +15,45 @@ import { CONSULTAS, RESULTADO_VACIO } from "./paneles.jsx";
  * backend (backend/.../consultas/ConsultaResource.java); acá solo se piden y se muestran.
  * Cada consulta es un panel de paneles.jsx.
  *
- * Es una pantalla "a demanda": no carga las zonas, incidentes ni recursos al abrirse. Cada
- * consulta devuelve ya la geometría de lo que encontró, y el fondo (todo lo demás) lo dibuja
- * GeoServer como imagen. Así funciona igual con miles de objetos.
+ * Es una pantalla "a demanda": nunca carga todos los objetos. Hay tres clases de cosas en el mapa:
+ *   - El FONDO: todo lo que existe, dibujado por GeoServer como imagen (WMS).
+ *   - Los OBJETOS PARA ELEGIR (consultas 1, 2, 3, 6 y 7): las zonas, incidentes o recursos de la parte
+ *     visible del mapa, hasta un límite (CargaPorZona). El front los dibuja y se eligen con un clic en el
+ *     mapa o en la lista del panel. Mientras están dibujados así, GeoServer no dibuja ese mismo tipo.
+ *   - El RESULTADO de la consulta: cada consulta devuelve ya la geometría de lo que encontró.
  */
 
-/** Capas que GeoServer dibuja de fondo (imágenes): todo lo que existe, sin cargarlo en el navegador. */
-const CAPAS_FONDO = ["geotravel:zona_operativa", "geotravel:incidente", "geotravel:recurso"];
+/**
+ * Desde qué zoom se cargan los objetos para elegir. Es más permisivo que en los ABM (donde se edita): acá solo se
+ * eligen y se miran, y el límite por pedido ya acota la cantidad. Con la ciudad entera a la vista alcanza.
+ */
+const ZOOM_MINIMO_ELEGIR = Math.max(1, CARGA_POR_ZONA.zoomMinimo - 2);
+
+/**
+ * Capas que GeoServer dibuja de fondo (imágenes, sin cargar nada en el navegador). Cada consulta pide solo el tipo
+ * de objeto con el que trabaja (campo "fondo" de paneles.jsx): no se dibuja todo lo que existe.
+ */
+const CAPA_DE = { zona: "geotravel:zona_operativa", incidente: "geotravel:incidente", recurso: "geotravel:recurso" };
 
 /** Los recursos se dibujan como cuadrados (los incidentes, como círculos), igual que en GeoServer. */
 const iconos = {};
-const iconoRecurso = (color) => {
-  if (!iconos[color]) {
-    iconos[color] = L.divIcon({
+const iconoRecurso = (color, elegido = false) => {
+  const clave = `${color}${elegido}`;
+  if (!iconos[clave]) {
+    const lado = elegido ? 24 : 18;
+    iconos[clave] = L.divIcon({
       className: "",
-      iconSize: [18, 18],
-      iconAnchor: [9, 9],
-      html: `<span style="display:block;width:18px;height:18px;box-sizing:border-box;background:${color};border:2px solid #fff;border-radius:4px;box-shadow:0 0 0 1px rgba(19,32,44,.55)"></span>`,
+      iconSize: [lado, lado],
+      iconAnchor: [lado / 2, lado / 2],
+      html: `<span style="display:block;width:${lado}px;height:${lado}px;box-sizing:border-box;background:${color};border:${elegido ? 3 : 2}px solid ${elegido ? "#13202c" : "#fff"};border-radius:4px;box-shadow:0 0 0 1px rgba(19,32,44,.55)"></span>`,
     });
   }
-  return iconos[color];
+  return iconos[clave];
 };
 
 function ClickEnMapa({ alClick }) {
   useMapEvents({ click: (e) => alClick([e.latlng.lat, e.latlng.lng]) });
   return null;
-}
-
-/**
- * Barra de dibujo para la consulta "línea o polígono": una sola figura a la vez, que se puede
- * editar o borrar. `alCambiar` recibe la geometría en lon/lat (GeoJSON), o null si se borra.
- */
-function DibujoFigura({ alCambiar }) {
-  const grupo = useRef(null);
-  const estilo = { color: "#13202c", weight: 3 };
-  return (
-    <FeatureGroup ref={grupo}>
-      <EditControl
-        position="topright"
-        onCreated={(e) => {
-          grupo.current.eachLayer((capa) => {
-            if (capa !== e.layer) grupo.current.removeLayer(capa);
-          });
-          alCambiar(e.layer.toGeoJSON().geometry);
-        }}
-        onEdited={(e) => e.layers.eachLayer((capa) => alCambiar(capa.toGeoJSON().geometry))}
-        onDeleted={() => alCambiar(null)}
-        draw={{
-          polyline: { shapeOptions: { ...estilo, weight: 4 } },
-          polygon: { allowIntersection: false, showArea: false, shapeOptions: estilo },
-          rectangle: { shapeOptions: estilo },
-          circle: false,
-          marker: false,
-          circlemarker: false,
-        }}
-      />
-    </FeatureGroup>
-  );
 }
 
 /** Si el punto elegido (p. ej. un cruce de calles) queda fuera de la vista, lleva el mapa hasta él. */
@@ -83,25 +65,50 @@ function CentrarEn({ punto }) {
   return null;
 }
 
+/** Informa la parte visible del mapa (bbox en lon/lat) cuando se deja de mover; la usan las consultas que filtran por vista. */
+function VigilarVista({ alCambiar }) {
+  const map = useMap();
+  useEffect(() => {
+    let espera;
+    const medir = () => {
+      clearTimeout(espera);
+      espera = setTimeout(() => alCambiar({ bbox: map.getBounds().toBBoxString(), zoom: map.getZoom() }), 300);
+    };
+    medir();
+    map.on("moveend", medir);
+    return () => {
+      map.off("moveend", medir);
+      clearTimeout(espera);
+    };
+  }, [map, alCambiar]);
+  return null;
+}
+
 /**
  * Encuadra el mapa en el resultado de la consulta: como los objetos pueden estar en cualquier
  * parte del país, no alcanza con mirar la zona inicial. Deja libre el lado del panel.
+ * Con porSeleccion (se eligió algo de lo que ya se ve) solo se aleja si el resultado no entra en la vista:
+ * nunca se acerca, para no mover el mapa debajo de quien está eligiendo.
  */
-function AjustarVista({ resultado, punto }) {
+function AjustarVista({ resultado, punto, porSeleccion }) {
   const map = useMap();
   useEffect(() => {
     const capas = [
       ...resultado.zonas.map((z) => z.geometria),
       ...resultado.incidentes.map((i) => i.geometria),
       ...resultado.recursos.map((r) => r.geometria),
-      ...(resultado.area ? [resultado.area] : []),
     ];
     if (capas.length === 0) return;
     const limites = L.geoJSON({ type: "GeometryCollection", geometries: capas }).getBounds();
     if (punto) limites.extend(punto);
     if (!limites.isValid()) return;
+    if (porSeleccion && map.getBounds().contains(limites)) return;
     const escritorio = window.matchMedia("(min-width: 800px)").matches;
-    map.fitBounds(limites, { paddingTopLeft: [escritorio ? 390 : 24, 40], paddingBottomRight: [24, escritorio ? 24 : 260], maxZoom: 16 });
+    map.fitBounds(limites, {
+      paddingTopLeft: [escritorio ? 390 : 24, 40],
+      paddingBottomRight: [24, escritorio ? 24 : 260],
+      maxZoom: porSeleccion ? map.getZoom() : 16,
+    });
     // Solo cuando cambia el resultado, no cuando se elige un punto
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultado, map]);
@@ -116,22 +123,13 @@ function CapaResultado({ resultado, punto }) {
 
   return (
     <>
-      {resultado.area && (
-        <GeoJSON
-          key={`area-${JSON.stringify(resultado.area.coordinates).length}-${JSON.stringify(resultado.area.coordinates[0][0])}`}
-          data={resultado.area}
-          interactive={false}
-          style={{ color: "#13202c", weight: 1.5, dashArray: "6 5", fillColor: "#13202c", fillOpacity: 0.07 }}
-        />
-      )}
-
       {resultado.zonas.map((z) => (
         <GeoJSON
           key={`z${z.id}-${z.intensidad}`}
           data={z.geometria}
           interactive={false}
           style={{
-            color: COLOR_PRIORIDAD[z.nivelPrioridad] ?? "#13202c",
+            color: "#13202c",
             weight: 3,
             fillColor: COLOR_PRIORIDAD[z.nivelPrioridad] ?? "#13202c",
             fillOpacity: 0.12 + 0.5 * z.intensidad,
@@ -191,11 +189,73 @@ function CapaResultado({ resultado, punto }) {
   );
 }
 
+/** Texto del rótulo de un objeto para elegir. */
+const etiquetaDe = (tipo, o) => (tipo === "zona" ? o.nombre : tipo === "incidente" ? `${o.titulo} — ${o.estado}` : `${o.identificacion} — ${o.tipo}`);
+
+/**
+ * Los objetos de la vista que se pueden elegir con un clic: zonas, incidentes o recursos, cada uno con su
+ * color (prioridad, estado). El elegido se dibuja más marcado. Va todo en UNA capa GeoJSON.
+ *   elegibles: { tipo, items (con geometria), elegidoId, elegir(objeto) }; las zonas pueden traer "intensidad" (0 a 1).
+ */
+function CapaElegibles({ elegibles }) {
+  const ultimo = useRef(elegibles);
+  ultimo.current = elegibles;
+  if (!elegibles || elegibles.items.length === 0) return null;
+
+  const { tipo, items, elegidoId } = elegibles;
+  const datos = {
+    type: "FeatureCollection",
+    features: items.map((o) => ({ type: "Feature", properties: { id: o.id }, geometry: o.geometria })),
+  };
+  const porId = new Map(items.map((o) => [o.id, o]));
+
+  const estilo = (f) => {
+    const o = porId.get(f.properties.id);
+    const elegido = o.id === elegidoId;
+    const forma = f.geometry.type.replace("Multi", "");
+    if (tipo === "zona") {
+      return {
+        color: elegido ? "#13202c" : "#5b6b52",
+        weight: elegido ? 4 : 1.5,
+        fillColor: COLOR_PRIORIDAD[o.nivelPrioridad] ?? "#999",
+        fillOpacity: elegido ? 0.55 : o.intensidad != null ? 0.12 + 0.5 * o.intensidad : 0.4,
+      };
+    }
+    const color = tipo === "incidente" ? (COLOR_ESTADO_INCIDENTE[o.estado] ?? "#555") : "#555";
+    if (forma === "Point") return { color: elegido ? "#13202c" : "#ffffff", weight: elegido ? 4 : 1.5, fillColor: color, fillOpacity: 0.9 };
+    if (forma === "LineString") return { color: elegido ? "#13202c" : color, weight: elegido ? 8 : 5, opacity: 0.9 };
+    return { color: elegido ? "#13202c" : color, weight: elegido ? 4 : 2, fillColor: color, fillOpacity: elegido ? 0.45 : 0.3 };
+  };
+
+  return (
+    <GeoJSON
+      key={`${tipo}|${elegidoId}|${items.map((o) => `${o.id}:${o.intensidad ?? ""}`).join(",")}`}
+      data={datos}
+      pointToLayer={(f, latlng) => {
+        const o = porId.get(f.properties.id);
+        if (tipo === "recurso") return L.marker(latlng, { icon: iconoRecurso(COLOR_ESTADO_RECURSO[o.estadoOperativo] ?? "#555", o.id === elegidoId) });
+        return L.circleMarker(latlng, { radius: o.id === elegidoId ? 11 : 8 });
+      }}
+      style={estilo}
+      onEachFeature={(f, capa) => {
+        const o = porId.get(f.properties.id);
+        capa.bindTooltip(etiquetaDe(tipo, o), { sticky: true });
+        capa.on("click", (e) => {
+          L.DomEvent.stopPropagation(e);
+          ultimo.current.elegir(o);
+        });
+      }}
+    />
+  );
+}
+
 export default function ConsultasPage() {
   const [consultaId, setConsultaId] = useState(CONSULTAS[0].id);
   const [resultado, setResultado] = useState(RESULTADO_VACIO);
+  const [elegibles, setElegibles] = useState(null); // objetos de la vista para elegir con un clic (ver CapaElegibles)
+  const [carga, setCarga] = useState(SIN_CARGAR); // objetos de la vista que pide CargaPorZona
+  const [vista, setVista] = useState(null); // parte visible del mapa: { bbox, zoom }
   const [punto, setPunto] = useState(null);
-  const [figura, setFigura] = useState(null); // línea o polígono dibujado (GeoJSON en lon/lat)
 
   const consulta = CONSULTAS.find((c) => c.id === consultaId);
   const { Panel } = consulta;
@@ -203,19 +263,27 @@ export default function ConsultasPage() {
   const elegir = (id) => {
     setConsultaId(id);
     setResultado(RESULTADO_VACIO);
+    setElegibles(null);
+    setCarga(SIN_CARGAR);
     setPunto(null);
-    setFigura(null);
   };
+
+  const alVerCambiar = useCallback((nueva) => setVista(nueva), []);
 
   const hijosMapa = (
     <>
       {consulta.pideClic && <ClickEnMapa alClick={setPunto} />}
       {consulta.pideClic && <CentrarEn punto={punto} />}
-      {consulta.dibuja && <DibujoFigura alCambiar={setFigura} />}
-      <AjustarVista resultado={resultado} punto={consulta.pideClic ? punto : null} />
+      {consulta.objetos && <CargaPorZona key={consulta.id} ruta={consulta.objetos} alCambiar={setCarga} zoomMinimo={ZOOM_MINIMO_ELEGIR} />}
+      <VigilarVista alCambiar={alVerCambiar} />
+      <AjustarVista resultado={resultado} punto={consulta.pideClic ? punto : null} porSeleccion={Boolean(consulta.objetos || consulta.sobreVista)} />
+      <CapaElegibles elegibles={elegibles} />
       <CapaResultado resultado={resultado} punto={consulta.pideClic ? punto : null} />
     </>
   );
+
+  // De fondo, solo el tipo de la consulta; y ese tampoco cuando el front ya dibuja los objetos para elegir (se vería doble).
+  const capasFondo = [CAPA_DE[consulta.fondo]].filter((capa) => !(elegibles && elegibles.items.length > 0 && capa === CAPA_DE[elegibles.tipo]));
 
   return (
     <PaginaMapa
@@ -223,7 +291,7 @@ export default function ConsultasPage() {
       titulo="Consultas geográficas"
       etiquetaBoton="Consultas"
       hijosMapa={hijosMapa}
-      mapaProps={{ layers: CAPAS_FONDO }}
+      mapaProps={{ layers: capasFondo, mostrarZoom: Boolean(consulta.objetos), zoomMinimo: ZOOM_MINIMO_ELEGIR }}
     >
       <div className="panel__seccion">
         <label className="campo">
@@ -242,7 +310,15 @@ export default function ConsultasPage() {
         </p>
       </div>
       <div className="panel__seccion">
-        <Panel key={consulta.id} punto={punto} setPunto={setPunto} figura={figura} setResultado={setResultado} />
+        <Panel
+          key={consulta.id}
+          punto={punto}
+          setPunto={setPunto}
+          setResultado={setResultado}
+          setElegibles={setElegibles}
+          carga={carga}
+          vista={vista}
+        />
       </div>
     </PaginaMapa>
   );

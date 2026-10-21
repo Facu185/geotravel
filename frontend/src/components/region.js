@@ -11,15 +11,15 @@
  *
  * Búsqueda de direcciones (consultas 4 y 5):
  *   ide: departamento y localidad que se mandan al servicio de direcciones de la IDE (cubre todo el país).
- *   callesPropias: true solo en Montevideo, que tiene calles y números de puerta en la base propia
- *     (cruce de calles y autocompletado). En el resto la dirección y la esquina las resuelve la IDE.
+ *   callesPropias: true solo en Salto, que tiene calles y números de puerta en la base propia
+ *     (cruce de calles y autocompletado, sin internet). En el resto la dirección y la esquina las resuelve la IDE.
  *   ejemploDireccion: texto de ayuda del campo.
  */
-const REGIONES = {
+export const REGIONES = {
   salto: {
     nombre: "Salto",
     ide: { departamento: "salto", localidad: "salto" },
-    callesPropias: false,
+    callesPropias: true,
     ejemploDireccion: "Uruguay 1000",
     centro: [-31.3857, -57.9606],
     encuadre: [
@@ -30,12 +30,12 @@ const REGIONES = {
   montevideo: {
     nombre: "Montevideo",
     ide: { departamento: "montevideo", localidad: "montevideo" },
-    callesPropias: true,
+    callesPropias: false,
     ejemploDireccion: "Buenos Aires 451",
-    centro: [-34.9011, -56.1645],
+    centro: [-34.88, -56.16],
     encuadre: [
-      [-34.9205, -56.2215],
-      [-34.9005, -56.1395],
+      [-34.915, -56.205],
+      [-34.845, -56.115],
     ],
   },
 };

@@ -1,9 +1,14 @@
-import { useEffect, useState } from "react";
-import { CircleMarker, Tooltip, useMapEvents } from "react-leaflet";
+import { useEffect, useRef, useState } from "react";
+import L from "leaflet";
+import { GeoJSON } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
+import CargaPorZona, { AvisoCarga, SIN_CARGAR } from "../../components/CargaPorZona.jsx";
+import Enfocar from "../../components/Enfocar.jsx";
+import EditorGeometria, { cargarGeometria, formaDe, geometriaDelGrupo } from "../../components/EditorGeometria.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Insignia, Segmentado } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, OPCIONES_PRIORIDAD } from "../../components/colores.js";
 import { api } from "../../api/client.js";
+import { CARGA_POR_ZONA } from "../../components/region.js";
 
 /**
  * Módulo Incidentes (dueño: P4): ABM + avanzar estado (con ramas) + histórico.
@@ -14,9 +19,17 @@ import { api } from "../../api/client.js";
  * opciones mostrar; el backend es quien valida de verdad (409 si no es válida) -- si
  * alguna vez se desincronizan, el mensaje de error del backend manda.
  *
- * El panel tiene tres vistas: la lista, el detalle de un incidente (con su historial y las
- * transiciones posibles) y el formulario para registrar uno nuevo. El mapa solo acepta
- * clics de ubicación cuando el formulario está abierto.
+ * La ubicación de un incidente es un PUNTO (un lugar: un choque), una LÍNEA (un tramo: una calle
+ * cortada) o un POLÍGONO (un área: una inundación). "geom" siempre es GeoJSON en lon/lat y el
+ * backend lo convierte al SRID de la base. Se dibuja con EditorGeometria (componente compartido).
+ *
+ * El panel tiene tres vistas: la lista, el detalle de un incidente (con su historial, las
+ * transiciones posibles y los botones Editar y Eliminar) y el formulario (nuevo o en edición).
+ * Dibujar una forma con la lista abierta ya abre el formulario de un incidente nuevo.
+ *
+ * Carga a demanda (CargaPorZona): solo se traen los incidentes del rectángulo visible, hasta un
+ * límite. Con el mapa alejado no se carga nada editable y los incidentes los dibuja GeoServer como
+ * imagen (capa WMS), así el navegador nunca tiene miles de objetos en memoria.
  */
 
 const TRANSICIONES = {
@@ -29,44 +42,86 @@ const TRANSICIONES = {
 
 const FORM_VACIO = { titulo: "", descripcion: "", tipoIncidente: "", prioridad: 3, equipoResponsable: "" };
 
-const posicionDe = (incidente) => {
-  const [lng, lat] = JSON.parse(incidente.geom).coordinates;
-  return { lat, lng };
+const FORMAS = [
+  { valor: "Point", etiqueta: "Punto", color: "#13202c" },
+  { valor: "LineString", etiqueta: "Línea", color: "#13202c" },
+  { valor: "Polygon", etiqueta: "Polígono", color: "#13202c" },
+];
+const NOMBRE_FORMA = { Point: "punto", LineString: "línea", Polygon: "polígono" };
+const CON_ARTICULO = { Point: "el punto", LineString: "la línea", Polygon: "el polígono" };
+const CON_ARTICULO_INDEFINIDO = { Point: "un punto", LineString: "una línea", Polygon: "un polígono" };
+const AYUDA_FORMA = {
+  Point: "un lugar (un choque, un incendio). Hacé clic en el mapa.",
+  LineString: "un tramo (una calle cortada). Un clic por vértice; el último, otra vez para terminar.",
+  Polygon: "un área (una inundación). Un clic por vértice; cerrá tocando el primero.",
 };
-const geometria = ({ lat, lng }) => ({ type: "Point", coordinates: [lng, lat] });
+const MARCA_FORMA = { Point: "circulo", LineString: "linea", Polygon: "zona" };
+
+const TIPOS = ["accidente_transito", "incendio", "corte_servicio", "inundacion", "calle_cortada", "otro"];
 
 const formatoFecha = (iso) =>
   new Date(iso).toLocaleString("es-UY", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
 
-function ClickEnMapa({ alClick }) {
-  useMapEvents({ click: (e) => alClick(e.latlng) });
-  return null;
-}
+/** Cómo se dibuja un incidente en el mapa: color del estado; punto en círculo, línea gruesa o área con relleno. */
+const estiloIncidente = (estado, tipo, resaltado) => {
+  const color = COLOR_ESTADO_INCIDENTE[estado] ?? "#555";
+  const forma = tipo.replace("Multi", "");
+  if (forma === "Point") return { color: resaltado ? "#13202c" : "#ffffff", weight: resaltado ? 4 : 1.5, fillColor: color, fillOpacity: 0.9 };
+  if (forma === "LineString") return { color: resaltado ? "#13202c" : color, weight: resaltado ? 8 : 5, opacity: 0.9 };
+  return { color: resaltado ? "#13202c" : color, weight: resaltado ? 4 : 2, fillColor: color, fillOpacity: resaltado ? 0.45 : 0.3 };
+};
+
+const comoFeature = (incidente) => ({
+  type: "Feature",
+  properties: { id: incidente.id, titulo: incidente.titulo, estado: incidente.estado },
+  geometry: JSON.parse(incidente.geom),
+});
+
+const circulo = (radio) => (_, latlng) => L.circleMarker(latlng, { radius: radio });
 
 export default function IncidentesPage() {
-  const [incidentes, setIncidentes] = useState([]);
-  const [vista, setVista] = useState("lista"); // "lista" | "detalle" | "nuevo"
+  const [carga, setCarga] = useState(SIN_CARGAR); // incidentes de la vista actual (ver CargaPorZona)
+  const [recarga, setRecarga] = useState(0); // cambiarlo vuelve a pedir la vista (después de guardar, borrar o cambiar de estado)
+  const [version, setVersion] = useState(0); // fuerza a <GeoJSON> a redibujarse cuando cambian los datos
+  const incidentes = carga.items;
+  const [enfoque, setEnfoque] = useState(null); // incidente elegido en la lista: el mapa va hasta él
+  const [vista, setVista] = useState("lista"); // "lista" | "detalle" | "form"
   const [seleccionado, setSeleccionado] = useState(null);
   const [historial, setHistorial] = useState([]);
   const [estadoDestino, setEstadoDestino] = useState("");
   const [usuario, setUsuario] = useState("");
   const [form, setForm] = useState(FORM_VACIO);
-  const [punto, setPunto] = useState(null);
+  const [forma, setForma] = useState("Point"); // forma elegida en el formulario
+  const [hayForma, setHayForma] = useState(false); // solo indica si hay algo dibujado; la forma se lee de la capa
+  const [pedido, setPedido] = useState(null); // pide a EditorGeometria que empiece a dibujar
   const [error, setError] = useState(null);
   const [mensaje, setMensaje] = useState(null);
+  const grupoRef = useRef(null);
+  const dibujando = useRef(false);
 
-  const cargar = () => api.get("/incidentes").then(setIncidentes).catch((e) => setError(e.message));
+  const alCargar = (nueva) => {
+    setCarga(nueva);
+    if (nueva.estado === "listo" || nueva.estado === "lejos") setVersion((v) => v + 1);
+  };
+  const cargar = () => setRecarga((n) => n + 1);
 
+  // Al editar un incidente, su forma pasa al grupo editable (el resto de la vida del grupo la manejan
+  // reiniciar() y el dibujo: acá no se vacía, para no borrar lo que se acaba de dibujar).
   useEffect(() => {
-    cargar();
-  }, []);
+    if (vista === "form" && seleccionado && grupoRef.current) {
+      cargarGeometria(grupoRef.current, JSON.parse(seleccionado.geom));
+    }
+  }, [vista, seleccionado]);
 
   const reiniciar = () => {
+    // Se vacía el grupo a mano: una forma recién dibujada (ya guardada o cancelada) no debe quedar sobre el mapa.
+    grupoRef.current?.clearLayers();
     setSeleccionado(null);
     setHistorial([]);
     setEstadoDestino("");
     setForm(FORM_VACIO);
-    setPunto(null);
+    setHayForma(false);
+    setPedido(null);
     setError(null);
   };
 
@@ -78,13 +133,15 @@ export default function IncidentesPage() {
   const abrirNuevo = () => {
     reiniciar();
     setMensaje(null);
-    setVista("nuevo");
+    setForma("Point");
+    setPedido({ forma: "Point" }); // el primer clic en el mapa ya ubica el incidente
+    setVista("form");
   };
 
   const seleccionar = async (inc) => {
+    if (dibujando.current) return; // un clic a mitad de un trazo no cambia de incidente
     reiniciar();
     setSeleccionado(inc);
-    setPunto(posicionDe(inc));
     setMensaje(null);
     setVista("detalle");
     try {
@@ -94,18 +151,73 @@ export default function IncidentesPage() {
     }
   };
 
-  const crear = async (ev) => {
+  const editar = () => {
+    setForm({
+      titulo: seleccionado.titulo,
+      descripcion: seleccionado.descripcion ?? "",
+      tipoIncidente: seleccionado.tipoIncidente,
+      prioridad: seleccionado.prioridad,
+      equipoResponsable: seleccionado.equipoResponsable ?? "",
+    });
+    setForma(formaDe(JSON.parse(seleccionado.geom)));
+    setHayForma(true);
+    setPedido(null);
+    setError(null);
+    setMensaje(null);
+    setVista("form");
+  };
+
+  // --- eventos del editor de geometría ---
+  const alDibujar = (geometria) => {
+    // Dibujar con el detalle o la lista abiertos empieza un incidente nuevo.
+    if (vista !== "form") {
+      setSeleccionado(null);
+      setHistorial([]);
+      setEstadoDestino("");
+      setForm(FORM_VACIO);
+      setVista("form");
+    }
+    setForma(formaDe(geometria));
+    setHayForma(true);
+    setError(null);
+    setMensaje(null);
+  };
+  const alEditar = (geometria) => setForma(formaDe(geometria));
+  const alBorrar = () => setHayForma(false);
+
+  const elegirForma = (nueva) => {
+    setForma(nueva);
+    setPedido({ forma: nueva });
+  };
+
+  const guardar = async (ev) => {
     ev.preventDefault();
     setError(null);
     setMensaje(null);
-    if (!punto) {
-      setError("Hacé clic en el mapa para elegir la ubicación del incidente.");
+    const geometria = geometriaDelGrupo(grupoRef.current);
+    if (!geometria) {
+      setError("Dibujá la ubicación en el mapa antes de guardar: un punto, una línea o un polígono.");
       return;
     }
+    const cuerpo = { ...form, prioridad: Number(form.prioridad), geomGeoJson: JSON.stringify(geometria) };
+    const edicion = seleccionado !== null;
     try {
-      await api.post("/incidentes", { ...form, prioridad: Number(form.prioridad), geomGeoJson: JSON.stringify(geometria(punto)) });
+      if (edicion) await api.put(`/incidentes/${seleccionado.id}`, cuerpo);
+      else await api.post("/incidentes", cuerpo);
       volverALista();
-      setMensaje("Incidente registrado.");
+      setMensaje(edicion ? "Incidente actualizado." : "Incidente registrado.");
+      cargar();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const eliminar = async () => {
+    if (!window.confirm(`¿Eliminar el incidente "${seleccionado.titulo}"?`)) return;
+    try {
+      await api.del(`/incidentes/${seleccionado.id}`);
+      volverALista();
+      setMensaje("Incidente eliminado.");
       cargar();
     } catch (e) {
       setError(e.message);
@@ -137,42 +249,51 @@ export default function IncidentesPage() {
     ? (TRANSICIONES[seleccionado.estado] ?? []).map((estado) => ({ valor: estado, etiqueta: estado, color: COLOR_ESTADO_INCIDENTE[estado] }))
     : [];
 
+  // Los demás incidentes, de fondo (el que se edita va en el grupo editable, y el del detalle, resaltado).
+  const fondo = {
+    type: "FeatureCollection",
+    features: incidentes.filter((i) => i.id !== seleccionado?.id).map(comoFeature),
+  };
+  const lejos = carga.estado === "lejos";
+  const formaSeleccionado = seleccionado ? formaDe(JSON.parse(seleccionado.geom)) : null;
+
   const hijosMapa = (
     <>
-      <ClickEnMapa alClick={(ubicacion) => vista === "nuevo" && setPunto(ubicacion)} />
-      {incidentes
-        .filter((i) => i.id !== seleccionado?.id)
-        .map((i) => {
-          const { lat, lng } = posicionDe(i);
-          return (
-            <CircleMarker
-              key={i.id}
-              center={[lat, lng]}
-              radius={8}
-              pathOptions={{ color: COLOR_ESTADO_INCIDENTE[i.estado] ?? "#555", fillOpacity: 0.85 }}
-              bubblingMouseEvents={false}
-              eventHandlers={{ click: () => seleccionar(i) }}
-            >
-              <Tooltip>
-                {i.titulo} — {i.estado}
-              </Tooltip>
-            </CircleMarker>
-          );
-        })}
-      {punto && vista !== "lista" && (
-        <CircleMarker
-          center={[punto.lat, punto.lng]}
-          radius={12}
-          pathOptions={{ color: seleccionado ? COLOR_ESTADO_INCIDENTE[seleccionado.estado] : "#13202c", weight: 4, fillOpacity: 0.25 }}
-        >
-          <Tooltip permanent>{seleccionado ? seleccionado.titulo : form.titulo || "Nuevo incidente"}</Tooltip>
-        </CircleMarker>
+      <CargaPorZona ruta="/incidentes" recarga={recarga} alCambiar={alCargar} />
+      <Enfocar objetivo={enfoque} />
+      <GeoJSON
+        key={`${version}-${seleccionado?.id ?? "ninguno"}`}
+        data={fondo}
+        pointToLayer={circulo(8)}
+        style={(f) => estiloIncidente(f.properties.estado, f.geometry.type, false)}
+        onEachFeature={(f, capa) => {
+          capa.bindTooltip(`${f.properties.titulo} — ${f.properties.estado}`);
+          capa.on("click", () => seleccionar(incidentes.find((i) => i.id === f.properties.id)));
+        }}
+      />
+      {vista === "detalle" && seleccionado && (
+        <GeoJSON
+          key={`resaltado-${seleccionado.id}-${seleccionado.estado}-${version}`}
+          data={comoFeature(seleccionado)}
+          pointToLayer={circulo(12)}
+          style={(f) => estiloIncidente(f.properties.estado, f.geometry.type, true)}
+          interactive={false}
+        />
       )}
+      <EditorGeometria grupoRef={grupoRef} pedido={pedido} dibujando={dibujando} alCrear={alDibujar} alEditar={alEditar} alBorrar={alBorrar} />
     </>
   );
 
   return (
-    <PaginaMapa etiqueta="Administración" titulo="Incidentes" etiquetaBoton="Incidentes" hijosMapa={hijosMapa}>
+    <PaginaMapa
+      etiqueta="Administración"
+      titulo="Incidentes"
+      etiquetaBoton="Incidentes"
+      hijosMapa={hijosMapa}
+      // Alejado, los incidentes se ven igual: los dibuja GeoServer (imagen, no objetos en memoria).
+      mapaProps={{ layers: lejos ? ["geotravel:incidente"] : [], wmsExtra: { actualizado: recarga }, mostrarZoom: true, zoomMinimo: CARGA_POR_ZONA.zoomMinimo }}
+      aviso={<AvisoCarga carga={carga} nombre="incidentes" />}
+    >
       {vista === "lista" && (
         <>
           <div className="panel__seccion">
@@ -181,25 +302,44 @@ export default function IncidentesPage() {
             <button type="button" className="btn btn--primario btn--ancho" onClick={abrirNuevo}>
               <IconoMas /> Registrar incidente
             </button>
-            <p className="ayuda">Tocá un incidente en el mapa o en la lista para ver su detalle y cambiar su estado.</p>
+            <p className="ayuda">
+              Un incidente puede ser un punto, una línea (una calle cortada) o un polígono (un área afectada). También podés dibujarlo
+              directo con las herramientas del mapa, o tocar uno para ver su detalle y cambiar su estado.
+            </p>
+            {!lejos && incidentes.length > 0 && (
+              <p className="ayuda">
+                {carga.truncado ? `Incidentes en esta vista: ${incidentes.length} de ${carga.total}` : `Incidentes en esta vista: ${incidentes.length}`}
+              </p>
+            )}
           </div>
           <ul className="items">
-            {incidentes.map((i) => (
-              <li key={i.id}>
-                <button type="button" className="item" onClick={() => seleccionar(i)}>
-                  <span className="item__marca item__marca--circulo" style={{ "--color": COLOR_ESTADO_INCIDENTE[i.estado] }} aria-hidden="true" />
-                  <span className="item__texto">
-                    <span className="item__titulo">{i.titulo}</span>
-                    <span className="item__detalle">
-                      {i.estado} · prioridad {i.prioridad}
+            {incidentes.map((i) => {
+              const tipo = formaDe(JSON.parse(i.geom));
+              return (
+                <li key={i.id}>
+                  <button
+                    type="button"
+                    className="item"
+                    onClick={() => {
+                      seleccionar(i);
+                      setEnfoque({ geom: JSON.parse(i.geom) });
+                    }}
+                  >
+                    <span className={`item__marca item__marca--${MARCA_FORMA[tipo]}`} style={{ "--color": COLOR_ESTADO_INCIDENTE[i.estado] }} aria-hidden="true" />
+                    <span className="item__texto">
+                      <span className="item__titulo">{i.titulo}</span>
+                      <span className="item__detalle">
+                        {i.estado} · prioridad {i.prioridad} · {NOMBRE_FORMA[tipo]}
+                      </span>
                     </span>
-                  </span>
-                  <IconoFlecha />
-                </button>
-              </li>
-            ))}
+                    <IconoFlecha />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
-          {incidentes.length === 0 && <p className="vacio">Todavía no hay incidentes registrados.</p>}
+          {lejos && <p className="vacio">Acercá el mapa para listar y editar los incidentes de esa área.</p>}
+          {carga.estado === "listo" && incidentes.length === 0 && <p className="vacio">No hay incidentes en esta parte del mapa.</p>}
         </>
       )}
 
@@ -222,6 +362,10 @@ export default function IncidentesPage() {
               <dd>{seleccionado.prioridad}</dd>
             </div>
             <div>
+              <dt>Ubicación</dt>
+              <dd>{NOMBRE_FORMA[formaSeleccionado]}</dd>
+            </div>
+            <div>
               <dt>Equipo</dt>
               <dd>{seleccionado.equipoResponsable || "—"}</dd>
             </div>
@@ -233,6 +377,15 @@ export default function IncidentesPage() {
 
           {mensaje && <Aviso tipo="ok">{mensaje}</Aviso>}
           {error && <Aviso tipo="error">{error}</Aviso>}
+
+          <div className="acciones">
+            <button type="button" className="btn btn--secundario" onClick={editar}>
+              Editar datos y ubicación
+            </button>
+            <button type="button" className="btn btn--peligro" onClick={eliminar}>
+              Eliminar
+            </button>
+          </div>
 
           <section className="bloque">
             <h4 className="bloque__titulo">Cambiar estado</h4>
@@ -268,16 +421,24 @@ export default function IncidentesPage() {
         </div>
       )}
 
-      {vista === "nuevo" && (
-        <form className="panel__seccion formulario" onSubmit={crear}>
+      {vista === "form" && (
+        <form className="panel__seccion formulario" onSubmit={guardar}>
           <BotonVolver onClick={volverALista}>Incidentes</BotonVolver>
-          <h3 className="formulario__titulo">Registrar incidente</h3>
+          <h3 className="formulario__titulo">{seleccionado ? seleccionado.titulo : "Registrar incidente"}</h3>
 
-          <p className={punto ? "paso paso--listo" : "paso"}>
-            {punto
-              ? `Ubicación elegida (${punto.lat.toFixed(5)}, ${punto.lng.toFixed(5)}). Tocá otro punto del mapa para moverla.`
-              : "Hacé clic en el mapa para elegir dónde ocurrió."}
+          <Segmentado leyenda="Ubicación" nombre="forma" opciones={FORMAS} valor={forma} onChange={elegirForma} />
+          <p className={hayForma ? "paso paso--listo" : "paso"}>
+            {hayForma
+              ? seleccionado
+                ? `Para cambiar la forma, usá el lápiz del mapa y mové los vértices; o elegí una forma y dibujala de nuevo.`
+                : `Ya dibujaste ${CON_ARTICULO_INDEFINIDO[forma]}. Podés ajustar su forma con el lápiz del mapa, o elegir otra forma y dibujarla de nuevo.`
+              : `Dibujá ${CON_ARTICULO[forma]}: ${AYUDA_FORMA[forma]}`}
           </p>
+          {hayForma && (
+            <button type="button" className="btn btn--secundario" onClick={() => setPedido({ forma })}>
+              Dibujar de nuevo
+            </button>
+          )}
 
           <label className="campo">
             <span className="campo__etiqueta">Título</span>
@@ -291,7 +452,7 @@ export default function IncidentesPage() {
             <span className="campo__etiqueta">Tipo</span>
             <input required list="tipos-incidente" placeholder="Ej.: incendio" {...campo("tipoIncidente")} />
             <datalist id="tipos-incidente">
-              {["accidente_transito", "incendio", "corte_servicio", "inundacion", "otro"].map((t) => (
+              {TIPOS.map((t) => (
                 <option key={t} value={t} />
               ))}
             </datalist>
@@ -312,7 +473,7 @@ export default function IncidentesPage() {
 
           <div className="acciones">
             <button type="submit" className="btn btn--primario">
-              Registrar incidente
+              {seleccionado ? "Guardar cambios" : "Registrar incidente"}
             </button>
             <button type="button" className="btn btn--secundario" onClick={volverALista}>
               Cancelar

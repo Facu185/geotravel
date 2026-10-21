@@ -300,6 +300,7 @@ paths:
         "400": { $ref: "#/components/responses/DatosInvalidos" }
     post:
       summary: Registrar incidente (siempre nace en estado "Registrado")
+      description: La ubicación (geomGeoJson) puede ser un punto, una línea o un polígono; ver IncidenteInput.
       tags: [incidentes]
       requestBody:
         required: true
@@ -428,23 +429,15 @@ paths:
 
   /consultas/zonas-mas-incidentes:
     get:
-      summary: C2. Zonas ordenadas por cantidad de incidentes, opcionalmente en un rango de fechas
-      tags: [consultas]
-      parameters:
-        - { name: desde, in: query, required: false, schema: { type: string, format: date-time } }
-        - { name: hasta, in: query, required: false, schema: { type: string, format: date-time } }
-      responses: { "200": { description: OK } }
-
-  /consultas/zonas-mayor-concentracion:
-    get:
       summary: >
-        Extra (la letra unificó la consulta 8 con la 2). Zonas ordenadas por incidentes/km² (normalizado por área).
-        AMBIGÜEDAD EN LA LETRA: no queda claro si difiere de "zonas-mas-incidentes"
-        -- confirmar con el tutor el criterio esperado. Opcionalmente en un rango de fechas.
+        C2. Zonas ordenadas por cantidad de incidentes, opcionalmente en un rango de fechas y solo las que están en
+        la parte visible del mapa (bbox). Con geometría; responde {items, total, truncado} (las 50 primeras por defecto).
       tags: [consultas]
       parameters:
         - { name: desde, in: query, required: false, schema: { type: string, format: date-time } }
         - { name: hasta, in: query, required: false, schema: { type: string, format: date-time } }
+        - $ref: "#/components/parameters/Bbox"
+        - $ref: "#/components/parameters/Limit"
       responses: { "200": { description: OK } }
 
   /consultas/recursos-cercanos/{incidenteId}:
@@ -488,50 +481,12 @@ paths:
         "200": { description: "OK; si el punto no cae en ninguna zona devuelve {\"zona\": null}" }
         "400": { description: Falta la coordenada (ni x,y ni lon,lat) }
 
-  /consultas/por-figura:
-    post:
-      summary: >
-        Extra. Qué incidentes, recursos y zonas hay dentro de, o a lo largo de, una línea o un polígono
-        dibujado en el mapa. Polígono: distancia 0 por defecto (lo de adentro). Línea: 200 m por
-        defecto (un pasillo a lo largo de ella). Con distancia > 0 se agranda la figura (ST_Buffer)
-        y ese área se devuelve en "area" para dibujarla. Cada lista trae como máximo 200 filas
-        (las más cercanas) y el total real.
-      tags: [consultas]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [geomGeoJson]
-              properties:
-                geomGeoJson: { type: string, description: "LineString o Polygon en lon/lat (EPSG:4326), como texto GeoJSON" }
-                distanciaM: { type: number, minimum: 0, maximum: 10000 }
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  tipo: { type: string, enum: [LineString, Polygon] }
-                  distanciaM: { type: number }
-                  largoM: { type: number, description: "Solo líneas (ST_Length)" }
-                  areaM2: { type: number, description: "Solo polígonos (ST_Area)" }
-                  perimetroM: { type: number, description: "Solo polígonos (ST_Perimeter)" }
-                  area: { type: string, nullable: true, description: "GeoJSON del área buscada; null si la distancia es 0" }
-                  incidentes: { type: object, properties: { total: { type: integer }, filas: { type: array, items: { type: object } } } }
-                  recursos: { type: object, properties: { total: { type: integer }, filas: { type: array, items: { type: object } } } }
-                  zonas: { type: array, items: { type: object } }
-        "400": { description: Figura ausente, GeoJSON inválido, que no es línea ni polígono, no válida (se cruza consigo misma) o distancia fuera de rango }
-
   /consultas/calles:
     get:
       summary: >
         Auxiliar de C4 y C5. Nombres de calle que contienen el texto dado (mínimo 2 letras; vacío si es menos), con
-        los que empiezan por él primero. Máximo 10. Para el autocompletado de intersecciones. Usa la red vial local,
-        actualmente de Montevideo; no representa cobertura de Salto.
+        los que empiezan por él primero. Máximo 10. Para el autocompletado de intersecciones. Usa la red vial local
+        (tabla via, de Salto).
       tags: [consultas]
       parameters:
         - { name: q, in: query, required: true, schema: { type: string } }
@@ -546,7 +501,7 @@ paths:
     get:
       summary: >
         Auxiliar de C4 y C5. Puntos donde se cruzan dos calles (lon/lat, EPSG:4326), calculados en PostGIS sobre la
-        red vial local (tabla via, actualmente Montevideo). Lista vacía si no se cruzan o algún nombre no existe; varios
+        red vial local (tabla via, de Salto). Lista vacía si no se cruzan o algún nombre no existe; varios
         elementos si hay nombres repetidos en la ciudad. El resultado se usa como lon/lat en
         /consultas/incidente-mas-cercano y /consultas/zona-por-punto.
       tags: [consultas]
@@ -572,10 +527,10 @@ paths:
       summary: >
         Auxiliar de C4 y C5. Ubica una dirección "calle número" (por ejemplo "Camino Carrasco 4680")
         y devuelve lon/lat (EPSG:4326). Se busca en la tabla acceso, los números de puerta de
-        Montevideo (capa mdg_accesos de la Intendencia; es también la capa "acceso" de GeoServer),
-        tolerando abreviaturas ("Camino" = CNO, "Avenida" = AV) y errores de tipeo. Si el número no
+        Salto (es también la capa "acceso" de GeoServer), sin tildes, con las palabras completas
+        ("Av." = AVENIDA, "Gral" = GENERAL, "Dr" = DOCTOR) y tolerando errores de tipeo. Si el número no
         existe se devuelve la puerta más cercana de la calle y se marca "aproximada". La tabla de puertas es
-        solo de Montevideo: con otro departamento o localidad, o con el parámetro esquina, se usa el servicio de
+        solo de Salto: con otro departamento o localidad, o con el parámetro esquina, se usa el servicio de
         direcciones de la IDE de Uruguay, que cubre todo el país (requiere internet). Sin departamento ni
         localidad se usan los configurados en el backend (IDE_DEPARTAMENTO e IDE_LOCALIDAD, por defecto Salto).
         El resultado se usa como lon/lat en
@@ -584,7 +539,7 @@ paths:
       parameters:
         - { name: direccion, in: query, required: true, schema: { type: string }, description: "Por ejemplo: Buenos Aires 451" }
         - { name: esquina, in: query, required: false, schema: { type: string }, description: "Segunda calle: ubica la esquina de direccion y esquina (siempre con la IDE)" }
-        - { name: departamento, in: query, required: false, schema: { type: string }, description: "Departamento donde buscar (por defecto, el de IDE_DEPARTAMENTO: salto). Fuera de Montevideo se usa la IDE, que cubre todo el país" }
+        - { name: departamento, in: query, required: false, schema: { type: string }, description: "Departamento donde buscar (por defecto, el de IDE_DEPARTAMENTO: salto). Fuera de Salto se usa la IDE, que cubre todo el país" }
         - { name: localidad, in: query, required: false, schema: { type: string }, description: "Localidad (por defecto, igual al departamento si se indicó; si no, la de IDE_LOCALIDAD)" }
       responses:
         "200":
@@ -599,7 +554,7 @@ paths:
                   lat: { type: number }
                   aproximada: { type: boolean }
                   aviso: { type: string, nullable: true }
-                  fuente: { type: string, description: "Puertas locales solo para Montevideo; IDE para otras localidades" }
+                  fuente: { type: string, description: "Puertas de Salto (tabla local) o IDE para otras localidades" }
         "400": { description: Falta la dirección }
         "404": { description: No se encontró la calle (solo con el respaldo de la IDE) }
         "502": { description: Respaldo de la IDE no disponible (sin internet) }
@@ -768,7 +723,7 @@ components:
             Se normaliza a minúsculas; cualquier otro valor responde 400.
         estadoOperativo: { type: string, enum: [Disponible, "En servicio", "Fuera de servicio"] }
         descripcion: { type: string }
-        geomGeoJson: { type: string, description: "GeoJSON Point en lon/lat, como TEXTO" }
+        geomGeoJson: { type: string, description: "Ubicación como TEXTO GeoJSON en lon/lat: Point (un lugar), LineString (un tramo, una calle cortada) o Polygon (un área). Cualquier otra cosa, o una forma inválida (un polígono que se cruza), da 400" }
     Incidente:
       type: object
       properties:

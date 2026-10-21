@@ -1,16 +1,23 @@
 package uy.edu.fing.geotravel.incidentes;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import uy.edu.fing.geotravel.db.DataSourceProvider;
 import uy.edu.fing.geotravel.mapa.Bbox;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.io.IOException;
 import java.sql.*;
 import java.util.*;
 
 /**
  * Módulo Incidentes (dueño: P4): ABM + máquina de estados + histórico.
+ *
+ * La ubicación de un incidente (geomGeoJson, GeoJSON en lon/lat) es un punto, una línea (una calle
+ * cortada) o un polígono (un área afectada); la columna es geometry(Geometry, 32721). Se rechaza con
+ * 400 lo que no sea una de esas formas o no sea una geometría válida (un polígono que se cruza).
  *
  * Reemplaza al módulo "Recorridos" de GeoTravel. Cambia sustancialmente:
  *  - NO hay estacionalidad (no existe el concepto en UrbanSafe) -- se elimina por completo
@@ -43,6 +50,12 @@ public class IncidenteResource {
         TRANSICIONES.put("Resuelto",    Collections.emptySet());
         TRANSICIONES.put("Cancelado",   Collections.emptySet());
     }
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    /** Formas que puede tener un incidente: punto, línea o polígono (y sus versiones múltiples). */
+    private static final Set<String> FORMAS =
+            new HashSet<>(Arrays.asList("Point", "LineString", "Polygon", "MultiPoint", "MultiLineString", "MultiPolygon"));
 
     private static final String GEOM_IN =
             "ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326), 32721)";
@@ -161,6 +174,10 @@ public class IncidenteResource {
         if (invalida != null) {
             return invalida;
         }
+        invalida = validarForma(in.geomGeoJson);
+        if (invalida != null) {
+            return invalida;
+        }
         // El estado inicial siempre es 'Registrado' (el DEFAULT de la columna) y el propio
         // trigger de la base dispara el primer registro de historial -- no se setea acá.
         String sql = "INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, equipo_responsable, geom) "
@@ -187,6 +204,10 @@ public class IncidenteResource {
     public Response editar(@PathParam("id") int id, IncidenteInput in) throws SQLException {
         // Edita los datos del incidente, NO su estado (para eso está /avanzar).
         Response invalida = validar(in);
+        if (invalida != null) {
+            return invalida;
+        }
+        invalida = validarForma(in.geomGeoJson);
         if (invalida != null) {
             return invalida;
         }
@@ -356,6 +377,48 @@ public class IncidenteResource {
             return error(400, "Falta la ubicación del incidente");
         }
         return null;
+    }
+
+    /**
+     * Mensaje de error si el texto no es una geometría GeoJSON de las formas permitidas (punto, línea
+     * o polígono) o no tiene coordenadas; null si está bien. No consulta la base.
+     */
+    static String errorDeForma(String geoJson) {
+        JsonNode nodo;
+        try {
+            nodo = JSON.readTree(geoJson);
+        } catch (IOException e) {
+            return "La ubicación no es un GeoJSON válido";
+        }
+        if (nodo == null || !FORMAS.contains(nodo.path("type").asText(""))) {
+            return "La ubicación debe ser un punto, una línea o un polígono (GeoJSON)";
+        }
+        if (!nodo.path("coordinates").isArray() || nodo.get("coordinates").size() == 0) {
+            return "La ubicación está vacía";
+        }
+        return null;
+    }
+
+    /** 400 si la forma no es de las permitidas o PostGIS la considera inválida (por ejemplo, un polígono que se cruza). */
+    private static Response validarForma(String geoJson) throws SQLException {
+        String mensaje = errorDeForma(geoJson);
+        if (mensaje != null) {
+            return error(400, mensaje);
+        }
+        String sql = "SELECT ST_IsValid(g) FROM (SELECT ST_GeomFromGeoJSON(?) AS g) t";
+        try (Connection conn = DataSourceProvider.get().getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, geoJson);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getBoolean(1)
+                        ? null
+                        : error(400, "La forma no es válida (por ejemplo, un polígono que se cruza a sí mismo o una línea de un solo punto)");
+            }
+        } catch (SQLException e) {
+            // GeoJSON con coordenadas que PostGIS no puede leer (una línea de un solo punto, por ejemplo).
+            return error(400, "No se pudo leer la ubicación: revisá que la línea tenga al menos dos puntos y el polígono tres");
+        }
     }
 
     private static Response error(int status, String mensaje) {
