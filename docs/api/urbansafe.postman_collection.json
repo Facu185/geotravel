@@ -523,6 +523,153 @@
           ]
         },
         {
+          "name": "Crear incidente de tipo LÍNEA (una calle cortada)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/incidentes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Calle cortada (Postman)\",\n  \"descripcion\": \"Un tramo de calle\",\n  \"tipoIncidente\": \"calle_cortada\",\n  \"prioridad\": 2,\n  \"equipoResponsable\": \"Equipo Centro\",\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"LineString\\\", \\\"coordinates\\\": [[-56.194, -34.9065], [-56.1925, -34.906], [-56.191, -34.9062]]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Respuesta correcta (201)\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"nuevoIncidenteLineaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear incidente de tipo POLÍGONO (un área afectada)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/incidentes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Área inundada (Postman)\",\n  \"descripcion\": \"Un área\",\n  \"tipoIncidente\": \"inundacion\",\n  \"prioridad\": 3,\n  \"equipoResponsable\": \"Equipo Centro\",\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Polygon\\\", \\\"coordinates\\\": [[[-56.195, -34.907], [-56.193, -34.907], [-56.193, -34.9055], [-56.195, -34.9055], [-56.195, -34.907]]]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Respuesta correcta (201)\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"nuevoIncidentePoligonoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear incidente con un polígono que se cruza a sí mismo (debe dar 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base}}/incidentes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Polígono inválido\",\n  \"tipoIncidente\": \"otro\",\n  \"prioridad\": 3,\n  \"geomGeoJson\": \"{\\\"type\\\": \\\"Polygon\\\", \\\"coordinates\\\": [[[0, 0], [1, 1], [1, 0], [0, 1], [0, 0]]]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar incidentes visibles (bbox y limit: responde items, total y truncado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base}}/incidentes?bbox=-56.21,-34.92,-56.17,-34.89&limit=500"
+          }
+        },
+        {
+          "name": "Eliminar el incidente de línea",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base}}/incidentes/{{nuevoIncidenteLineaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar el incidente de polígono",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base}}/incidentes/{{nuevoIncidentePoligonoId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Editar incidente (no cambia el estado)",
           "request": {
             "method": "PUT",

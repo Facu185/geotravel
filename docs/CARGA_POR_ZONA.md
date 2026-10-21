@@ -49,6 +49,32 @@ aviso={<AvisoCarga carga={carga} nombre="incidentes" />}
 El componente espera 300 ms a que el mapa deje de moverse, cancela el pedido anterior y
 reemplaza los objetos (no acumula lo que salió de la vista).
 
+## Incidentes (P4): punto, línea y polígono
+
+`/incidentes` ya usa la carga a demanda (`?bbox=&limit=`, mismo contrato) y la pantalla Incidentes
+(`modules/incidentes/IncidentesPage.jsx`) la consume con `CargaPorZona`; alejado se ve la capa WMS
+`geotravel:incidente`.
+
+La ubicación de un incidente es un **punto** (un lugar), una **línea** (un tramo: una calle cortada) o un **polígono**
+(un área afectada). Se elige la forma en el formulario y se dibuja en el mapa, o se usa la barra de dibujo del mapa
+directamente. El backend (`IncidenteResource`) rechaza con 400 lo que no sea una de esas formas o no sea válida
+(`ST_IsValid`: un polígono que se cruza a sí mismo, una línea de un solo punto).
+
+El dibujo está en un componente compartido, `components/EditorGeometria.jsx`, pensado para reusar en Zonas y Recursos:
+
+```jsx
+const grupoRef = useRef(null);
+const dibujando = useRef(false); // true mientras se dibuja: un clic sobre otro objeto no lo selecciona
+// dentro del mapa (hijosMapa):
+<EditorGeometria grupoRef={grupoRef} pedido={pedido} dibujando={dibujando}
+                 alCrear={(geometria) => ...} alEditar={(geometria) => ...} alBorrar={() => ...} />
+// cargarGeometria(grupoRef.current, geojson) pone la forma de un objeto para editarla;
+// geometriaDelGrupo(grupoRef.current) lee la forma que hay al guardar.
+```
+
+Ojo con `react-leaflet-draw`: si `EditControl` recibe un objeto `draw` distinto en cada render, rehace la barra y cancela
+el trazo en curso. `EditorGeometria` lo evita (opciones en `useMemo`); si se usa `EditControl` directo, hacer lo mismo.
+
 ## Región
 
 `VITE_REGION=salto | montevideo` en `frontend/.env.local` (por defecto `salto`). Para otro

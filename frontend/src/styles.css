@@ -1079,6 +1079,12 @@ body {
   border-radius: 50%;
 }
 
+/* Un incidente que es una línea (una calle cortada): una barra, no un cuadrado. */
+.item__marca--linea {
+  height: 5px;
+  border-radius: 3px;
+}
+
 .item__texto {
   flex: 1;
   min-width: 0;

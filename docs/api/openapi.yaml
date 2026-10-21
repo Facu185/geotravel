@@ -300,6 +300,7 @@ paths:
         "400": { $ref: "#/components/responses/DatosInvalidos" }
     post:
       summary: Registrar incidente (siempre nace en estado "Registrado")
+      description: La ubicación (geomGeoJson) puede ser un punto, una línea o un polígono; ver IncidenteInput.
       tags: [incidentes]
       requestBody:
         required: true
@@ -768,7 +769,7 @@ components:
             Se normaliza a minúsculas; cualquier otro valor responde 400.
         estadoOperativo: { type: string, enum: [Disponible, "En servicio", "Fuera de servicio"] }
         descripcion: { type: string }
-        geomGeoJson: { type: string, description: "GeoJSON Point en lon/lat, como TEXTO" }
+        geomGeoJson: { type: string, description: "Ubicación como TEXTO GeoJSON en lon/lat: Point (un lugar), LineString (un tramo, una calle cortada) o Polygon (un área). Cualquier otra cosa, o una forma inválida (un polígono que se cruza), da 400" }
     Incidente:
       type: object
       properties:
