@@ -25,7 +25,8 @@ en lo documentado en los Prácticos 2 y 3 del curso.]
 
 [Resumen del enunciado: entidades (zona operativa, incidente, recurso), roles
 (administrador/invitado), reglas de negocio (máquina de estados de un
-incidente, no-solapamiento de zonas operativas).]
+incidente; las zonas operativas pueden superponerse, por lo que un punto puede
+pertenecer a más de una zona).]
 
 ## Solución planteada
 
@@ -54,9 +55,11 @@ comunican — ver `docs/diagramas/arquitectura.md`.]
 concretos de este proyecto que pueden ir acá:
 - El cambio de letra a mitad de semestre (de GeoTravel a UrbanSafe) y cómo
   se reestructuró el repo reaprovechando la arquitectura.
-- Por qué `ST_Overlaps` no alcanza para "las zonas no deben superponerse"
-  (no detecta una zona idéntica ni una contenida dentro de otra) y se usó
-  `ST_Intersects AND NOT ST_Touches`.
+- Zonas operativas: primero se implementó la regla "no deben superponerse" (con
+  `ST_Intersects AND NOT ST_Touches`, porque `ST_Overlaps` no detecta una zona
+  idéntica ni una contenida en otra). Después el tutor definió que las zonas SÍ
+  pueden superponerse y se retiró la validación. Consecuencia: una consulta como
+  "zona de un punto" ya no devuelve una sola zona sino todas las que lo contienen.
 - El diseño de la máquina de estados de un incidente con ramas (no lineal),
   y cómo se validó contra la letra (o las respuestas del tutor).]
 

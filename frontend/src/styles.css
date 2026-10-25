@@ -1578,3 +1578,57 @@ body {
   flex-direction: column;
   gap: 12px;
 }
+
+/* Íconos de recursos: la forma es el tipo, el color es el estado operativo (components/iconos.jsx). */
+.marcador-recurso {
+  background: none;
+  border: 0;
+}
+
+.insignia-icono {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--color, #555);
+  box-shadow: 0 1px 4px rgba(15, 28, 40, 0.5);
+}
+
+.insignia-icono img {
+  display: block;
+  width: 60%;
+  height: 60%;
+  pointer-events: none;
+}
+
+.insignia-icono--chico {
+  width: 26px;
+  height: 26px;
+  box-shadow: 0 0 0 1px rgba(15, 28, 40, 0.28);
+}
+
+.insignia-icono--resaltado {
+  outline: 3px solid var(--color, #555);
+  outline-offset: 2px;
+}
+
+.leyenda-iconos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--tinta-suave, #4a5a68);
+}
+
+.leyenda-iconos li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

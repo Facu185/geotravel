@@ -14,7 +14,7 @@ flowchart LR
 
     subgraph Backend[JEE / Tomcat]
         API[REST API<br/>Jersey]
-        Reglas[Reglas de negocio<br/>solapamiento de zonas,<br/>maquina de estados de incidentes]
+        Reglas[Reglas de negocio<br/>validacion de tipos y geometrias,<br/>maquina de estados de incidentes]
     end
 
     subgraph GeoServer
