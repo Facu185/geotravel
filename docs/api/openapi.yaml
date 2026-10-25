@@ -189,7 +189,7 @@ paths:
                       - { properties: { items: { type: array, items: { $ref: "#/components/schemas/Zona" } } } }
         "400": { $ref: "#/components/responses/DatosInvalidos" }
     post:
-      summary: Crear zona (valida datos y que no se superponga con otra)
+      summary: Crear zona (valida los datos; las zonas pueden superponerse)
       tags: [zonas]
       requestBody:
         required: true
@@ -199,11 +199,10 @@ paths:
       responses:
         "201": { description: Creada, content: { application/json: { schema: { $ref: "#/components/schemas/IdCreado" } } } }
         "400": { $ref: "#/components/responses/DatosInvalidos" }
-        "409": { $ref: "#/components/responses/ZonaSuperpuesta" }
 
   /zonas/{id}:
     put:
-      summary: Editar zona (misma validación; la zona no cuenta como superpuesta consigo misma)
+      summary: Editar zona (misma validación; las zonas pueden superponerse)
       tags: [zonas]
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       requestBody:
@@ -213,7 +212,6 @@ paths:
         "200": { description: Actualizada }
         "400": { $ref: "#/components/responses/DatosInvalidos" }
         "404": { $ref: "#/components/responses/NoExiste" }
-        "409": { $ref: "#/components/responses/ZonaSuperpuesta" }
     delete:
       summary: Eliminar zona
       tags: [zonas]
@@ -658,9 +656,6 @@ components:
   responses:
     DatosInvalidos:
       description: Datos inválidos
-      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
-    ZonaSuperpuesta:
-      description: 'La zona se superpone con otra existente; el mensaje indica con cuál (ej. La zona se superpone con "Centro")'
       content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
     NoExiste:
       description: No existe

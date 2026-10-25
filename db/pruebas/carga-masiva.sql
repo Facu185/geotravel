@@ -13,8 +13,8 @@
 -- Si GeoServer no dibuja nada en Salto, recalcular la extensión de la capa: ver
 -- docs/CARGA_POR_ZONA.md.
 --
--- La grilla puede superponerse con zonas reales de Salto: la regla de no superposición la
--- controla la API, no la base. Borrar estos datos antes de cargar los definitivos.
+-- La grilla puede superponerse con zonas reales de Salto (las zonas pueden superponerse).
+-- Borrar estos datos antes de cargar los definitivos.
 
 BEGIN;
 

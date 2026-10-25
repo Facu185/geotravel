@@ -33,9 +33,9 @@ import java.util.Map;
  *   - al LEER se transforma a 4326:  ST_Transform(geom, 4326)
  *   - al GUARDAR se transforma a 32721 (GEOM_IN, abajo)
  *
- * Regla de negocio: las zonas no pueden superponerse. Se usa
- * "ST_Intersects AND NOT ST_Touches" y NO ST_Overlaps, porque ST_Overlaps no
- * detecta una zona idéntica a otra ni una contenida dentro de otra.
+ * Las zonas PUEDEN superponerse (lo definió el tutor): al guardar solo se valida que el
+ * polígono sea válido. Consecuencia para las consultas: un punto, un recurso o un incidente
+ * puede estar en más de una zona a la vez.
  */
 @Path("/zonas")
 public class ZonaResource {
@@ -129,7 +129,7 @@ public class ZonaResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Response crear(ZonaInput in) throws SQLException {
         try (Connection conn = DataSourceProvider.get().getConnection()) {
-            Response invalida = validar(conn, in, -1);
+            Response invalida = validar(conn, in);
             if (invalida != null) {
                 return invalida;
             }
@@ -156,7 +156,7 @@ public class ZonaResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Response editar(@PathParam("id") int id, ZonaInput in) throws SQLException {
         try (Connection conn = DataSourceProvider.get().getConnection()) {
-            Response invalida = validar(conn, in, id); // excluye a la propia zona del chequeo de solapamiento
+            Response invalida = validar(conn, in);
             if (invalida != null) {
                 return invalida;
             }
@@ -191,8 +191,11 @@ public class ZonaResource {
 
     // ------------------------------------------------------------------ validaciones
 
-    /** @return null si todo está bien; si no, la Response de error (400 datos inválidos, 409 solapamiento). */
-    private static Response validar(Connection conn, ZonaInput in, int idActual) throws SQLException {
+    /**
+     * @return null si todo está bien; si no, la Response de error (400 datos inválidos).
+     * Las zonas SÍ pueden superponerse (lo definió el tutor): no se controla contra las demás.
+     */
+    private static Response validar(Connection conn, ZonaInput in) {
         if (in == null || in.nombre == null || in.nombre.trim().isEmpty()) {
             return error(400, "El nombre es obligatorio");
         }
@@ -201,10 +204,6 @@ public class ZonaResource {
         }
         if (in.geomGeoJson == null || !esPoligonoValido(conn, in.geomGeoJson)) {
             return error(400, "La geometría no es un polígono válido");
-        }
-        String choque = zonaQueSeSuperpone(conn, in.geomGeoJson, idActual);
-        if (choque != null) {
-            return error(409, "La zona se superpone con \"" + choque + "\"");
         }
         return null;
     }
@@ -219,22 +218,6 @@ public class ZonaResource {
             }
         } catch (SQLException e) {
             return false; // GeoJSON mal formado
-        }
-    }
-
-    /** @return el nombre de una zona existente que se superpone con la geometría dada, o null si no hay ninguna. */
-    private static String zonaQueSeSuperpone(Connection conn, String geojson, int idActual) throws SQLException {
-        String sql = "WITH nueva AS (SELECT " + GEOM_IN + " AS g) "
-                   + "SELECT z.nombre FROM zona_operativa z, nueva n "
-                   + "WHERE z.id <> ? AND z.geom && n.g "
-                   + "  AND ST_Intersects(z.geom, n.g) AND NOT ST_Touches(z.geom, n.g) "
-                   + "LIMIT 1";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, geojson);
-            ps.setInt(2, idActual);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getString(1) : null;
-            }
         }
     }
 

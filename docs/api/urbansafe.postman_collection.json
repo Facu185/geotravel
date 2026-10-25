@@ -291,7 +291,7 @@
           ]
         },
         {
-          "name": "Crear zona que se superpone con Centro (debe dar 409)",
+          "name": "Crear zona que se superpone con Centro (se permite: da 201 y se borra)",
           "request": {
             "method": "POST",
             "header": [
@@ -317,7 +317,26 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+                  "pm.test(\"HTTP 201 (las zonas pueden superponerse)\", () => pm.response.to.have.status(201)); pm.collectionVariables.set(\"zonaSolapadaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar la zona superpuesta",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base}}/zonas/{{zonaSolapadaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
                 ]
               }
             }
@@ -789,7 +808,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+                  "pm.test(\"HTTP 201 (las zonas pueden superponerse)\", () => pm.response.to.have.status(201)); pm.collectionVariables.set(\"zonaSolapadaId\", pm.response.json().id);"
                 ]
               }
             }

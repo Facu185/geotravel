@@ -141,7 +141,7 @@ export default function ZonasPage() {
       setMensaje(texto);
       cargar();
     } catch (e) {
-      setError(e.message); // p. ej. La zona se superpone con "Centro"
+      setError(e.message); // p. ej. La geometría no es un polígono válido
     }
   };
 
