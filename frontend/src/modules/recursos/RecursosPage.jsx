@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
-import L from "leaflet";
-import { CircleMarker, Tooltip, useMapEvents } from "react-leaflet";
+import { useState } from "react";
+import { Marker, Tooltip, useMapEvents } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import CargaPorZona, { AvisoCarga, SIN_CARGAR } from "../../components/CargaPorZona.jsx";
 import Enfocar from "../../components/Enfocar.jsx";
+import { IconoRecurso, iconoRecurso } from "../../components/iconos.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Segmentado } from "../../components/ui.jsx";
 import { COLOR_ESTADO_RECURSO, TIPOS_RECURSO, nombreTipoRecurso } from "../../components/colores.js";
 import { api } from "../../api/client.js";
@@ -54,9 +54,6 @@ export default function RecursosPage() {
   const recursos = carga.items;
   const lejos = carga.estado === "lejos";
   const [enfoque, setEnfoque] = useState(null); // recurso elegido en la lista: el mapa va hasta él
-  // Los marcadores van en un único lienzo (canvas) en vez de un elemento SVG por recurso:
-  // con cientos de recursos en pantalla el mapa se mueve mucho más fluido.
-  const lienzo = useMemo(() => L.canvas({ padding: 0.5 }), []);
   const [vista, setVista] = useState("lista"); // "lista" | "form"
   const [seleccionado, setSeleccionado] = useState(null);
   const [form, setForm] = useState(FORM_VACIO);
@@ -146,37 +143,33 @@ export default function RecursosPage() {
       <Enfocar objetivo={enfoque} />
       <ClickEnMapa alClick={(ubicacion) => vista === "form" && setPunto(ubicacion)} />
 
-      {/* Los demás recursos, de fondo. bubblingMouseEvents=false evita que el clic sobre un
+      {/* Los demás recursos, de fondo: la forma del ícono es el tipo y el color es el estado
+          (ver components/iconos.jsx). bubblingMouseEvents=false evita que el clic sobre un
           marcador también cuente como clic en el mapa (y mueva la ubicación en edición). */}
       {recursos
         .filter((r) => r.id !== seleccionado?.id)
         .map((r) => {
           const { lat, lng } = posicionDe(r);
           return (
-            <CircleMarker
+            <Marker
               key={r.id}
-              center={[lat, lng]}
-              radius={8}
-              pathOptions={{ color: COLOR_ESTADO_RECURSO[r.estadoOperativo] ?? "#555", fillOpacity: 0.85, renderer: lienzo }}
+              position={[lat, lng]}
+              icon={iconoRecurso(r.tipo, r.estadoOperativo)}
               bubblingMouseEvents={false}
               eventHandlers={{ click: () => seleccionar(r) }}
             >
               <Tooltip>
                 {r.identificacion} — {nombreTipoRecurso(r.tipo)}
               </Tooltip>
-            </CircleMarker>
+            </Marker>
           );
         })}
 
-      {/* La ubicación que se está eligiendo (nueva o en edición). */}
+      {/* La ubicación que se está eligiendo (nueva o en edición): el mismo ícono, resaltado. */}
       {vista === "form" && punto && (
-        <CircleMarker
-          center={[punto.lat, punto.lng]}
-          radius={12}
-          pathOptions={{ color: COLOR_ESTADO_RECURSO[form.estadoOperativo], weight: 4, fillOpacity: 0.3 }}
-        >
+        <Marker position={[punto.lat, punto.lng]} icon={iconoRecurso(form.tipo, form.estadoOperativo, { resaltado: true })}>
           <Tooltip permanent>{form.identificacion || "Nuevo recurso"}</Tooltip>
-        </CircleMarker>
+        </Marker>
       )}
     </>
   );
@@ -205,6 +198,21 @@ export default function RecursosPage() {
                 {carga.truncado ? `Recursos en esta vista: ${recursos.length} de ${carga.total}` : `Recursos en esta vista: ${recursos.length}`}
               </p>
             )}
+            {/* Leyenda: la forma es el tipo; el color, el estado operativo. */}
+            <ul className="leyenda-iconos" aria-label="Tipos de recurso">
+              {TIPOS_RECURSO.map((t) => (
+                <li key={t}>
+                  <IconoRecurso tipo={t} estado="" chico /> {nombreTipoRecurso(t)}
+                </li>
+              ))}
+            </ul>
+            <ul className="leyenda-iconos" aria-label="Estados operativos">
+              {ESTADOS_OPERATIVOS.map((e) => (
+                <li key={e.valor}>
+                  <span className="item__marca" style={{ "--color": e.color, borderRadius: "50%" }} aria-hidden="true" /> {e.etiqueta}
+                </li>
+              ))}
+            </ul>
           </div>
           <ul className="items">
             {recursos.map((r) => (
@@ -217,7 +225,7 @@ export default function RecursosPage() {
                     setEnfoque({ geom: JSON.parse(r.geom) });
                   }}
                 >
-                  <span className="item__marca item__marca--cuadrado" style={{ "--color": COLOR_ESTADO_RECURSO[r.estadoOperativo] }} aria-hidden="true" />
+                  <IconoRecurso tipo={r.tipo} estado={r.estadoOperativo} chico />
                   <span className="item__texto">
                     <span className="item__titulo">{r.identificacion}</span>
                     <span className="item__detalle">

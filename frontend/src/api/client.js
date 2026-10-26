@@ -12,7 +12,7 @@ const autorizacion = () => {
  * Wrapper mínimo de fetch. Cada módulo lo usa así:
  *   const zonas = await api.get("/zonas");
  *
- * Si el backend responde con error (400 datos inválidos, 409 solapamiento, ...)
+ * Si el backend responde con error (400 datos inválidos, 404 no existe, ...)
  * el mensaje de la excepción es el texto que mandó el backend ({"error": "..."}),
  * listo para mostrarle al usuario.
  */
