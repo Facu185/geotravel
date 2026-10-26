@@ -44,6 +44,12 @@ Con un `ogc:Filter` por `tipo` y otro por `estado_operativo` se arman las combin
 
 ## Incidentes
 
-Pendiente de definir por quien los tiene (P4 en el mapa de administración, P5 en el público): el
-color ya sale de `COLOR_ESTADO_INCIDENTE` (por estado). Si se quiere un ícono por tipo de incidente,
+Un incidente **puntual** se dibuja con `incidente.svg` (el triángulo de advertencia) sobre un círculo del **color
+del estado** (`COLOR_ESTADO_INCIDENTE`): `iconoIncidente(estado)` para el mapa e `IconoIncidente` para listas, en
+`frontend/src/components/iconos.jsx`. Lo usan la pantalla Incidentes y las Consultas. Los incidentes de **línea**
+(calle cortada) y **polígono** (área afectada) se siguen dibujando con su forma y el color del estado.
+
+Pendiente en GeoServer (P1): que `incidentes_estado.sld` dibuje los puntos con este mismo ícono (un
+`PointSymbolizer` con `ExternalGraphic` sobre un círculo del color del estado), y que la leyenda del mapa público
+(`modules/invitado/capas.js`) se actualice cuando el SLD cambie. Si se quiere un ícono por tipo de incidente,
 agregar los SVG a la misma carpeta con el nombre `incidente-<tipo>.svg`.

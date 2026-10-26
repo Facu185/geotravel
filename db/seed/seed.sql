@@ -1,5 +1,5 @@
 -- seed.sql — datos de prueba para Salto: unos pocos hechos a mano y, al final, un conjunto más grande
--- (zonas, recursos e incidentes de todos los tipos y formas) para recorrer las consultas, en Salto y en Montevideo.
+-- (zonas —algunas superpuestas—, recursos e incidentes de todos los tipos y formas) para recorrer las consultas, en Salto y en Montevideo.
 -- Las geometrías se definen en lon/lat (EPSG:4326, coordenadas reales de Salto) y se
 -- transforman a EPSG:32721, el SRID que usa la base.
 -- Ejecutar después de la migración V1. 
@@ -86,6 +86,14 @@ FROM (
     FROM generate_series(0, 6) i, generate_series(0, 4) j
 ) celdas
 WHERE NOT EXISTS (SELECT 1 FROM zona_operativa z WHERE z.geom && celda AND ST_Intersects(z.geom, celda));
+
+-- Zonas que SÍ se superponen con otras (las zonas operativas pueden superponerse): un punto, un recurso o un
+-- incidente puede estar en más de una. Van después de la grilla, que saltea las celdas que tocan una zona previa.
+INSERT INTO zona_operativa (nombre, descripcion, nivel_prioridad, responsable, geom) VALUES
+('Casco urbano Salto', 'Zona amplia que incluye el centro y varias zonas vecinas', 2, 'Coordinación Salto',
+ ST_Transform(ST_MakeEnvelope(-57.985, -31.395, -57.945, -31.375, 4326), 32721)),
+('Corredor Av. Uruguay', 'Franja a lo largo de la avenida, superpuesta con el centro', 1, 'Equipo Tránsito',
+ ST_Transform(ST_MakeEnvelope(-57.975, -31.389, -57.950, -31.384, 4326), 32721));
 
 -- Recursos: 60 puntos al azar sobre Salto, de todos los tipos y estados.
 WITH nuevos AS (
@@ -224,6 +232,11 @@ SELECT 'Montevideo Zona ' || chr(65 + j) || (i + 1),
        ST_Transform(ST_MakeEnvelope(-56.195 + i * 0.0125, -34.900 + j * 0.010,
                                     -56.195 + i * 0.0125 + 0.0118, -34.900 + j * 0.010 + 0.0094, 4326), 32721)
 FROM generate_series(0, 5) i, generate_series(0, 4) j;
+
+-- Una zona que se superpone con varias de la grilla.
+INSERT INTO zona_operativa (nombre, descripcion, nivel_prioridad, responsable, geom) VALUES
+('Montevideo Ciudad Vieja y Centro', 'Zona amplia superpuesta con varias zonas vecinas', 2, 'Coordinación MVD',
+ ST_Transform(ST_MakeEnvelope(-56.200, -34.900, -56.165, -34.885, 4326), 32721));
 
 -- Recursos: 40 puntos al azar sobre la misma área, de todos los tipos y estados.
 WITH nuevos AS (
