@@ -29,7 +29,9 @@ flowchart LR
     Admin --> Mapa
     Admin --> ABM
 
-    Mapa -->|WMS: capas base| WMS
+    Mapa -->|WMS: fondo, imágenes de las capas| WMS
+    Mapa -->|WFS hits y GetFeatureInfo: conteos y detalle| WFS
+    Mapa -->|REST: objetos de la vista, bbox y limit| API
     ABM -->|REST: ABM y acciones| API
 
     API --> Reglas --> DB
@@ -77,7 +79,7 @@ erDiagram
         int prioridad "1-5"
         text estado
         timestamp fecha_hora_registro
-        geometry geom "Point, 32721"
+        geometry geom "Geometry (punto, línea o polígono), 32721"
     }
     HISTORIAL_ESTADO {
         int incidente_id
@@ -88,9 +90,13 @@ erDiagram
 ```
 
 `zona_operativa` no tiene relación de clave foránea con `incidente` ni con
-`recurso` -- la pertenencia a una zona siempre se calcula espacialmente con
-`ST_Contains`, no se guarda. Es la misma decisión que en GeoTravel (zonas
-turísticas / recorridos).
+`recurso` -- la pertenencia a una zona siempre se calcula espacialmente, no se
+guarda: con `ST_Contains` para los recursos (son puntos) y con `ST_Intersects` para
+los incidentes (pueden ser líneas o polígonos que cruzan el borde de una zona).
+Es la misma decisión que en GeoTravel (zonas turísticas / recorridos).
+
+`incidente.geom` es de tipo `Geometry`: un incidente puede ser un **punto** (un lugar),
+una **línea** (una calle cortada) o un **polígono** (un área afectada).
 
 ## Máquina de estados de un incidente
 
@@ -116,6 +122,22 @@ Este diagrama es la interpretación usada en `IncidenteResource.java`
 (constante `TRANSICIONES`) -- si el tutor confirma otra cosa, es el único
 lugar del backend que hay que tocar.
 
+## Carga a demanda: cómo se combinan GeoServer y el REST
+
+El navegador nunca carga todos los objetos. Según el zoom:
+
+| Zoom | Quién dibuja | Cómo llegan los datos |
+|---|---|---|
+| Lejos (menor que el mínimo: 13 en los ABM, 11 en Consultas) | **GeoServer**, como imágenes | WMS `GetMap`; el front no pide objetos |
+| Cerca | **El front** (Leaflet), porque los objetos tienen que ser clickeables o editables | REST `GET /zonas?bbox=oeste,sur,este,norte&limit=500` → `{items, total, truncado}` |
+
+- `bbox` en lon/lat (4326); el filtro usa el índice GiST (`geom && ST_MakeEnvelope(...)`).
+- `limit` por defecto 500, máximo 2.000; `total` es la cantidad real (`count(*) OVER ()`) y `truncado` avisa si
+  quedaron objetos afuera. En ese caso el front avisa "Mostrando 500 de N: acercá el mapa".
+- Cuando el front dibuja un tipo de objeto, GeoServer deja de dibujar ese tipo (no se ve doble).
+- Las zonas se simplifican 3 m al devolverlas: se dibujan igual y pesan mucho menos.
+- Detalle: `docs/CARGA_POR_ZONA.md`.
+
 ## Por qué las consultas complejas van por REST y no solo por WFS
 
 Las consultas geográficas (incidentes por zona, zonas con más incidentes,
@@ -123,5 +145,6 @@ recursos cercanos a un incidente, etc.) requieren joins entre
 `zona_operativa`, `incidente`, `recurso` e `incidente_recurso` con
 agregaciones — más flexible resolverlas como SQL directo en
 `backend/.../consultas/ConsultaResource.java` que como `CQL_FILTER` de WFS.
-El mapa "de fondo" (capas completas, coloreadas por SLD) sí sale directo de
-GeoServer vía WMS — no hace falta backend para eso.
+Cada consulta devuelve ya la geometría de lo que encontró, para que el front la
+dibuje sin pedir nada más. El mapa "de fondo" (capas completas, coloreadas por
+SLD) sale directo de GeoServer vía WMS — no hace falta backend para eso.
