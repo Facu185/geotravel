@@ -113,6 +113,51 @@ public final class OsrmClient {
         return null;
     }
 
+    /** Vigencia de una comprobacion de salud: una caida se refleja en /eta/criterios en a lo sumo este tiempo. */
+    public static final long SALUD_VIGENCIA_MS = 5_000;
+    static final long SALUD_TIMEOUT_MS = 2_000;
+    private static final java.util.Map<String, long[]> SALUD = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** true si el motor del criterio esta configurado y responde una ruta valida (consulta con timeout de 2 s, cacheada 5 s). */
+    public static boolean saludable(Criterio criterio) {
+        String servidor = servidorDe(criterio);
+        if (servidor == null) {
+            return false;
+        }
+        long ahora = System.nanoTime() / 1_000_000;
+        long[] previo = SALUD.get(servidor);
+        if (previo != null && ahora - previo[1] < SALUD_VIGENCIA_MS) {
+            return previo[0] == 1;
+        }
+        boolean ok = comprobar(servidor, SALUD_TIMEOUT_MS);
+        SALUD.put(servidor, new long[] {ok ? 1 : 0, ahora});
+        return ok;
+    }
+
+    /** Pide una ruta corta fija (Montevideo) y exige code=Ok con geometria; cualquier otra cosa es "no saludable". */
+    static boolean comprobar(String servidor, long timeoutMs) {
+        String url = servidor.replaceAll("/+$", "")
+                + "/route/v1/driving/-56.1900,-34.9000;-56.1685,-34.9158?overview=false";
+        HttpRequest solicitud = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMillis(timeoutMs))
+                .GET()
+                .build();
+        CompletableFuture<HttpResponse<String>> pedido =
+                HTTP.sendAsync(solicitud, HttpResponse.BodyHandlers.ofString());
+        try {
+            HttpResponse<String> r = pedido.get(timeoutMs, TimeUnit.MILLISECONDS);
+            return r.statusCode() == 200 && "Ok".equals(JSON.readTree(r.body()).path("code").asText());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            pedido.cancel(true);
+            return false;
+        } catch (Exception e) {
+            pedido.cancel(true);
+            return false;
+        }
+    }
+
     public static boolean cortaConfigurada() {
         return servidorDe(Criterio.MAS_CORTA) != null;
     }

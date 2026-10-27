@@ -33,9 +33,11 @@ paths:
   /eta/criterios:
     get:
       summary: Criterios de ruta disponibles en el servidor
-      description: Informa si están disponibles mas_rapida y mas_corta (esta requiere OSRM_SHORTEST_URL).
+      description: >
+        Disponibilidad real de cada motor OSRM (no solo que la URL esté configurada). Se verifica con una ruta
+        de prueba (timeout 2 s) y el resultado se cachea 5 s. mas_corta requiere OSRM_SHORTEST_URL.
       responses:
-        "200": { description: 'Ej. {"mas_rapida":true,"mas_corta":false}' }
+        "200": { description: 'Ej. {"mas_rapida":true,"mas_corta":false,"motivos":{"mas_corta":"El servicio OSRM no responde"}}' }
 
   /eta/recursos/{recursoId}/incidentes/{incidenteId}:
     get:

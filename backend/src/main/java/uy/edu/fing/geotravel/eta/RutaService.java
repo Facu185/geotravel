@@ -175,6 +175,15 @@ public class RutaService {
         return true;
     }
 
+    /** Estado real del motor: configurado Y respondiendo (en pruebas con motores simulados, siempre "ok"). */
+    public boolean saludable(Criterio criterio) {
+        if (!disponible(criterio)) {
+            return false;
+        }
+        MotorRutas m = criterio == Criterio.MAS_CORTA ? motorCorta : motor;
+        return m instanceof MotorOsrm ? OsrmClient.saludable(criterio) : true;
+    }
+
     /** Extremos de la ruta (en lon/lat) y distancia directa; null si el recurso o el incidente no existen. */
     public Extremos extremos(Connection conexion, int recursoId, int incidenteId) throws SQLException {
         try (PreparedStatement consulta = conexion.prepareStatement(SQL_EXTREMOS)) {

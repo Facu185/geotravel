@@ -31,14 +31,24 @@ public class EtaResource {
         this.rutas = rutas;
     }
 
-    /** Criterios de ruta que el servidor puede calcular (la ruta mas corta requiere OSRM propio). */
+    /**
+     * Criterios de ruta realmente disponibles: el motor debe estar configurado y responder.
+     * La comprobacion se cachea 5 s (OsrmClient.SALUD_VIGENCIA_MS), asi una caida se refleja en pocos segundos.
+     */
     @GET
     @Path("/criterios")
     public Response criterios() {
         Map<String, Object> cuerpo = new LinkedHashMap<>();
+        Map<String, Object> motivos = new LinkedHashMap<>();
         for (Criterio c : Criterio.values()) {
-            cuerpo.put(c.codigo, rutas.disponible(c));
+            boolean configurado = rutas.disponible(c);
+            boolean ok = rutas.saludable(c);
+            cuerpo.put(c.codigo, ok);
+            if (!ok) {
+                motivos.put(c.codigo, configurado ? "El servicio OSRM no responde" : "El servicio OSRM no esta configurado");
+            }
         }
+        cuerpo.put("motivos", motivos);
         return Response.ok(cuerpo).build();
     }
 

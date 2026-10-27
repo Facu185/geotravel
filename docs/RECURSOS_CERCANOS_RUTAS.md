@@ -72,8 +72,14 @@ El criterio de la ruta rápida es la duración estimada con las velocidades del 
 - Cada pedido a OSRM tiene un límite estricto (10 s, o el tiempo restante de los 25 s de la consulta); al vencer se
   cancela. Los recursos cuya ruta no alcanzó a calcularse quedan con `estadoRuta: "plazo_agotado"`; el resto se devuelve.
 - Un recurso sin ruta (`sin_ruta`) o con error (`error`) no interrumpe a los demás; si el motor está caído no se insiste.
-- `GET /eta/criterios` informa qué criterios están disponibles (`{"mas_rapida":true,"mas_corta":bool}`); el frontend
-  deshabilita "Más corta" cuando no está configurada. Sin el motor corto, el endpoint con `criterio=mas_corta` responde 503.
+- `GET /eta/criterios` informa la disponibilidad real de cada motor: `{"mas_rapida":bool,"mas_corta":bool,"motivos":{...}}`.
+  No basta con que la URL esté configurada: el backend consulta una ruta fija de prueba a cada motor (timeout 2 s, exige
+  HTTP 200 y `code=Ok`). El resultado se guarda en caché 5 s por motor, de modo que una caída se detecta como máximo
+  5 s después y no se generan consultas de salud excesivas. `motivos` explica por qué un criterio no está disponible.
+- El frontend consulta `/eta/criterios` al abrir, cada 15 s (solo con la pestaña visible) y al volver a la pestaña.
+  Si un motor no está disponible deshabilita ese criterio, muestra el motivo, no envía pedidos de ruta y no cambia
+  al otro motor por su cuenta. Se recupera solo al reiniciarse el motor.
+- Sin el motor corto, el endpoint con `criterio=mas_corta` responde 503.
 
 ### Pruebas
 

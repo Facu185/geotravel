@@ -35,7 +35,8 @@ export default function EtaPage() {
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState(null);
   const [criterio, setCriterio] = useState("mas_rapida");
-  const criteriosRuta = useCriteriosRuta();
+  const { opciones: criteriosRuta, mensajeDe } = useCriteriosRuta();
+  const avisoCriterio = mensajeDe(criterio);
   const solicitudActual = useRef(0);
 
   useEffect(() => {
@@ -98,7 +99,7 @@ export default function EtaPage() {
   }
 
   async function calcular() {
-    if (!incidenteId || !recursoId) return;
+    if (!incidenteId || !recursoId || avisoCriterio) return;
 
     const numeroSolicitud = ++solicitudActual.current;
     setCalculando(true);
@@ -219,7 +220,7 @@ export default function EtaPage() {
               type="button"
               className="btn btn--primario btn--ancho"
               onClick={calcular}
-              disabled={!incidenteId || !recursoId || calculando}
+              disabled={!incidenteId || !recursoId || calculando || Boolean(avisoCriterio)}
             >
               {calculando ? "Calculando..." : "Calcular llegada"}
             </button>
@@ -227,6 +228,7 @@ export default function EtaPage() {
         )}
 
         {error && <Aviso tipo="error">{error}</Aviso>}
+        {avisoCriterio && <Aviso tipo="error">{avisoCriterio}</Aviso>}
 
         {resultado && (
           <section className="bloque">

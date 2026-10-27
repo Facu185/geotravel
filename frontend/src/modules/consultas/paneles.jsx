@@ -341,7 +341,8 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   const [limite, setLimite] = useState(5);
   const [soloDisponibles, setSoloDisponibles] = useState(true);
   const [criterio, setCriterio] = useState("mas_rapida");
-  const CRITERIOS = useCriteriosRuta();
+  const { opciones: CRITERIOS, mensajeDe } = useCriteriosRuta();
+  const avisoCriterio = mensajeDe(criterio);
   const [elegidoId, setElegidoId] = useState(null);
   const [calculo, setCalculo] = useState(null); // rutas pedidas: { base, fase, datos, error }
 
@@ -362,7 +363,7 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   const conRutas = Boolean(calculoVigente?.datos);
 
   const calcularRutas = () => {
-    if (!base) return;
+    if (!base || avisoCriterio) return;
     setCalculo({ base, fase: "cargando", datos: null, error: null });
     api
       .get(`${base}&conRutas=true`)
@@ -432,6 +433,7 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
         Solo recursos disponibles
       </label>
       <Segmentado leyenda="Criterio de la ruta" nombre="criterioRuta" opciones={CRITERIOS} valor={criterio} onChange={setCriterio} />
+      {avisoCriterio && <Aviso tipo="error">{avisoCriterio}</Aviso>}
 
       {!incidente && <ListaElegible carga={carga} tipo="incidente" objetos={incidentes} elegido={incidente} onElegir={elegirIncidente} />}
 
@@ -463,7 +465,7 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
               </ul>
               {sinCalcular && (
                 <>
-                  <button type="button" className="btn btn--primario btn--ancho" onClick={calcularRutas} disabled={calculando}>
+                  <button type="button" className="btn btn--primario btn--ancho" onClick={calcularRutas} disabled={calculando || Boolean(avisoCriterio)}>
                     {calculando ? "Calculando rutas…" : "Calcular rutas por calles"}
                   </button>
                   <p className="ayuda">Se calculan las rutas de los {Math.min(items.length, datos.rutasMaximas)} recursos más cercanos.</p>
