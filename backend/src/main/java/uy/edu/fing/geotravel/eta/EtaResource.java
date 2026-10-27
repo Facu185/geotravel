@@ -7,6 +7,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
@@ -34,8 +35,18 @@ public class EtaResource {
     @Path("/recursos/{recursoId}/incidentes/{incidenteId}")
     public Response estimar(
             @PathParam("recursoId") int recursoId,
-            @PathParam("incidenteId") int incidenteId)
+            @PathParam("incidenteId") int incidenteId,
+            @QueryParam("criterio") String criterioParam)
             throws SQLException {
+
+        Criterio criterio = Criterio.desde(criterioParam);
+        if (criterio == null) {
+            return error(400, "criterio tiene que ser mas_rapida o mas_corta");
+        }
+        if (!rutas.disponible(criterio)) {
+            return error(503, "El criterio " + criterio.codigo
+                    + " no esta disponible: falta configurar el OSRM propio (OSRM_URL_CORTA)");
+        }
 
         // Validar que ambos identificadores sean positivos
         if (recursoId <= 0 || incidenteId <= 0) {
@@ -54,7 +65,7 @@ public class EtaResource {
 
         // 3. Consultar OSRM para calcular la ruta
         try {
-            OsrmClient.Ruta ruta = rutas.consultar(extremos);
+            OsrmClient.Ruta ruta = rutas.consultar(extremos, criterio);
 
             // 4. Construir la respuesta JSON
             Map<String, Object> respuesta = new LinkedHashMap<>();
@@ -65,10 +76,10 @@ public class EtaResource {
             respuesta.put("duracionSegundos", Math.round(ruta.duracionSegundos));
             respuesta.put("tiempoEstimadoMinutos", ruta.minutosRedondeados());
             respuesta.put("geometriaRuta", ruta.geometriaRuta);
-            respuesta.put("motor", RutaService.MOTOR);
+            respuesta.put("motor", criterio.motor);
             respuesta.put("aclaracion", "Estimacion sin trafico en tiempo real");
-            respuesta.put("criterioRuta", RutaService.CRITERIO);
-            respuesta.put("criterioRutaTexto", RutaService.CRITERIO_TEXTO);
+            respuesta.put("criterioRuta", criterio.codigo);
+            respuesta.put("criterioRutaTexto", criterio.texto);
             respuesta.put("distanciaDirectaMetros", Math.round(extremos.distanciaDirectaM));
             respuesta.put("ajusteOrigenMetros", redondeado(ruta.ajusteOrigenMetros));
             respuesta.put("ajusteDestinoMetros", redondeado(ruta.ajusteDestinoMetros));

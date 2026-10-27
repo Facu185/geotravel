@@ -71,17 +71,57 @@ public final class OsrmClient {
         }
     }
 
+    /** El criterio pedido requiere un servicio OSRM que no esta configurado. */
+    public static class NoConfiguradoException extends IOException {
+
+        public NoConfiguradoException(String mensaje) {
+            super(mensaje);
+        }
+    }
+
+    public static boolean cortaConfigurada() {
+        String url = System.getenv("OSRM_URL_CORTA");
+        return url != null && !url.isBlank();
+    }
+
     public static Ruta consultar(
             double origenLon,
             double origenLat,
             double destinoLon,
             double destinoLat
     ) throws IOException, InterruptedException {
+        return consultar(origenLon, origenLat, destinoLon, destinoLat, Criterio.MAS_RAPIDA);
+    }
 
-        String servidor = System.getenv("OSRM_URL");
+    public static Ruta consultarCorta(
+            double origenLon,
+            double origenLat,
+            double destinoLon,
+            double destinoLat
+    ) throws IOException, InterruptedException {
+        return consultar(origenLon, origenLat, destinoLon, destinoLat, Criterio.MAS_CORTA);
+    }
 
-        if (servidor == null || servidor.isBlank()) {
-            servidor = "https://router.project-osrm.org";
+    public static Ruta consultar(
+            double origenLon,
+            double origenLat,
+            double destinoLon,
+            double destinoLat,
+            Criterio criterio
+    ) throws IOException, InterruptedException {
+
+        String servidor;
+        if (criterio == Criterio.MAS_CORTA) {
+            servidor = System.getenv("OSRM_URL_CORTA");
+            if (servidor == null || servidor.isBlank()) {
+                throw new NoConfiguradoException(
+                        "El servicio de ruta mas corta (OSRM_URL_CORTA) no esta configurado");
+            }
+        } else {
+            servidor = System.getenv("OSRM_URL");
+            if (servidor == null || servidor.isBlank()) {
+                servidor = "https://router.project-osrm.org";
+            }
         }
 
         servidor = servidor.replaceAll("/+$", "");

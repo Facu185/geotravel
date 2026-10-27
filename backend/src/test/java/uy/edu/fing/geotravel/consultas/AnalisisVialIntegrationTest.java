@@ -25,8 +25,9 @@ import static org.junit.Assert.assertTrue;
 /** Pruebas contra PostGIS local; se activan con URBANSAFE_INTEGRATION_TESTS=true. El motor de rutas es simulado. */
 public class AnalisisVialIntegrationTest {
 
-    private static final double LON = -57.96215;
-    private static final double LAT = -31.39029;
+    // Punto rural sin datos de seed cerca, para que el limite de resultados no desplace a los recursos de la prueba
+    private static final double LON = -55.5;
+    private static final double LAT = -32.5;
 
     private final List<Integer> incidentes = new ArrayList<>();
     private final List<Integer> recursos = new ArrayList<>();

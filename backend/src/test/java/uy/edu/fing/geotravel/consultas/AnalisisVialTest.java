@@ -173,5 +173,30 @@ public class AnalisisVialTest {
     @Test
     public void sinRutasNoHayRecursoMasRapido() {
         assertNull(AnalisisVial.recursoMasRapido(candidatos(2)));
+        assertNull(AnalisisVial.recursoMasCorto(candidatos(2)));
+    }
+
+    @Test
+    public void elRecursoMasCortoEsElDeMenorDistanciaAunqueTardeMas() {
+        AnalisisVial analisis = new AnalisisVial(new RutaService(
+                (a, b, c, d) -> new OsrmClient.Ruta(1000, 50),
+                (a, b, c, d) -> new OsrmClient.Ruta(a < -57.9625 ? 700 : 1200, 400)));
+        List<AnalisisVial.Candidato> lista = candidatos(3);
+
+        analisis.calcularRutas(lista, SIN_PLAZO, uy.edu.fing.geotravel.eta.Criterio.MAS_CORTA);
+
+        assertEquals(Integer.valueOf(3), AnalisisVial.recursoMasCorto(lista));
+        assertEquals(Long.valueOf(700), lista.get(2).item.get("distanciaViaM"));
+    }
+
+    @Test
+    public void conCortaNoConfiguradaLosRecursosQuedanEnError() {
+        AnalisisVial analisis = new AnalisisVial(new RutaService((a, b, c, d) -> new OsrmClient.Ruta(1, 1)));
+        List<AnalisisVial.Candidato> lista = candidatos(2);
+
+        int obtenidas = analisis.calcularRutas(lista, SIN_PLAZO, uy.edu.fing.geotravel.eta.Criterio.MAS_CORTA);
+
+        assertEquals(0, obtenidas);
+        assertEquals("error", lista.get(0).item.get("estadoRuta"));
     }
 }

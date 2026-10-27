@@ -1,6 +1,7 @@
 package uy.edu.fing.geotravel.consultas;
 
 import uy.edu.fing.geotravel.db.DataSourceProvider;
+import uy.edu.fing.geotravel.eta.Criterio;
 import uy.edu.fing.geotravel.eta.RutaService;
 import uy.edu.fing.geotravel.mapa.Bbox;
 
@@ -198,8 +199,21 @@ public class ConsultaResource {
                                             @QueryParam("radioMetros") String radioMetros,
                                             @QueryParam("limite") String limite,
                                             @QueryParam("soloDisponibles") @DefaultValue("true") boolean soloDisponibles,
-                                            @QueryParam("conRutas") @DefaultValue("false") boolean conRutas)
+                                            @QueryParam("conRutas") @DefaultValue("false") boolean conRutas,
+                                            @QueryParam("criterio") String criterioParam)
             throws SQLException, IOException {
+        Criterio criterio = Criterio.desde(criterioParam);
+        if (criterio == null) {
+            throw peticionInvalida("criterio tiene que ser mas_rapida o mas_corta");
+        }
+        RutaService servicio = RutaService.predeterminado();
+        if (conRutas && !servicio.disponible(criterio)) {
+            throw new WebApplicationException(Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .type(MediaType.APPLICATION_JSON)
+                    .entity(Map.of("error", "El criterio " + criterio.codigo
+                            + " no esta disponible: falta configurar el OSRM propio (OSRM_URL_CORTA)"))
+                    .build());
+        }
         AnalisisVial.Parametros parametros;
         try {
             parametros = AnalisisVial.validar(
@@ -208,8 +222,8 @@ public class ConsultaResource {
             throw peticionInvalida(e.getMessage());
         }
         try (Connection conn = DataSourceProvider.get().getConnection()) {
-            Map<String, Object> respuesta = new AnalisisVial(RutaService.predeterminado())
-                    .analizar(conn, incidenteId, parametros, soloDisponibles, conRutas);
+            Map<String, Object> respuesta = new AnalisisVial(servicio)
+                    .analizar(conn, incidenteId, parametros, soloDisponibles, conRutas, criterio);
             if (respuesta == null) {
                 throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
                         .type(MediaType.APPLICATION_JSON)

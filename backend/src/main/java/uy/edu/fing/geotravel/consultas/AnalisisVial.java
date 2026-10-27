@@ -1,6 +1,7 @@
 package uy.edu.fing.geotravel.consultas;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import uy.edu.fing.geotravel.eta.Criterio;
 import uy.edu.fing.geotravel.eta.OsrmClient;
 import uy.edu.fing.geotravel.eta.RutaService;
 
@@ -115,6 +116,13 @@ public class AnalisisVial {
     public Map<String, Object> analizar(Connection conexion, int incidenteId, Parametros p,
                                         boolean soloDisponibles, boolean conRutas)
             throws SQLException, IOException {
+        return analizar(conexion, incidenteId, p, soloDisponibles, conRutas, Criterio.MAS_RAPIDA);
+    }
+
+    /** @return la respuesta, o null si el incidente no existe */
+    public Map<String, Object> analizar(Connection conexion, int incidenteId, Parametros p,
+                                        boolean soloDisponibles, boolean conRutas, Criterio criterio)
+            throws SQLException, IOException {
 
         Map<String, Object> respuesta = new LinkedHashMap<>();
         respuesta.put("incidenteId", incidenteId);
@@ -159,16 +167,22 @@ public class AnalisisVial {
 
         respuesta.put("totalEnRadio", total);
         respuesta.put("truncado", total > candidatos.size());
-        respuesta.put("criterioRuta", RutaService.CRITERIO);
-        respuesta.put("criterioRutaTexto", RutaService.CRITERIO_TEXTO);
+        respuesta.put("criterioRuta", criterio.codigo);
+        respuesta.put("criterioRutaTexto", criterio.texto);
         respuesta.put("rutasMaximas", RUTAS_MAXIMAS);
 
+        for (Candidato c : candidatos) {
+            c.item.put("criterioRuta", criterio.codigo);
+        }
         int calculadas = 0;
         if (conRutas) {
-            calculadas = calcularRutas(candidatos, System.nanoTime() + PLAZO_RUTAS_NANOS);
+            calculadas = calcularRutas(candidatos, System.nanoTime() + PLAZO_RUTAS_NANOS, criterio);
         }
         respuesta.put("rutasDisponibles", calculadas);
         respuesta.put("recursoMasRapidoId", recursoMasRapido(candidatos));
+        respuesta.put("recursoMasCortoId", recursoMasCorto(candidatos));
+        respuesta.put("recursoMejorId",
+                criterio == Criterio.MAS_CORTA ? recursoMasCorto(candidatos) : recursoMasRapido(candidatos));
 
         List<Map<String, Object>> items = new ArrayList<>();
         for (Candidato c : candidatos) {
@@ -204,6 +218,10 @@ public class AnalisisVial {
      * @return cuantas rutas se obtuvieron
      */
     int calcularRutas(List<Candidato> candidatos, long limiteNanos) {
+        return calcularRutas(candidatos, limiteNanos, Criterio.MAS_RAPIDA);
+    }
+
+    int calcularRutas(List<Candidato> candidatos, long limiteNanos, Criterio criterio) {
         int obtenidas = 0;
         boolean motorCaido = false;
         int pedidas = 0;
@@ -224,7 +242,7 @@ public class AnalisisVial {
                 continue;
             }
 
-            RutaService.Resultado r = rutas.intentar(c.extremos);
+            RutaService.Resultado r = rutas.intentar(c.extremos, criterio);
             switch (r.estado) {
                 case DISPONIBLE:
                     completar(c, r.ruta);
@@ -258,6 +276,20 @@ public class AnalisisVial {
         item.put("ajusteOrigenM", ruta.ajusteOrigenMetros == null ? null : Math.round(ruta.ajusteOrigenMetros));
         item.put("ajusteDestinoM", ruta.ajusteDestinoMetros == null ? null : Math.round(ruta.ajusteDestinoMetros));
         item.put("advertencia", RutaService.advertencia(ruta));
+    }
+
+    /** Id del recurso con menor distancia vial entre los que tienen ruta; null si ninguno la tiene. */
+    static Integer recursoMasCorto(List<Candidato> candidatos) {
+        Integer mejor = null;
+        long menor = Long.MAX_VALUE;
+        for (Candidato c : candidatos) {
+            Object distancia = c.item.get("distanciaViaM");
+            if (distancia instanceof Long && (Long) distancia < menor) {
+                menor = (Long) distancia;
+                mejor = (Integer) c.item.get("recursoId");
+            }
+        }
+        return mejor;
     }
 
     /** Id del recurso con menor duracion entre los que tienen ruta; null si ninguno la tiene. */

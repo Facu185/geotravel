@@ -32,3 +32,6 @@ Thumbs.db
 
 # --- Logs ---
 *.log
+
+# Datos procesados de OSRM (grandes, se generan con infra/osrm/preparar.ps1)
+infra/osrm/data/

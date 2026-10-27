@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Aviso, Insignia, Selector } from "../../components/ui.jsx";
+import { Aviso, Insignia, Segmentado, Selector } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
 import { api } from "../../api/client.js";
 import { REGION } from "../../components/region.js";
@@ -283,6 +283,10 @@ const RADIOS_M = [500, 1000, 2000, 5000, 10000];
 const RADIO_INICIAL_M = 2000;
 const CANTIDADES = [1, 2, 3, 5, 10];
 const textoRadio = (m) => (m >= 1000 ? `${m / 1000} km` : `${m} m`);
+const CRITERIOS = [
+  { valor: "mas_rapida", etiqueta: "Más rápida (tiempo)", color: "#2563eb" },
+  { valor: "mas_corta", etiqueta: "Más corta (distancia)", color: "#16a34a" },
+];
 
 /** Leyenda de los colores del mapa de esta consulta (los mismos que dibuja CapaResultado). */
 function LeyendaRutas({ conRutas }) {
@@ -307,7 +311,7 @@ function LeyendaRutas({ conRutas }) {
 }
 
 /** Una tarjeta por recurso: distancia directa, distancia por calles, tiempo y disponibilidad de la ruta. */
-function FilaRecursoCercano({ it, elegido, masRapido, onElegir }) {
+function FilaRecursoCercano({ it, elegido, mejor, criterio, onElegir }) {
   const hayRuta = it.estadoRuta === "disponible";
   const sinRuta = it.estadoRuta === "sin_ruta" || it.estadoRuta === "error";
   return (
@@ -328,7 +332,7 @@ function FilaRecursoCercano({ it, elegido, masRapido, onElegir }) {
           {sinRuta && <span className="item__detalle">Ruta no disponible</span>}
           {hayRuta && it.advertencia && <span className="item__detalle">⚠ {it.advertencia}</span>}
         </span>
-        {masRapido && <Insignia color="#16a34a">Más rápido</Insignia>}
+        {mejor && <Insignia color="#16a34a">{criterio === "mas_corta" ? "Más corto" : "Más rápido"}</Insignia>}
       </button>
     </li>
   );
@@ -339,6 +343,7 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   const [radio, setRadio] = useState(RADIO_INICIAL_M);
   const [limite, setLimite] = useState(5);
   const [soloDisponibles, setSoloDisponibles] = useState(true);
+  const [criterio, setCriterio] = useState("mas_rapida");
   const [elegidoId, setElegidoId] = useState(null);
   const [calculo, setCalculo] = useState(null); // rutas pedidas: { base, fase, datos, error }
 
@@ -350,7 +355,7 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   useElegibles(setElegibles, "incidente", incidentes, incidente, elegirIncidente);
 
   // Buscar recursos en el buffer solo usa PostGIS; las rutas (OSRM) se piden recién con el botón.
-  const base = incidente ? `/consultas/recursos-cercanos/${incidente.id}/analisis-vial${query({ radioMetros: radio, limite, soloDisponibles })}` : null;
+  const base = incidente ? `/consultas/recursos-cercanos/${incidente.id}/analisis-vial${query({ radioMetros: radio, limite, soloDisponibles, criterio })}` : null;
   const { fase, datos: previo, error } = useRuta(base);
 
   const calculoVigente = calculo && calculo.base === base ? calculo : null;
@@ -428,6 +433,7 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
         <input type="checkbox" checked={soloDisponibles} onChange={(e) => setSoloDisponibles(e.target.checked)} />
         Solo recursos disponibles
       </label>
+      <Segmentado leyenda="Criterio de la ruta" nombre="criterioRuta" opciones={CRITERIOS} valor={criterio} onChange={setCriterio} />
 
       {!incidente && <ListaElegible carga={carga} tipo="incidente" objetos={incidentes} elegido={incidente} onElegir={elegirIncidente} />}
 
@@ -451,7 +457,8 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
                     key={it.recursoId}
                     it={it}
                     elegido={it.recursoId === elegidoId}
-                    masRapido={conRutas && it.recursoId === datos.recursoMasRapidoId}
+                    mejor={conRutas && it.recursoId === datos.recursoMejorId}
+                    criterio={criterio}
                     onElegir={() => setElegidoId(it.recursoId === elegidoId ? null : it.recursoId)}
                   />
                 ))}
@@ -472,7 +479,12 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
               )}
               {conRutas && (
                 <p className="ayuda">
-                  Los recorridos son la <strong>ruta más rápida</strong> por calles (OSRM), no necesariamente la de menor distancia. Tiempo estimado sin tráfico en tiempo real.
+                  {criterio === "mas_corta" ? (
+                    <>Los recorridos son la <strong>ruta más corta</strong> por calles permitidas (OSRM propio, minimiza la distancia). Su tiempo puede ser mayor que el de la ruta más rápida.</>
+                  ) : (
+                    <>Los recorridos son la <strong>ruta más rápida</strong> por calles (OSRM, minimiza la duración), no necesariamente la de menor distancia.</>
+                  )}{" "}
+                  Tiempo estimado sin tráfico en tiempo real.
                 </p>
               )}
               <LeyendaRutas conRutas={conRutas && datos.rutasDisponibles > 0} />

@@ -114,17 +114,34 @@ public class RutaService {
         }
     }
 
-    private static final RutaService PREDETERMINADO = new RutaService(OsrmClient::consultar);
+    private static final RutaService PREDETERMINADO = new RutaService(
+            OsrmClient::consultar,
+            (lonO, latO, lonD, latD) -> OsrmClient.consultarCorta(lonO, latO, lonD, latD));
 
     private final MotorRutas motor;
+    private final MotorRutas motorCorta;
     private final Map<String, Entrada> cache = new ConcurrentHashMap<>();
 
     public RutaService(MotorRutas motor) {
+        this(motor, null);
+    }
+
+    /** motorCorta null significa que el criterio mas_corta no esta disponible. */
+    public RutaService(MotorRutas motor, MotorRutas motorCorta) {
         this.motor = motor;
+        this.motorCorta = motorCorta;
     }
 
     public static RutaService predeterminado() {
         return PREDETERMINADO;
+    }
+
+    /** Si el criterio se puede calcular con la configuracion actual. */
+    public boolean disponible(Criterio criterio) {
+        if (criterio == Criterio.MAS_CORTA) {
+            return motorCorta != null && (motorCorta != PREDETERMINADO.motorCorta || OsrmClient.cortaConfigurada());
+        }
+        return true;
     }
 
     /** Extremos de la ruta (en lon/lat) y distancia directa; null si el recurso o el incidente no existen. */
@@ -146,8 +163,16 @@ public class RutaService {
 
     /** Consulta la ruta (con cache de pocos minutos para no repetir pedidos iguales). */
     public OsrmClient.Ruta consultar(Extremos e) throws IOException, InterruptedException {
-        String clave = String.format(Locale.ROOT, "%.5f,%.5f;%.5f,%.5f",
-                e.origenLon, e.origenLat, e.destinoLon, e.destinoLat);
+        return consultar(e, Criterio.MAS_RAPIDA);
+    }
+
+    public OsrmClient.Ruta consultar(Extremos e, Criterio criterio) throws IOException, InterruptedException {
+        MotorRutas elegido = criterio == Criterio.MAS_CORTA ? motorCorta : motor;
+        if (elegido == null) {
+            throw new OsrmClient.NoConfiguradoException("Criterio de ruta no disponible: " + criterio.codigo);
+        }
+        String clave = String.format(Locale.ROOT, "%s|%.5f,%.5f;%.5f,%.5f",
+                criterio.codigo, e.origenLon, e.origenLat, e.destinoLon, e.destinoLat);
         long ahora = System.nanoTime();
 
         Entrada guardada = cache.get(clave);
@@ -155,7 +180,7 @@ public class RutaService {
             return guardada.ruta;
         }
 
-        OsrmClient.Ruta ruta = motor.calcular(e.origenLon, e.origenLat, e.destinoLon, e.destinoLat);
+        OsrmClient.Ruta ruta = elegido.calcular(e.origenLon, e.origenLat, e.destinoLon, e.destinoLat);
 
         if (cache.size() >= CACHE_MAXIMO) {
             cache.clear();
@@ -166,8 +191,12 @@ public class RutaService {
 
     /** Igual que consultar, pero traduce los fallos a un estado para respuestas parciales. */
     public Resultado intentar(Extremos e) {
+        return intentar(e, Criterio.MAS_RAPIDA);
+    }
+
+    public Resultado intentar(Extremos e, Criterio criterio) {
         try {
-            return Resultado.ok(consultar(e));
+            return Resultado.ok(consultar(e, criterio));
         } catch (OsrmClient.SinRutaException ex) {
             return Resultado.sinRuta(ex.getMessage());
         } catch (InterruptedException ex) {

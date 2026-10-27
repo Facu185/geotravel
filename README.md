@@ -68,6 +68,10 @@ IDs fijos. La pantalla `/eta` muestra distancia, duracion y la ruta vial
 GeoJSON sobre Leaflet. El calculo de rutas utiliza un servicio OSRM con acceso
 a internet.
 
+**Ruta más corta (opcional):** el criterio `mas_corta` (minimiza distancia) usa un OSRM propio. Preparar los datos
+con `infra/osrm/preparar.ps1` (o `.sh`), definir `OSRM_URL`/`OSRM_URL_CORTA` en `infra/.env` y levantar con
+`docker compose --profile osrm up -d --build`. Detalles en [docs/RECURSOS_CERCANOS_RUTAS.md](docs/RECURSOS_CERCANOS_RUTAS.md).
+
 **Guia de instalacion en otra computadora y verificaciones:**
 [docs/ETA_SALTO_DEMO.md](docs/ETA_SALTO_DEMO.md).
 

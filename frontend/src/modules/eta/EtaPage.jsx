@@ -4,7 +4,7 @@ import { GeoJSON } from "react-leaflet";
 
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import Enfocar from "../../components/Enfocar.jsx";
-import { Aviso, Selector } from "../../components/ui.jsx";
+import { Aviso, Segmentado, Selector } from "../../components/ui.jsx";
 import { api } from "../../api/client.js";
 
 function obtenerGeometria(elemento) {
@@ -33,6 +33,7 @@ export default function EtaPage() {
   const [calculando, setCalculando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState(null);
+  const [criterio, setCriterio] = useState("mas_rapida");
   const solicitudActual = useRef(0);
 
   useEffect(() => {
@@ -104,7 +105,7 @@ export default function EtaPage() {
 
     try {
       const datos = await api.get(
-        `/eta/recursos/${recursoId}/incidentes/${incidenteId}`
+        `/eta/recursos/${recursoId}/incidentes/${incidenteId}?criterio=${criterio}`
       );
       if (numeroSolicitud === solicitudActual.current) setResultado(datos);
     } catch (e) {
@@ -201,6 +202,20 @@ export default function EtaPage() {
               vacio="Seleccioná un recurso"
             />
 
+            <Segmentado
+              leyenda="Criterio de la ruta"
+              nombre="criterioEta"
+              opciones={[
+                { valor: "mas_rapida", etiqueta: "Más rápida (tiempo)", color: "#2563eb" },
+                { valor: "mas_corta", etiqueta: "Más corta (distancia)", color: "#16a34a" },
+              ]}
+              valor={criterio}
+              onChange={(valor) => {
+                limpiarResultado();
+                setCriterio(valor);
+              }}
+            />
+
             <button
               type="button"
               className="btn btn--primario btn--ancho"
@@ -236,7 +251,7 @@ export default function EtaPage() {
               </div>
               <div>
                 <dt>Criterio</dt>
-                <dd>Ruta más rápida</dd>
+                <dd>{resultado.criterioRutaTexto}</dd>
               </div>
               <div>
                 <dt>Motor</dt>
@@ -246,7 +261,9 @@ export default function EtaPage() {
             {resultado.advertencia && <Aviso>{resultado.advertencia}</Aviso>}
             <p className="ayuda">Tiempo estimado sin tráfico en tiempo real.</p>
             <p className="ayuda">
-              El recorrido optimiza la duración, no la distancia: puede no ser el camino de menor distancia vial.
+              {resultado.criterioRuta === "mas_corta"
+                ? "El recorrido minimiza la distancia por calles permitidas; su duración puede ser mayor que la de la ruta más rápida."
+                : "El recorrido optimiza la duración, no la distancia: puede no ser el camino de menor distancia vial."}
             </p>
           </section>
         )}
