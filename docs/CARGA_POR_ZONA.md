@@ -114,9 +114,9 @@ Qué hace cada consulta:
 |---|---|---|
 | 1. Incidentes por zona | Las zonas de la vista | Sus incidentes, dibujados y listados |
 | 2. Zonas con más incidentes | Las zonas de la vista, más oscuras cuantos más incidentes (`?bbox=` en `/consultas/zonas-mas-incidentes`) | Una zona: sus incidentes |
-| 3. Recursos cercanos | Los incidentes de la vista | Sus recursos más cercanos, con la distancia |
+| 3. Recursos cercanos | Los incidentes de la vista | Los recursos Disponibles dentro de un radio: buffer del incidente (`ST_Buffer`, `ST_DWithin`), línea recta y, a pedido, el camino por calles |
 | 4. Incidente más cercano a un punto | De fondo, los incidentes (GeoServer, imagen); se busca con un clic, una dirección o un cruce | El incidente encontrado y la línea hasta el punto. No se cargan los de la vista porque el más cercano puede quedar afuera |
-| 5. Zona de un punto | De fondo, las zonas (GeoServer, imagen) | La zona que contiene al punto |
+| 5. Zona de un punto | De fondo, las zonas (GeoServer, imagen) | Todas las zonas que contienen al punto (se pueden superponer) |
 | 6. Recursos por zona | Las zonas de la vista | Sus recursos |
 | 7. Incidentes por recurso | Los recursos de la vista | Sus incidentes, con una línea desde el recurso |
 

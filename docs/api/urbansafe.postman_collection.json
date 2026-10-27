@@ -940,7 +940,7 @@
           }
         },
         {
-          "name": "C3. Recursos cercanos a un incidente",
+          "name": "C3. Recursos operativos (Disponible) más cercanos a un incidente",
           "request": {
             "method": "GET",
             "header": [],
@@ -948,11 +948,11 @@
           }
         },
         {
-          "name": "C3b. Recursos cercanos, solo los disponibles",
+          "name": "C3b. Recursos cercanos dentro de un radio (devuelve el buffer en area)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}?limite=3&soloDisponibles=true"
+            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}?limite=5&radioM=1500"
           }
         },
         {
@@ -980,7 +980,7 @@
           }
         },
         {
-          "name": "C5b. Búsqueda de zona: zona que contiene un punto (lon,lat)",
+          "name": "C5b. Búsqueda de zona: zonas que contienen un punto (lon,lat; puede ser más de una)",
           "request": {
             "method": "GET",
             "header": [],

@@ -1,5 +1,5 @@
 import L from "leaflet";
-import { COLOR_ESTADO_RECURSO, TIPOS_RECURSO, nombreTipoRecurso } from "./colores.js";
+import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, TIPOS_RECURSO, nombreTipoRecurso } from "./colores.js";
 
 /**
  * Íconos de los recursos de emergencia. Convención (la misma para el mapa de administración,
@@ -60,6 +60,48 @@ export function IconoRecurso({ tipo, estado, chico = false }) {
       aria-label={estado ? `${nombreTipoRecurso(tipo)} (${estado})` : nombreTipoRecurso(tipo)}
     >
       <img src={urlIconoRecurso(tipo)} alt="" draggable="false" />
+    </span>
+  );
+}
+
+// ------------------------------------------------------------------------------------------ incidentes
+
+/**
+ * Íconos de los incidentes puntuales (las líneas y los polígonos se dibujan con su forma): el dibujo es siempre el
+ * mismo (el triángulo de advertencia, incidente.svg) y el COLOR dice el estado, el mismo de COLOR_ESTADO_INCIDENTE.
+ */
+export const colorEstadoIncidente = (estado) => COLOR_ESTADO_INCIDENTE[estado] ?? COLOR_DESCONOCIDO;
+
+/** Ícono de Leaflet de un incidente puntual, para un <Marker icon={...}>. `resaltado` marca el que se está eligiendo. */
+export function iconoIncidente(estado, { resaltado = false } = {}) {
+  const clave = `incidente|${estado}|${resaltado}`;
+  if (!cache.has(clave)) {
+    cache.set(
+      clave,
+      L.divIcon({
+        className: "marcador-recurso",
+        html:
+          `<span class="insignia-icono${resaltado ? " insignia-icono--resaltado" : ""}" style="--color:${colorEstadoIncidente(estado)}">` +
+          `<img src="${urlIconoIncidente}" alt="" draggable="false"></span>`,
+        iconSize: [TAMANO_MARCADOR, TAMANO_MARCADOR],
+        iconAnchor: [TAMANO_MARCADOR / 2, TAMANO_MARCADOR / 2],
+        tooltipAnchor: [TAMANO_MARCADOR / 2, 0],
+      }),
+    );
+  }
+  return cache.get(clave);
+}
+
+/** El mismo ícono para listas y leyendas (fuera del mapa). */
+export function IconoIncidente({ estado, chico = false }) {
+  return (
+    <span
+      className={chico ? "insignia-icono insignia-icono--chico" : "insignia-icono"}
+      style={{ "--color": colorEstadoIncidente(estado) }}
+      role="img"
+      aria-label={estado ? `Incidente (${estado})` : "Incidente"}
+    >
+      <img src={urlIconoIncidente} alt="" draggable="false" />
     </span>
   );
 }
