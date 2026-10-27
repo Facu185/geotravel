@@ -19,6 +19,13 @@ until existe "$G/about/version.json"; do
   sleep 5
 done
 
+# Copiar SLDs y SVGs desde custom_styles al directorio de estilos
+echo "geoserver-init: copiando SLDs y SVGs..."
+mkdir -p /opt/geoserver/data_dir/styles
+cp -f /custom_styles/*.sld /opt/geoserver/data_dir/styles/
+cp -f /custom_styles/*.svg /opt/geoserver/data_dir/styles/
+echo "geoserver-init: SLDs y SVGs copiados"
+
 # Las consultas de existencia piden siempre la versión .json: sin extensión, GeoServer puede
 # responder 500 para un estilo que sí existe (intenta devolver el archivo SLD).
 if existe "$G/workspaces/$WS.json"; then
@@ -54,7 +61,7 @@ for par in incidentes_estado:incidente recursos_tipo:recurso zonas_nivel_priorid
   capa="${par##*:}"
   existe "$G/workspaces/$WS/styles/$estilo.json" || \
     curl -sf $A -X POST -H "$JSON" -d "{\"style\":{\"name\":\"$estilo\",\"filename\":\"$estilo.sld\"}}" "$G/workspaces/$WS/styles" > /dev/null
-  curl -sf $A -X PUT -H "Content-Type: application/vnd.ogc.sld+xml" --data-binary "@/styles/$estilo.sld" "$G/workspaces/$WS/styles/$estilo" > /dev/null
+  curl -sf $A -X PUT -H "Content-Type: application/vnd.ogc.sld+xml" --data-binary "@/opt/geoserver/data_dir/styles/$estilo.sld" "$G/workspaces/$WS/styles/$estilo" > /dev/null
   curl -sf $A -X PUT -H "$JSON" -d "{\"layer\":{\"defaultStyle\":{\"name\":\"$estilo\",\"workspace\":\"$WS\"}}}" "$G/layers/$WS:$capa" > /dev/null
   echo "estilo $estilo: aplicado a $capa"
 done

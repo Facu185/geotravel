@@ -57,6 +57,7 @@ services:
   # (ver init/geoserver-init.sh). Es repetible: lo que ya existe se deja como está.
   geoserver-init:
     image: curlimages/curl:8.10.1
+    user: "0:0"
     depends_on:
       geoserver:
         condition: service_started
@@ -70,7 +71,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
     volumes:
       - ./init/geoserver-init.sh:/init/geoserver-init.sh:ro
-      - ../geoserver/styles:/styles:ro
+      - ../geoserver/styles:/custom_styles:ro
+      - geoserver_data:/opt/geoserver/data_dir
     entrypoint: ["/bin/sh", "/init/geoserver-init.sh"]
 
   # Opcional: compila el .war en backend/target sin levantar nada (el servicio 'backend' ya
