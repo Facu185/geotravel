@@ -4,7 +4,8 @@ import { CircleMarker, GeoJSON, Marker, Polyline, Tooltip, useMap, useMapEvents 
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import CargaPorZona, { SIN_CARGAR } from "../../components/CargaPorZona.jsx";
 import { CARGA_POR_ZONA } from "../../components/region.js";
-import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
+import { COLOR_ESTADO_INCIDENTE, COLOR_PRIORIDAD } from "../../components/colores.js";
+import { iconoIncidente, iconoRecurso } from "../../components/iconos.jsx";
 import { CONSULTAS, RESULTADO_VACIO } from "./paneles.jsx";
 
 /**
@@ -34,22 +35,6 @@ const ZOOM_MINIMO_ELEGIR = Math.max(1, CARGA_POR_ZONA.zoomMinimo - 2);
  * de objeto con el que trabaja (campo "fondo" de paneles.jsx): no se dibuja todo lo que existe.
  */
 const CAPA_DE = { zona: "geotravel:zona_operativa", incidente: "geotravel:incidente", recurso: "geotravel:recurso" };
-
-/** Los recursos se dibujan como cuadrados (los incidentes, como círculos), igual que en GeoServer. */
-const iconos = {};
-const iconoRecurso = (color, elegido = false) => {
-  const clave = `${color}${elegido}`;
-  if (!iconos[clave]) {
-    const lado = elegido ? 24 : 18;
-    iconos[clave] = L.divIcon({
-      className: "",
-      iconSize: [lado, lado],
-      iconAnchor: [lado / 2, lado / 2],
-      html: `<span style="display:block;width:${lado}px;height:${lado}px;box-sizing:border-box;background:${color};border:${elegido ? 3 : 2}px solid ${elegido ? "#13202c" : "#fff"};border-radius:4px;box-shadow:0 0 0 1px rgba(19,32,44,.55)"></span>`,
-    });
-  }
-  return iconos[clave];
-};
 
 function ClickEnMapa({ alClick }) {
   useMapEvents({ click: (e) => alClick([e.latlng.lat, e.latlng.lng]) });
@@ -88,7 +73,9 @@ function VigilarVista({ alCambiar }) {
  * Encuadra el mapa en el resultado de la consulta: como los objetos pueden estar en cualquier
  * parte del país, no alcanza con mirar la zona inicial. Deja libre el lado del panel.
  * Con porSeleccion (se eligió algo de lo que ya se ve) solo se aleja si el resultado no entra en la vista:
- * nunca se acerca, para no mover el mapa debajo de quien está eligiendo.
+ * nunca se acerca, para no mover el mapa debajo de quien está eligiendo. Si el resultado trae un área (el buffer
+ * de la consulta 3), sí encuadra en ella aunque haya que acercar. Un panel puede poner `ajuste` para que se
+ * reencuadre solo cuando esa clave cambia (y no cada vez que se suma algo, como un camino por calles).
  */
 function AjustarVista({ resultado, punto, porSeleccion }) {
   const map = useMap();
@@ -98,22 +85,24 @@ function AjustarVista({ resultado, punto, porSeleccion }) {
       ...resultado.incidentes.map((i) => i.geometria),
       ...resultado.recursos.map((r) => r.geometria),
       ...(resultado.buffer ? [resultado.buffer] : []),
+      ...(resultado.area ? [resultado.area] : []),
       ...resultado.rutas.map((r) => r.geometria),
     ];
     if (capas.length === 0) return;
     const limites = L.geoJSON({ type: "GeometryCollection", geometries: capas }).getBounds();
     if (punto) limites.extend(punto);
     if (!limites.isValid()) return;
-    if (porSeleccion && map.getBounds().contains(limites)) return;
+    const soloAlejar = porSeleccion && !resultado.area && !resultado.buffer;
+    if (soloAlejar && map.getBounds().contains(limites)) return;
     const escritorio = window.matchMedia("(min-width: 800px)").matches;
     map.fitBounds(limites, {
       paddingTopLeft: [escritorio ? 390 : 24, 40],
       paddingBottomRight: [24, escritorio ? 24 : 260],
-      maxZoom: porSeleccion ? map.getZoom() : 16,
+      maxZoom: soloAlejar ? map.getZoom() : 16,
     });
-    // Solo cuando cambia el resultado, no cuando se elige un punto
+    // Solo cuando cambia el resultado (o su clave de ajuste), no cuando se elige un punto
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resultado, map]);
+  }, [resultado.ajuste ?? resultado, map]);
   return null;
 }
 
@@ -132,6 +121,15 @@ function CapaResultado({ resultado, punto }) {
           data={resultado.buffer}
           interactive={false}
           style={{ color: "#1d6fb8", weight: 2, fillColor: "#3b8fe0", fillOpacity: 0.12 }}
+        />
+      )}
+
+      {resultado.area && (
+        <GeoJSON
+          key={`area-${JSON.stringify(resultado.area.coordinates[0][0])}-${resultado.area.coordinates[0].length}`}
+          data={resultado.area}
+          interactive={false}
+          style={{ color: "#13202c", weight: 1.5, dashArray: "6 5", fillColor: "#13202c", fillOpacity: 0.07 }}
         />
       )}
 
@@ -155,6 +153,7 @@ function CapaResultado({ resultado, punto }) {
         </GeoJSON>
       ))}
 
+      {/* Línea directa (punteada) del incidente a cada recurso. */}
       {resultado.lineas.map((l, n) => (
         <Polyline
           key={`l${n}-${l.elegida ? "e" : ""}`}
@@ -165,6 +164,7 @@ function CapaResultado({ resultado, punto }) {
         </Polyline>
       ))}
 
+      {/* Camino por calles (continuo y de otro color) que calcula el servicio de rutas. */}
       {resultado.rutas.map((r) => (
         <GeoJSON
           key={`ruta-${r.id}-${r.elegida ? "e" : ""}-${hayRutaElegida ? "h" : ""}`}
@@ -178,17 +178,11 @@ function CapaResultado({ resultado, punto }) {
 
       {resultado.incidentes.map((i) =>
         i.geometria.type === "Point" ? (
-          <CircleMarker
-            key={`I${i.id}`}
-            center={i.pos}
-            radius={10}
-            bubblingMouseEvents={false}
-            pathOptions={{ color: colorEstado(i), weight: 3, fillOpacity: 0.85 }}
-          >
+          <Marker key={`I${i.id}`} position={i.pos} icon={iconoIncidente(i.estado)} bubblingMouseEvents={false}>
             <Tooltip>
               {i.titulo} — {i.estado}
             </Tooltip>
-          </CircleMarker>
+          </Marker>
         ) : (
           // Un incidente lineal (calle cortada) o un polígono: se dibuja con su forma y el color de su estado.
           <GeoJSON key={`I${i.id}`} data={i.geometria} bubblingMouseEvents={false} style={{ color: colorEstado(i), weight: 6, opacity: 0.9, fillOpacity: 0.25 }}>
@@ -203,7 +197,7 @@ function CapaResultado({ resultado, punto }) {
         <Marker
           key={`R${r.id}-${r.elegido ? "e" : ""}`}
           position={r.pos}
-          icon={iconoRecurso(COLOR_ESTADO_RECURSO[r.estadoOperativo] ?? "#555", Boolean(r.elegido))}
+          icon={iconoRecurso(r.tipo, r.estadoOperativo, { resaltado: Boolean(r.elegido) })}
           bubblingMouseEvents={false}
           eventHandlers={r.alElegir ? { click: r.alElegir } : undefined}
         >
@@ -266,8 +260,9 @@ function CapaElegibles({ elegibles }) {
       data={datos}
       pointToLayer={(f, latlng) => {
         const o = porId.get(f.properties.id);
-        if (tipo === "recurso") return L.marker(latlng, { icon: iconoRecurso(COLOR_ESTADO_RECURSO[o.estadoOperativo] ?? "#555", o.id === elegidoId) });
-        return L.circleMarker(latlng, { radius: o.id === elegidoId ? 11 : 8 });
+        const resaltado = o.id === elegidoId;
+        if (tipo === "recurso") return L.marker(latlng, { icon: iconoRecurso(o.tipo, o.estadoOperativo, { resaltado }) });
+        return L.marker(latlng, { icon: iconoIncidente(o.estado, { resaltado }) });
       }}
       style={estilo}
       onEachFeature={(f, capa) => {

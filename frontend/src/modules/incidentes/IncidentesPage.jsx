@@ -7,6 +7,7 @@ import Enfocar from "../../components/Enfocar.jsx";
 import EditorGeometria, { cargarGeometria, formaDe, geometriaDelGrupo } from "../../components/EditorGeometria.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Insignia, Segmentado } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, OPCIONES_PRIORIDAD } from "../../components/colores.js";
+import { IconoIncidente, iconoIncidente } from "../../components/iconos.jsx";
 import { api } from "../../api/client.js";
 import { CARGA_POR_ZONA } from "../../components/region.js";
 
@@ -77,7 +78,8 @@ const comoFeature = (incidente) => ({
   geometry: JSON.parse(incidente.geom),
 });
 
-const circulo = (radio) => (_, latlng) => L.circleMarker(latlng, { radius: radio });
+/** Un incidente puntual se dibuja con el ícono compartido (components/iconos.jsx): el color es el estado. */
+const marcador = (resaltado) => (f, latlng) => L.marker(latlng, { icon: iconoIncidente(f.properties.estado, { resaltado }) });
 
 export default function IncidentesPage() {
   const [carga, setCarga] = useState(SIN_CARGAR); // incidentes de la vista actual (ver CargaPorZona)
@@ -264,7 +266,7 @@ export default function IncidentesPage() {
       <GeoJSON
         key={`${version}-${seleccionado?.id ?? "ninguno"}`}
         data={fondo}
-        pointToLayer={circulo(8)}
+        pointToLayer={marcador(false)}
         style={(f) => estiloIncidente(f.properties.estado, f.geometry.type, false)}
         onEachFeature={(f, capa) => {
           capa.bindTooltip(`${f.properties.titulo} — ${f.properties.estado}`);
@@ -275,7 +277,7 @@ export default function IncidentesPage() {
         <GeoJSON
           key={`resaltado-${seleccionado.id}-${seleccionado.estado}-${version}`}
           data={comoFeature(seleccionado)}
-          pointToLayer={circulo(12)}
+          pointToLayer={marcador(true)}
           style={(f) => estiloIncidente(f.properties.estado, f.geometry.type, true)}
           interactive={false}
         />
@@ -325,7 +327,11 @@ export default function IncidentesPage() {
                       setEnfoque({ geom: JSON.parse(i.geom) });
                     }}
                   >
-                    <span className={`item__marca item__marca--${MARCA_FORMA[tipo]}`} style={{ "--color": COLOR_ESTADO_INCIDENTE[i.estado] }} aria-hidden="true" />
+                    {tipo === "Point" ? (
+                      <IconoIncidente estado={i.estado} chico />
+                    ) : (
+                      <span className={`item__marca item__marca--${MARCA_FORMA[tipo]}`} style={{ "--color": COLOR_ESTADO_INCIDENTE[i.estado] }} aria-hidden="true" />
+                    )}
                     <span className="item__texto">
                       <span className="item__titulo">{i.titulo}</span>
                       <span className="item__detalle">

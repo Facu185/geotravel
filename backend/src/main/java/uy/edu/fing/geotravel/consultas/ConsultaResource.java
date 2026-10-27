@@ -160,31 +160,58 @@ public class ConsultaResource {
 
     // ---------------------------------------------------- 3. Recursos cercanos a un incidente
     /**
-     * Los recursos más cercanos al incidente dado, ordenados por distancia, con su geometría. Con
-     * soloDisponibles=true se consideran únicamente los recursos en estado "Disponible"
-     * (la letra pide los recursos *operativos* más cercanos).
+     * Los recursos operativos (estado "Disponible") más cercanos al incidente dado, ordenados por distancia
+     * en línea recta, con su geometría. Con radioM solo cuenta los que están a esa distancia o menos del
+     * incidente (ST_DWithin), y devuelve en "area" el buffer del incidente (ST_Buffer) para dibujarlo: si el
+     * incidente es una línea o un polígono, el buffer es el pasillo o el área agrandada a su alrededor.
+     * Responde {radioM, area, items, total, truncado}; total es cuántos recursos cumplen, antes del límite.
+     * El camino por calles de cada recurso lo da /eta/recursos/{recursoId}/incidentes/{incidenteId}.
      */
     @GET
     @Path("/recursos-cercanos/{incidenteId}")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<Map<String, Object>> recursosCercanos(@PathParam("incidenteId") int incidenteId,
-                                                        @QueryParam("limite") @DefaultValue("5") int limite,
-                                                        @QueryParam("soloDisponibles") @DefaultValue("false") boolean soloDisponibles)
-            throws SQLException {
+    public Map<String, Object> recursosCercanos(@PathParam("incidenteId") int incidenteId,
+                                                @QueryParam("limite") @DefaultValue("5") int limite,
+                                                @QueryParam("radioM") Double radioM) throws SQLException {
         int max = limite < 1 ? 5 : Math.min(limite, 50);
+        if (radioM != null && (!Double.isFinite(radioM) || radioM < 1 || radioM > 100000)) {
+            throw peticionInvalida("radioM debe estar entre 1 y 100000 metros");
+        }
         String sql =
             "SELECT r.id, r.identificacion, r.tipo, r.estado_operativo, " +
-            "       ST_Distance(r.geom, i.geom) AS distancia_m, " + geomIncidente("r") + " " +
+            "       ST_Distance(r.geom, i.geom) AS distancia_m, " + geomIncidente("r") + ", count(*) OVER () AS total " +
             "FROM recurso r, incidente i " +
-            "WHERE i.id = ? " +
-            (soloDisponibles ? "  AND r.estado_operativo = 'Disponible' " : "") +
+            "WHERE i.id = ? AND r.estado_operativo = 'Disponible' " +
+            (radioM != null ? "  AND ST_DWithin(r.geom, i.geom, ?) " : "") +
             "ORDER BY r.geom <-> i.geom " +
             "LIMIT ?";
-        try (Connection conn = DataSourceProvider.get().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, incidenteId);
-            ps.setInt(2, max);
-            return rowsToMaps(ps.executeQuery(), "id", "identificacion", "tipo", "estado_operativo", "distancia_m", "geom");
+        try (Connection conn = DataSourceProvider.get().getConnection()) {
+            String area = null;
+            if (radioM != null) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT ST_AsGeoJSON(ST_Transform(ST_Buffer(geom, ?), 4326), 6) FROM incidente WHERE id = ?")) {
+                    ps.setDouble(1, radioM);
+                    ps.setInt(2, incidenteId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
+                                .type(MediaType.APPLICATION_JSON).entity(Map.of("error", "El incidente no existe")).build());
+                        }
+                        area = rs.getString(1);
+                    }
+                }
+            }
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                int n = 1;
+                ps.setInt(n++, incidenteId);
+                if (radioM != null) ps.setDouble(n++, radioM);
+                ps.setInt(n, max);
+                Map<String, Object> resultado = new LinkedHashMap<>();
+                resultado.put("radioM", radioM);
+                resultado.put("area", area);
+                resultado.putAll(conTotal(ps.executeQuery(), "id", "identificacion", "tipo", "estado_operativo", "distancia_m", "geom"));
+                return resultado;
+            }
         }
     }
 
@@ -272,7 +299,11 @@ public class ConsultaResource {
     }
 
     // ----------------------------------------------------------------- 5. Búsqueda de zona
-    /** Zona que contiene el punto dado (x, y en EPSG:32721, o lon, lat en EPSG:4326), con su geometría. */
+    /**
+     * Zonas que contienen el punto dado (x, y en EPSG:32721, o lon, lat en EPSG:4326), con su geometría. Las
+     * zonas pueden superponerse, así que un punto puede estar en varias: devuelve todas, de mayor a menor
+     * prioridad. Responde {items, total, truncado}; sin zonas, items vacío.
+     */
     @GET
     @Path("/zona-por-punto")
     @Produces(MediaType.APPLICATION_JSON)
@@ -283,24 +314,15 @@ public class ConsultaResource {
         double a = enGrados ? lon : x;
         double b = enGrados ? lat : y;
         String sql =
-            "SELECT z.id, z.nombre, z.nivel_prioridad, z.responsable, " + geomZona("z") + " " +
+            "SELECT z.id, z.nombre, z.nivel_prioridad, z.responsable, " + geomZona("z") + ", count(*) OVER () AS total " +
             "FROM zona_operativa z " +
             "WHERE ST_Contains(z.geom, " + (enGrados ? PUNTO_LON_LAT : PUNTO_X_Y) + ") " +
-            "LIMIT 1";
+            "ORDER BY z.nivel_prioridad, z.nombre LIMIT ?";
         try (Connection conn = DataSourceProvider.get().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setDouble(1, a); ps.setDouble(2, b);
-            try (ResultSet rs = ps.executeQuery()) {
-                Map<String, Object> row = new LinkedHashMap<>();
-                if (!rs.next()) {
-                    row.put("zona", null);
-                    return row;
-                }
-                for (String columna : new String[] {"id", "nombre", "nivel_prioridad", "responsable", "geom"}) {
-                    row.put(toCamelCase(columna), texto(rs.getObject(columna)));
-                }
-                return row;
-            }
+            ps.setInt(3, Bbox.LIMITE_POR_DEFECTO);
+            return conTotal(ps.executeQuery(), "id", "nombre", "nivel_prioridad", "responsable", "geom");
         }
     }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Aviso, Insignia, Segmentado, Selector } from "../../components/ui.jsx";
-import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
+import { COLOR_ESTADO_INCIDENTE, COLOR_PRIORIDAD, nombreTipoRecurso } from "../../components/colores.js";
+import { IconoIncidente, IconoRecurso } from "../../components/iconos.jsx";
 import { api } from "../../api/client.js";
 import useCriteriosRuta from "../../api/useCriteriosRuta.js";
 import { REGION } from "../../components/region.js";
@@ -27,9 +28,11 @@ export const RESULTADO_VACIO = {
   zonas: [], // [{ id, nombre, nivelPrioridad, geometria, intensidad entre 0 y 1 }]
   incidentes: [], // [{ id, titulo, estado, geometria, pos }]
   recursos: [], // [{ id, identificacion, estadoOperativo, geometria, pos }]
-  lineas: [], // [{ desde: [lat, lng], hasta: [lat, lng], texto, color?, elegida? }]
+  lineas: [], // [{ desde: [lat, lng], hasta: [lat, lng], texto, color?, elegida? }]: la línea directa (punteada)
   buffer: null, // geometría GeoJSON (lon/lat) del área de búsqueda alrededor del incidente (consulta 3)
   rutas: [], // [{ id, geometria (LineString GeoJSON), texto, elegida }]: recorridos por calles (consulta 3)
+  area: null, // GeoJSON (lon/lat) de un área buscada genérica (se dibuja punteada)
+  ajuste: null, // si se pone, el mapa se vuelve a encuadrar solo cuando esta clave cambia (no con cada cambio del resultado)
 };
 
 /** Una zona de la API (o de una búsqueda) lista para dibujar, con la intensidad con la que se pinta. */
@@ -143,7 +146,7 @@ function FilaIncidente({ i, extra }) {
     .join(" · ");
   return (
     <li className="fila">
-      <span className="item__marca item__marca--circulo" style={{ "--color": COLOR_ESTADO_INCIDENTE[i.estado] }} aria-hidden="true" />
+      <IconoIncidente estado={i.estado} chico />
       <span className="item__texto">
         <span className="item__titulo">{i.titulo}</span>
         {detalle && <span className="item__detalle">{detalle}</span>}
@@ -156,11 +159,11 @@ function FilaIncidente({ i, extra }) {
 function FilaRecurso({ r, dato }) {
   return (
     <li className="fila">
-      <span className="item__marca item__marca--cuadrado" style={{ "--color": COLOR_ESTADO_RECURSO[r.estadoOperativo] }} aria-hidden="true" />
+      <IconoRecurso tipo={r.tipo} estado={r.estadoOperativo} chico />
       <span className="item__texto">
         <span className="item__titulo">{r.identificacion}</span>
         <span className="item__detalle">
-          {r.tipo} · {r.estadoOperativo}
+          {nombreTipoRecurso(r.tipo)} · {r.estadoOperativo}
         </span>
       </span>
       {dato && <span className="resultado__dato">{dato}</span>}
@@ -207,14 +210,14 @@ function ListaElegible({ carga, tipo, objetos, elegido, onElegir }) {
           <li key={o.id}>
             <button type="button" className={elegido?.id === o.id ? "item item--activo" : "item"} onClick={() => onElegir(o)}>
               {tipo === "zona" && <span className="item__marca item__marca--zona" style={{ "--color": COLOR_PRIORIDAD[o.nivelPrioridad] }} aria-hidden="true" />}
-              {tipo === "incidente" && <span className="item__marca item__marca--circulo" style={{ "--color": COLOR_ESTADO_INCIDENTE[o.estado] }} aria-hidden="true" />}
-              {tipo === "recurso" && <span className="item__marca item__marca--cuadrado" style={{ "--color": COLOR_ESTADO_RECURSO[o.estadoOperativo] }} aria-hidden="true" />}
+              {tipo === "incidente" && <IconoIncidente estado={o.estado} chico />}
+              {tipo === "recurso" && <IconoRecurso tipo={o.tipo} estado={o.estadoOperativo} chico />}
               <span className="item__texto">
                 <span className="item__titulo">{tipo === "zona" ? o.nombre : tipo === "incidente" ? o.titulo : o.identificacion}</span>
                 <span className="item__detalle">
                   {tipo === "zona" && `Prioridad ${o.nivelPrioridad}`}
                   {tipo === "incidente" && `${o.estado} · prioridad ${o.prioridad}`}
-                  {tipo === "recurso" && `${o.tipo} · ${o.estadoOperativo}`}
+                  {tipo === "recurso" && `${nombreTipoRecurso(o.tipo)} · ${o.estadoOperativo}`}
                 </span>
               </span>
             </button>
@@ -314,11 +317,11 @@ function FilaRecursoCercano({ it, elegido, mejor, criterio, onElegir }) {
   return (
     <li>
       <button type="button" className={elegido ? "item item--activo" : "item"} onClick={onElegir} aria-pressed={elegido}>
-        <span className="item__marca item__marca--cuadrado" style={{ "--color": COLOR_ESTADO_RECURSO[it.estadoOperativo] }} aria-hidden="true" />
+        <IconoRecurso tipo={it.tipo} estado={it.estadoOperativo} chico />
         <span className="item__texto">
           <span className="item__titulo">{it.identificacion}</span>
           <span className="item__detalle">
-            {it.tipo} · {it.estadoOperativo}
+            {nombreTipoRecurso(it.tipo)} · {it.estadoOperativo}
           </span>
           <span className="item__detalle">Directa: {metros(it.distanciaDirectaM)}</span>
           {hayRuta && (
@@ -400,8 +403,16 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
         texto: `${it.identificacion}: ${metros(it.distanciaViaM)} por calles · ${it.tiempoEstimadoMinutos} min`,
         elegida: it.recursoId === elegidoId,
       }));
-    setResultado({ ...RESULTADO_VACIO, incidentes: [incidente], recursos, lineas, rutas, buffer: datos.bufferGeom });
-  }, [datos, incidente, elegidoId, setResultado]);
+    setResultado({
+      ...RESULTADO_VACIO,
+      incidentes: [incidente],
+      recursos,
+      lineas,
+      rutas,
+      buffer: datos.bufferGeom,
+      ajuste: `${incidente.id}|${radio}|${limite}|${soloDisponibles}`, // elegir un recurso o ver sus rutas no mueve el mapa
+    });
+  }, [datos, incidente, elegidoId, radio, limite, soloDisponibles, setResultado]);
 
   const items = datos?.items ?? [];
   const sinCalcular = items.length > 0 && !conRutas;
@@ -706,34 +717,43 @@ function PanelIncidenteCercano({ punto, setPunto, setResultado }) {
   );
 }
 
-// -------------------------------------------------- 5: búsqueda de zona (zona de un punto)
+// -------------------------------------------------- 5: búsqueda de zona (zonas de un punto)
 
+/** Las zonas pueden superponerse: un punto puede estar en varias, y se muestran todas. */
 function PanelZonaPunto({ punto, setPunto, setResultado }) {
-  const { fase, datos: zona, error } = useRuta(punto ? `/consultas/zona-por-punto?lon=${punto[1]}&lat=${punto[0]}` : null);
+  const { fase, datos: r, error } = useRuta(punto ? `/consultas/zona-por-punto?lon=${punto[1]}&lat=${punto[0]}` : null);
+  const zonas = r?.items;
 
   useEffect(() => {
-    setResultado(zona?.id ? { ...RESULTADO_VACIO, zonas: [comoZona(zona)] } : RESULTADO_VACIO);
-  }, [zona, setResultado]);
+    setResultado(zonas?.length ? { ...RESULTADO_VACIO, zonas: zonas.map((z) => comoZona(z, 0.25)) } : RESULTADO_VACIO);
+  }, [zonas, setResultado]);
 
   return (
     <>
       {!punto && <Aviso tipo="info">Hacé clic en el mapa, o escribí una dirección, para elegir el punto a ubicar.</Aviso>}
       <Estado fase={fase} error={error} />
-      {zona?.id && (
-        <ul className="items">
-          <li className="fila">
-            <span className="item__marca item__marca--zona" style={{ "--color": COLOR_PRIORIDAD[zona.nivelPrioridad] }} aria-hidden="true" />
-            <span className="item__texto">
-              <span className="item__titulo">{zona.nombre}</span>
-              <span className="item__detalle">
-                Prioridad {zona.nivelPrioridad}
-                {zona.responsable ? ` · ${zona.responsable}` : ""}
-              </span>
-            </span>
-          </li>
-        </ul>
+      {zonas?.length > 0 && (
+        <>
+          <p className="ayuda">
+            El punto está en {zonas.length} {zonas.length === 1 ? "zona operativa" : "zonas operativas (se superponen)"}:
+          </p>
+          <ul className="items">
+            {zonas.map((zona) => (
+              <li key={zona.id} className="fila">
+                <span className="item__marca item__marca--zona" style={{ "--color": COLOR_PRIORIDAD[zona.nivelPrioridad] }} aria-hidden="true" />
+                <span className="item__texto">
+                  <span className="item__titulo">{zona.nombre}</span>
+                  <span className="item__detalle">
+                    Prioridad {zona.nivelPrioridad}
+                    {zona.responsable ? ` · ${zona.responsable}` : ""}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
-      {fase === "ok" && !zona?.id && <Aviso tipo="info">El punto no está dentro de ninguna zona operativa.</Aviso>}
+      {fase === "ok" && zonas?.length === 0 && <Aviso tipo="info">El punto no está dentro de ninguna zona operativa.</Aviso>}
       <BuscadoresDePunto setPunto={setPunto} />
     </>
   );
@@ -1010,7 +1030,7 @@ export const CONSULTAS = [
     id: "zona-punto",
     fondo: "zona", // lo que GeoServer dibuja de fondo
     titulo: "5. Búsqueda de zona (dirección, cruce o punto)",
-    descripcion: "Elegí un punto con un clic en el mapa, escribí una dirección o ubicá el cruce de dos calles, y se indica a qué zona operativa pertenece.",
+    descripcion: "Elegí un punto con un clic en el mapa, escribí una dirección o ubicá el cruce de dos calles, y se indican las zonas operativas a las que pertenece (pueden ser varias: las zonas se superponen).",
     postgis: "ST_Contains(zona, punto); la dirección con la tabla de puertas (Salto) o la IDE (resto del país); el cruce de calles con ST_Intersection",
     pideClic: true,
     Panel: PanelZonaPunto,

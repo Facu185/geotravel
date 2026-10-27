@@ -214,7 +214,7 @@ documentado en el código (buscar "SUPUESTO").
 **Aclaradas por el tutor:**
 
 - **Consultas 2 y 8:** era la misma consulta (error de la letra, ya corregida). Queda la consulta 2 por
-  cantidad de incidentes; el orden por incidentes/km² quedó como extra.
+  cantidad de incidentes (el extra por incidentes/km² se quitó).
 - **Ubicación de los recursos:** es la ubicación geográfica del recurso, que se elige en el mapa al
   registrarlo y se ve en el mapa en las consultas del invitado.
 - **Líneas:** la ubicación de un incidente puede ser un punto, una línea (por ejemplo una calle cortada) o un polígono (la letra dice "zona": un área, no una zona operativa).
@@ -237,7 +237,7 @@ documentado en el código (buscar "SUPUESTO").
 
 Base reestructurada para UrbanSafe: esquema de datos, endpoints núcleo (ABM
 completo de zonas y recursos, incidentes con máquina de estados por ramas y
-avanzar/historial, las 8 consultas geográficas + 1 reporte, búsqueda por dirección con números de puerta, cruce de calles y mapa público con filtros y detalle), frontend con
+avanzar/historial, las 7 consultas geográficas + 1 reporte, búsqueda por dirección con números de puerta, cruce de calles y mapa público con filtros y detalle), carga a demanda (solo lo visible, con tope; el resto lo dibuja GeoServer), incidentes como punto, línea o polígono, datos de prueba en Salto y Montevideo, frontend con
 navegación entre módulos, docker-compose para el ambiente local, y CI de
 backend/frontend. Verificado de punta a punta (compilación, casos de API,
 navegador) antes de subir — ver el detalle en el historial de commits.

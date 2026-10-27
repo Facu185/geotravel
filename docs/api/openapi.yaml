@@ -468,13 +468,20 @@ paths:
 
   /consultas/recursos-cercanos/{incidenteId}:
     get:
-      summary: C3. Los N recursos más cercanos al incidente dado (por defecto 5)
+      summary: >
+        C3. Los N recursos operativos (estado Disponible) más cercanos al incidente dado, por distancia en línea recta
+        (por defecto 5). Con radioM solo los que están a esa distancia o menos (ST_DWithin) y devuelve en "area" el
+        buffer del incidente (ST_Buffer, GeoJSON lon/lat) para dibujarlo. Responde {radioM, area, items, total, truncado}.
+        El camino por calles de cada recurso lo da /eta/recursos/{recursoId}/incidentes/{incidenteId}.
       tags: [consultas]
       parameters:
         - { name: incidenteId, in: path, required: true, schema: { type: integer } }
-        - { name: limite, in: query, required: false, schema: { type: integer, default: 5 } }
-        - { name: soloDisponibles, in: query, required: false, schema: { type: boolean, default: false }, description: "true: solo recursos en estado Disponible" }
-      responses: { "200": { description: OK } }
+        - { name: limite, in: query, required: false, schema: { type: integer, default: 5 }, description: "Cuántos recursos devolver (máximo 50)" }
+        - { name: radioM, in: query, required: false, schema: { type: number, minimum: 1, maximum: 100000 }, description: "Radio de búsqueda en metros alrededor del incidente" }
+      responses:
+        "200": { description: OK }
+        "400": { description: radioM fuera de rango }
+        "404": { description: El incidente no existe (con radioM) }
 
   /consultas/recursos-cercanos/{incidenteId}/analisis-vial:
     get:
@@ -526,8 +533,9 @@ paths:
   /consultas/zona-por-punto:
     get:
       summary: >
-        C5. Búsqueda de zona. Zona que contiene un punto, en metros (x, y en EPSG:32721) o en grados (lon, lat en
-        EPSG:4326). Resolver antes la dirección a coordenada.
+        C5. Búsqueda de zona. Zonas que contienen un punto, en metros (x, y en EPSG:32721) o en grados (lon, lat en
+        EPSG:4326). Las zonas pueden superponerse, así que devuelve todas las que lo contienen (de mayor a menor
+        prioridad), con su geometría. Resolver antes la dirección a coordenada.
       tags: [consultas]
       parameters:
         - { name: x, in: query, required: false, schema: { type: number }, description: "Este, EPSG:32721 (junto con y)" }
@@ -535,7 +543,7 @@ paths:
         - { name: lon, in: query, required: false, schema: { type: number }, description: "Longitud, EPSG:4326 (junto con lat)" }
         - { name: lat, in: query, required: false, schema: { type: number }, description: "Latitud, EPSG:4326 (junto con lon)" }
       responses:
-        "200": { description: "OK; si el punto no cae en ninguna zona devuelve {\"zona\": null}" }
+        "200": { description: "OK; responde {items, total, truncado}; si el punto no cae en ninguna zona, items vacío" }
         "400": { description: Falta la coordenada (ni x,y ni lon,lat) }
 
   /consultas/calles:
