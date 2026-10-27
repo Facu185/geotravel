@@ -195,14 +195,15 @@ public class ConsultaResource {
     @Path("/recursos-cercanos/{incidenteId}/analisis-vial")
     @Produces(MediaType.APPLICATION_JSON)
     public Map<String, Object> analisisVial(@PathParam("incidenteId") int incidenteId,
-                                            @QueryParam("radioMetros") Integer radioMetros,
-                                            @QueryParam("limite") Integer limite,
+                                            @QueryParam("radioMetros") String radioMetros,
+                                            @QueryParam("limite") String limite,
                                             @QueryParam("soloDisponibles") @DefaultValue("true") boolean soloDisponibles,
                                             @QueryParam("conRutas") @DefaultValue("false") boolean conRutas)
             throws SQLException, IOException {
         AnalisisVial.Parametros parametros;
         try {
-            parametros = AnalisisVial.validar(radioMetros, limite);
+            parametros = AnalisisVial.validar(
+                    AnalisisVial.entero("radioMetros", radioMetros), AnalisisVial.entero("limite", limite));
         } catch (IllegalArgumentException e) {
             throw peticionInvalida(e.getMessage());
         }

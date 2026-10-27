@@ -110,6 +110,13 @@ public final class OsrmClient {
         );
 
         if (respuesta.statusCode() != 200) {
+            // OSRM informa "sin ruta" con HTTP 400 (NoSegment) o 404 (NoRoute): no es una caida del motor
+            if (respuesta.statusCode() == 400 || respuesta.statusCode() == 404) {
+                String codigo = codigoDe(respuesta.body());
+                if ("NoSegment".equals(codigo) || "NoRoute".equals(codigo)) {
+                    throw new SinRutaException(mensajeSinRuta(codigo));
+                }
+            }
             throw new IOException(
                     "OSRM respondio HTTP " + respuesta.statusCode()
             );
@@ -132,8 +139,8 @@ public final class OsrmClient {
 
         String codigo = raiz.path("code").asText();
 
-        if ("NoRoute".equals(codigo)) {
-            throw new SinRutaException("No se encontro ruta vial");
+        if ("NoRoute".equals(codigo) || "NoSegment".equals(codigo)) {
+            throw new SinRutaException(mensajeSinRuta(codigo));
         }
 
         if (!"Ok".equals(codigo)) {
@@ -188,6 +195,20 @@ public final class OsrmClient {
         Double ajusteDestino = ajusteDe(puntos.path(1));
 
         return new Ruta(distancia, duracion, geometria, ajusteOrigen, ajusteDestino);
+    }
+
+    private static String mensajeSinRuta(String codigo) {
+        return "NoSegment".equals(codigo)
+                ? "No hay una calle transitable cerca del recurso o del incidente"
+                : "No se encontro ruta vial";
+    }
+
+    private static String codigoDe(String contenido) {
+        try {
+            return JSON.readTree(contenido).path("code").asText();
+        } catch (IOException | RuntimeException e) {
+            return "";
+        }
     }
 
     private static Double ajusteDe(JsonNode waypoint) {

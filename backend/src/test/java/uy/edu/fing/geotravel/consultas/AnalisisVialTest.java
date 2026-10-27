@@ -44,6 +44,18 @@ public class AnalisisVialTest {
         assertEquals(5, p.limite);
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void unRadioNoNumericoEsInvalido() {
+        AnalisisVial.entero("radioMetros", "abc");
+    }
+
+    @Test
+    public void enteroTomaVacioComoAusente() {
+        assertNull(AnalisisVial.entero("limite", null));
+        assertNull(AnalisisVial.entero("limite", " "));
+        assertEquals(Integer.valueOf(250), AnalisisVial.entero("radioMetros", " 250 "));
+    }
+
     @Test
     public void aceptaElRadioMaximo() {
         assertEquals(AnalisisVial.RADIO_MAXIMO_M, AnalisisVial.validar(AnalisisVial.RADIO_MAXIMO_M, 1).radioMetros);

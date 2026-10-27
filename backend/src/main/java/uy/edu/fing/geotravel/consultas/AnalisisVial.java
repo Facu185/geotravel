@@ -74,6 +74,18 @@ public class AnalisisVial {
         }
     }
 
+    /** Convierte un parametro de consulta a entero; null si no vino. @throws IllegalArgumentException si no es entero */
+    public static Integer entero(String nombre, String valor) {
+        if (valor == null || valor.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(valor.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(nombre + " tiene que ser un numero entero");
+        }
+    }
+
     /** @throws IllegalArgumentException si el radio o el limite estan fuera de rango */
     public static Parametros validar(Integer radioMetros, Integer limite) {
         int radio = radioMetros == null ? RADIO_DEFECTO_M : radioMetros;

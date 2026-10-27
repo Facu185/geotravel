@@ -66,6 +66,11 @@ public class OsrmClientTest {
         OsrmClient.parsearRuta(json);
     }
 
+    @Test(expected = OsrmClient.SinRutaException.class)
+    public void sinCalleCercanaEsSinRutaYNoCaidaDelMotor() throws Exception {
+        OsrmClient.parsearRuta("{\"code\":\"NoSegment\",\"message\":\"Could not find a matching segment\"}");
+    }
+
     @Test(expected = IOException.class)
     public void detectaDuracionFaltante() throws Exception {
         String json = "{\"code\":\"Ok\",\"routes\":[{\"distance\":1151}]}";
