@@ -97,6 +97,8 @@ function AjustarVista({ resultado, punto, porSeleccion }) {
       ...resultado.zonas.map((z) => z.geometria),
       ...resultado.incidentes.map((i) => i.geometria),
       ...resultado.recursos.map((r) => r.geometria),
+      ...(resultado.buffer ? [resultado.buffer] : []),
+      ...resultado.rutas.map((r) => r.geometria),
     ];
     if (capas.length === 0) return;
     const limites = L.geoJSON({ type: "GeometryCollection", geometries: capas }).getBounds();
@@ -120,9 +122,19 @@ const colorEstado = (i) => COLOR_ESTADO_INCIDENTE[i.estado] ?? "#555";
 /** Lo que devolvió la consulta, dibujado con su propia geometría, y el punto elegido. */
 function CapaResultado({ resultado, punto }) {
   const pocasZonas = resultado.zonas.length <= 8; // con muchas, los rótulos se amontonan
+  const hayRutaElegida = resultado.rutas.some((r) => r.elegida);
 
   return (
     <>
+      {resultado.buffer && (
+        <GeoJSON
+          key={`buffer-${JSON.stringify(resultado.buffer.coordinates[0]?.[0])}-${resultado.buffer.coordinates[0]?.length}`}
+          data={resultado.buffer}
+          interactive={false}
+          style={{ color: "#1d6fb8", weight: 2, fillColor: "#3b8fe0", fillOpacity: 0.12 }}
+        />
+      )}
+
       {resultado.zonas.map((z) => (
         <GeoJSON
           key={`z${z.id}-${z.intensidad}`}
@@ -144,9 +156,24 @@ function CapaResultado({ resultado, punto }) {
       ))}
 
       {resultado.lineas.map((l, n) => (
-        <Polyline key={`l${n}`} positions={[l.desde, l.hasta]} pathOptions={{ color: "#13202c", weight: 2, dashArray: "6 6" }}>
+        <Polyline
+          key={`l${n}-${l.elegida ? "e" : ""}`}
+          positions={[l.desde, l.hasta]}
+          pathOptions={{ color: l.color ?? "#13202c", weight: l.elegida ? 3 : 2, dashArray: "6 6" }}
+        >
           <Tooltip sticky>{l.texto}</Tooltip>
         </Polyline>
+      ))}
+
+      {resultado.rutas.map((r) => (
+        <GeoJSON
+          key={`ruta-${r.id}-${r.elegida ? "e" : ""}-${hayRutaElegida ? "h" : ""}`}
+          data={r.geometria}
+          bubblingMouseEvents={false}
+          style={{ color: "#16a34a", weight: r.elegida ? 7 : 5, opacity: hayRutaElegida && !r.elegida ? 0.4 : 0.9 }}
+        >
+          <Tooltip sticky>{r.texto}</Tooltip>
+        </GeoJSON>
       ))}
 
       {resultado.incidentes.map((i) =>
@@ -173,7 +200,13 @@ function CapaResultado({ resultado, punto }) {
       )}
 
       {resultado.recursos.map((r) => (
-        <Marker key={`R${r.id}`} position={r.pos} icon={iconoRecurso(COLOR_ESTADO_RECURSO[r.estadoOperativo] ?? "#555")} bubblingMouseEvents={false}>
+        <Marker
+          key={`R${r.id}-${r.elegido ? "e" : ""}`}
+          position={r.pos}
+          icon={iconoRecurso(COLOR_ESTADO_RECURSO[r.estadoOperativo] ?? "#555", Boolean(r.elegido))}
+          bubblingMouseEvents={false}
+          eventHandlers={r.alElegir ? { click: r.alElegir } : undefined}
+        >
           <Tooltip>
             {r.identificacion} — {r.tipo ?? r.estadoOperativo}
           </Tooltip>

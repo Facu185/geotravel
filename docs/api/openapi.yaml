@@ -82,6 +82,15 @@ paths:
                   tiempoEstimadoMinutos:
                     type: integer
                     minimum: 0
+                  criterioRuta:
+                    type: string
+                    enum: [mas_rapida]
+                    description: OSRM driving optimiza duración, no distancia.
+                  criterioRutaTexto: { type: string }
+                  distanciaDirectaMetros: { type: number, description: Línea recta recurso-incidente }
+                  ajusteOrigenMetros: { type: number, nullable: true, description: Distancia a la calle más cercana (origen) }
+                  ajusteDestinoMetros: { type: number, nullable: true, description: Distancia a la calle más cercana (destino) }
+                  advertencia: { type: string, nullable: true, description: Presente si el ajuste a la calle es >= 100 m }
                   geometriaRuta:
                     type: object
                     description: >
@@ -447,6 +456,33 @@ paths:
         - { name: limite, in: query, required: false, schema: { type: integer, default: 5 } }
         - { name: soloDisponibles, in: query, required: false, schema: { type: boolean, default: false }, description: "true: solo recursos en estado Disponible" }
       responses: { "200": { description: OK } }
+
+  /consultas/recursos-cercanos/{incidenteId}/analisis-vial:
+    get:
+      summary: >
+        C3 con buffer. Recursos dentro de un buffer (ST_Buffer/ST_DWithin) alrededor del incidente, con distancia
+        directa y línea directa (ST_Distance/ST_ShortestLine) y, con conRutas=true, el recorrido por calles (OSRM)
+        de los 5 más cercanos. El criterio de la ruta es la MÁS RÁPIDA (OSRM driving optimiza duración); no se
+        garantiza la menor distancia vial. Para incidentes LineString/Polygon se usa el punto del incidente más
+        cercano al recurso. Los tiempos no incluyen tráfico en tiempo real.
+      tags: [consultas]
+      parameters:
+        - { name: incidenteId, in: path, required: true, schema: { type: integer } }
+        - { name: radioMetros, in: query, required: false, schema: { type: number, default: 2000, minimum: 1, maximum: 10000 } }
+        - { name: limite, in: query, required: false, schema: { type: integer, default: 5, minimum: 1, maximum: 10 } }
+        - { name: soloDisponibles, in: query, required: false, schema: { type: boolean, default: true } }
+        - { name: conRutas, in: query, required: false, schema: { type: boolean, default: false }, description: "true: consulta OSRM (máx. 5 recursos, plazo total 25 s)" }
+      responses:
+        "200":
+          description: >
+            { incidenteId, radioMetros, soloDisponibles, conRutas, incidente, bufferGeom (GeoJSON Polygon 4326),
+            totalEnRadio, truncado, criterioRuta ("mas_rapida"), criterioRutaTexto, rutasMaximas, rutasDisponibles,
+            recursoMasRapidoId, items[{ recursoId, identificacion, tipo, estadoOperativo, geom, distanciaDirectaM,
+            lineaDirecta (LineString), estadoRuta (no_calculada|disponible|sin_ruta|error), mensajeRuta,
+            distanciaViaM, duracionS, tiempoEstimadoMinutos, geometriaRuta, ajusteOrigenM, ajusteDestinoM,
+            advertencia }] }
+        "400": { description: radioMetros o limite fuera de rango }
+        "404": { description: Incidente inexistente }
 
   /consultas/incidente-mas-cercano:
     get:

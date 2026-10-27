@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Aviso, Insignia, Selector } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
 import { api } from "../../api/client.js";
@@ -26,7 +26,9 @@ export const RESULTADO_VACIO = {
   zonas: [], // [{ id, nombre, nivelPrioridad, geometria, intensidad entre 0 y 1 }]
   incidentes: [], // [{ id, titulo, estado, geometria, pos }]
   recursos: [], // [{ id, identificacion, estadoOperativo, geometria, pos }]
-  lineas: [], // [{ desde: [lat, lng], hasta: [lat, lng], texto }]
+  lineas: [], // [{ desde: [lat, lng], hasta: [lat, lng], texto, color?, elegida? }]
+  buffer: null, // geometría GeoJSON (lon/lat) del área de búsqueda alrededor del incidente (consulta 3)
+  rutas: [], // [{ id, geometria (LineString GeoJSON), texto, elegida }]: recorridos por calles (consulta 3)
 };
 
 /** Una zona de la API (o de una búsqueda) lista para dibujar, con la intensidad con la que se pinta. */
@@ -277,59 +279,214 @@ const PanelRecursosZona = (props) => <PanelPorZona {...props} tipo="recursos" />
 
 // ------------------------------------------------------ 3: recursos cercanos a un incidente
 
+const RADIOS_M = [500, 1000, 2000, 5000, 10000];
+const RADIO_INICIAL_M = 2000;
+const CANTIDADES = [1, 2, 3, 5, 10];
+const textoRadio = (m) => (m >= 1000 ? `${m / 1000} km` : `${m} m`);
+
+/** Leyenda de los colores del mapa de esta consulta (los mismos que dibuja CapaResultado). */
+function LeyendaRutas({ conRutas }) {
+  return (
+    <ul className="leyenda-ruta" aria-label="Leyenda del mapa">
+      <li>
+        <span className="leyenda-ruta__muestra leyenda-ruta__muestra--buffer" aria-hidden="true" />
+        Azul: buffer de búsqueda
+      </li>
+      <li>
+        <span className="leyenda-ruta__muestra leyenda-ruta__muestra--directa" aria-hidden="true" />
+        Gris punteado: distancia directa
+      </li>
+      {conRutas && (
+        <li>
+          <span className="leyenda-ruta__muestra leyenda-ruta__muestra--ruta" aria-hidden="true" />
+          Verde continuo: recorrido transitable
+        </li>
+      )}
+    </ul>
+  );
+}
+
+/** Una tarjeta por recurso: distancia directa, distancia por calles, tiempo y disponibilidad de la ruta. */
+function FilaRecursoCercano({ it, elegido, masRapido, onElegir }) {
+  const hayRuta = it.estadoRuta === "disponible";
+  const sinRuta = it.estadoRuta === "sin_ruta" || it.estadoRuta === "error";
+  return (
+    <li>
+      <button type="button" className={elegido ? "item item--activo" : "item"} onClick={onElegir} aria-pressed={elegido}>
+        <span className="item__marca item__marca--cuadrado" style={{ "--color": COLOR_ESTADO_RECURSO[it.estadoOperativo] }} aria-hidden="true" />
+        <span className="item__texto">
+          <span className="item__titulo">{it.identificacion}</span>
+          <span className="item__detalle">
+            {it.tipo} · {it.estadoOperativo}
+          </span>
+          <span className="item__detalle">Directa: {metros(it.distanciaDirectaM)}</span>
+          {hayRuta && (
+            <span className="item__detalle">
+              Por calles: {metros(it.distanciaViaM)} · {it.tiempoEstimadoMinutos} min
+            </span>
+          )}
+          {sinRuta && <span className="item__detalle">Ruta no disponible</span>}
+          {hayRuta && it.advertencia && <span className="item__detalle">⚠ {it.advertencia}</span>}
+        </span>
+        {masRapido && <Insignia color="#16a34a">Más rápido</Insignia>}
+      </button>
+    </li>
+  );
+}
+
 function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   const [incidente, setIncidente] = useState(null);
-  const [limite, setLimite] = useState(3);
+  const [radio, setRadio] = useState(RADIO_INICIAL_M);
+  const [limite, setLimite] = useState(5);
   const [soloDisponibles, setSoloDisponibles] = useState(true);
-  const cantidad = Math.min(10, Math.max(1, Number(limite) || 3));
+  const [elegidoId, setElegidoId] = useState(null);
+  const [calculo, setCalculo] = useState(null); // rutas pedidas: { base, fase, datos, error }
 
   const incidentes = useObjetosDeLaVista(carga);
-  useElegibles(setElegibles, "incidente", incidentes, incidente, setIncidente);
+  const elegirIncidente = useCallback((objeto) => {
+    setIncidente(objeto);
+    setElegidoId(null);
+  }, []);
+  useElegibles(setElegibles, "incidente", incidentes, incidente, elegirIncidente);
 
-  const ruta = incidente ? `/consultas/recursos-cercanos/${incidente.id}${query({ limite: cantidad, soloDisponibles })}` : null;
-  const { fase, datos: filas, error } = useRuta(ruta);
+  // Buscar recursos en el buffer solo usa PostGIS; las rutas (OSRM) se piden recién con el botón.
+  const base = incidente ? `/consultas/recursos-cercanos/${incidente.id}/analisis-vial${query({ radioMetros: radio, limite, soloDisponibles })}` : null;
+  const { fase, datos: previo, error } = useRuta(base);
+
+  const calculoVigente = calculo && calculo.base === base ? calculo : null;
+  const datos = calculoVigente?.datos ?? previo;
+  const calculando = calculoVigente?.fase === "cargando";
+  const conRutas = Boolean(calculoVigente?.datos);
+
+  const calcularRutas = () => {
+    if (!base) return;
+    setCalculo({ base, fase: "cargando", datos: null, error: null });
+    api
+      .get(`${base}&conRutas=true`)
+      .then((d) => setCalculo((c) => (c?.base === base ? { base, fase: "ok", datos: d, error: null } : c)))
+      .catch((e) => setCalculo((c) => (c?.base === base ? { base, fase: "error", datos: null, error: e.message } : c)));
+  };
 
   useEffect(() => {
-    if (!filas || !incidente) {
+    if (!datos || !incidente) {
       setResultado(RESULTADO_VACIO);
       return;
     }
-    const recursos = filas.map(conGeometria);
-    const lineas = recursos.map((r) => ({ desde: incidente.pos, hasta: r.pos, texto: `${r.identificacion}: ${metros(r.distanciaM)}` }));
-    setResultado({ ...RESULTADO_VACIO, incidentes: [incidente], recursos, lineas });
-  }, [filas, incidente, setResultado]);
+    const recursos = datos.items.map((it) => ({
+      ...conGeometria(it),
+      id: it.recursoId,
+      elegido: it.recursoId === elegidoId,
+      alElegir: () => setElegidoId(it.recursoId),
+    }));
+    const lineas = datos.items.map((it) => {
+      const [desde, hasta] = it.lineaDirecta.coordinates;
+      return {
+        desde: [desde[1], desde[0]],
+        hasta: [hasta[1], hasta[0]],
+        texto: `${it.identificacion}: ${metros(it.distanciaDirectaM)} en línea recta`,
+        elegida: it.recursoId === elegidoId,
+        color: "#6b7280",
+      };
+    });
+    const rutas = datos.items
+      .filter((it) => it.estadoRuta === "disponible")
+      .map((it) => ({
+        id: it.recursoId,
+        geometria: it.geometriaRuta,
+        texto: `${it.identificacion}: ${metros(it.distanciaViaM)} por calles · ${it.tiempoEstimadoMinutos} min`,
+        elegida: it.recursoId === elegidoId,
+      }));
+    setResultado({ ...RESULTADO_VACIO, incidentes: [incidente], recursos, lineas, rutas, buffer: datos.bufferGeom });
+  }, [datos, incidente, elegidoId, setResultado]);
+
+  const items = datos?.items ?? [];
+  const sinCalcular = items.length > 0 && !conRutas;
 
   return (
     <>
       <label className="campo">
-        <span className="campo__etiqueta">Cuántos recursos</span>
-        <input type="number" min="1" max="10" value={limite} onChange={(e) => setLimite(e.target.value)} />
+        <span className="campo__etiqueta">Radio de búsqueda</span>
+        <select value={radio} onChange={(e) => setRadio(Number(e.target.value))}>
+          {RADIOS_M.map((m) => (
+            <option key={m} value={m}>
+              {textoRadio(m)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="campo">
+        <span className="campo__etiqueta">Cuántos recursos (los más cercanos)</span>
+        <select value={limite} onChange={(e) => setLimite(Number(e.target.value))}>
+          {CANTIDADES.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="casilla">
         <input type="checkbox" checked={soloDisponibles} onChange={(e) => setSoloDisponibles(e.target.checked)} />
         Solo recursos disponibles
       </label>
+
+      {!incidente && <ListaElegible carga={carga} tipo="incidente" objetos={incidentes} elegido={incidente} onElegir={elegirIncidente} />}
+
       {incidente && (
         <section className="bloque">
           <h4 className="resultado__grupo">{incidente.titulo}</h4>
-          <Estado fase={fase} error={error} />
-          {filas && filas.length === 0 && <p className="ayuda">No hay recursos que cumplan.</p>}
-          {filas && filas.length > 0 && (
-            <ul className="items">
-              {filas.map((f) => (
-                <FilaRecurso key={f.id} r={f} dato={metros(f.distanciaM)} />
-              ))}
-            </ul>
+          {fase === "cargando" && <p className="ayuda">Buscando recursos en {textoRadio(radio)} a la redonda…</p>}
+          {fase === "error" && <Aviso tipo="error">{error}</Aviso>}
+          {datos && items.length === 0 && (
+            <p className="ayuda">No hay recursos {soloDisponibles ? "disponibles " : ""}a menos de {textoRadio(radio)} del incidente. Probá con un radio mayor.</p>
           )}
-          <button type="button" className="btn btn--secundario" onClick={() => setIncidente(null)}>
+          {datos && items.length > 0 && (
+            <>
+              <p className="ayuda">
+                {datos.totalEnRadio} {datos.totalEnRadio === 1 ? "recurso" : "recursos"} dentro del buffer de {textoRadio(radio)}
+                {datos.truncado ? `; se muestran los ${items.length} más cercanos` : ""}. Elegí uno para resaltarlo en el mapa.
+              </p>
+              <ul className="items">
+                {items.map((it) => (
+                  <FilaRecursoCercano
+                    key={it.recursoId}
+                    it={it}
+                    elegido={it.recursoId === elegidoId}
+                    masRapido={conRutas && it.recursoId === datos.recursoMasRapidoId}
+                    onElegir={() => setElegidoId(it.recursoId === elegidoId ? null : it.recursoId)}
+                  />
+                ))}
+              </ul>
+              {sinCalcular && (
+                <>
+                  <button type="button" className="btn btn--primario btn--ancho" onClick={calcularRutas} disabled={calculando}>
+                    {calculando ? "Calculando rutas…" : "Calcular rutas por calles"}
+                  </button>
+                  <p className="ayuda">Se calculan las rutas de los {Math.min(items.length, datos.rutasMaximas)} recursos más cercanos.</p>
+                </>
+              )}
+              {calculando && <p className="ayuda">Calculando rutas por calles…</p>}
+              {calculoVigente?.fase === "error" && <Aviso tipo="error">{calculoVigente.error}</Aviso>}
+              {conRutas && datos.rutasDisponibles === 0 && <Aviso tipo="error">Ruta no disponible: no se pudo obtener ningún recorrido por calles. Se muestra la distancia directa.</Aviso>}
+              {conRutas && datos.rutasDisponibles > 0 && datos.rutasDisponibles < Math.min(items.length, datos.rutasMaximas) && (
+                <Aviso>Algunos recursos no tienen ruta disponible; conservan su distancia directa.</Aviso>
+              )}
+              {conRutas && (
+                <p className="ayuda">
+                  Los recorridos son la <strong>ruta más rápida</strong> por calles (OSRM), no necesariamente la de menor distancia. Tiempo estimado sin tráfico en tiempo real.
+                </p>
+              )}
+              <LeyendaRutas conRutas={conRutas && datos.rutasDisponibles > 0} />
+            </>
+          )}
+          <button type="button" className="btn btn--secundario" onClick={() => elegirIncidente(null)}>
             Elegir otro incidente
           </button>
         </section>
       )}
-      {!incidente && <ListaElegible carga={carga} tipo="incidente" objetos={incidentes} elegido={incidente} onElegir={setIncidente} />}
     </>
   );
 }
+
 
 // ------------------------------------- elegir el punto por intersección de dos calles
 
@@ -823,8 +980,8 @@ export const CONSULTAS = [
     id: "recursos-cercanos",
     fondo: "incidente", // lo que GeoServer dibuja de fondo
     titulo: "3. Recursos cercanos a un incidente",
-    descripcion: "Se ven los incidentes de esta parte del mapa. Elegí uno y se muestran sus recursos más cercanos, con la distancia en línea recta.",
-    postgis: "operador <-> (vecino más cercano) y ST_Distance",
+    descripcion: "Se ven los incidentes de esta parte del mapa. Elegí uno, definí el radio del buffer y se muestran los recursos que están dentro, con la distancia directa. Con \"Calcular rutas por calles\" se agrega el recorrido transitable de los más cercanos.",
+    postgis: "ST_Buffer y ST_DWithin (recursos dentro del radio), ST_Distance y ST_ShortestLine (distancia directa); recorrido por calles con OSRM",
     objetos: "/incidentes",
     Panel: PanelRecursosCercanos,
   },

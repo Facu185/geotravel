@@ -1,6 +1,7 @@
 package uy.edu.fing.geotravel.consultas;
 
 import uy.edu.fing.geotravel.db.DataSourceProvider;
+import uy.edu.fing.geotravel.eta.RutaService;
 import uy.edu.fing.geotravel.mapa.Bbox;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -183,6 +184,38 @@ public class ConsultaResource {
             ps.setInt(1, incidenteId);
             ps.setInt(2, max);
             return rowsToMaps(ps.executeQuery(), "id", "identificacion", "tipo", "estado_operativo", "distancia_m", "geom");
+        }
+    }
+
+    /**
+     * Consulta 3 ampliada: recursos dentro de un buffer de radioMetros alrededor del incidente, con distancia directa
+     * y, con conRutas=true, la ruta por calles de los más cercanos. Ver AnalisisVial y docs/api/openapi.yaml.
+     */
+    @GET
+    @Path("/recursos-cercanos/{incidenteId}/analisis-vial")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Map<String, Object> analisisVial(@PathParam("incidenteId") int incidenteId,
+                                            @QueryParam("radioMetros") Integer radioMetros,
+                                            @QueryParam("limite") Integer limite,
+                                            @QueryParam("soloDisponibles") @DefaultValue("true") boolean soloDisponibles,
+                                            @QueryParam("conRutas") @DefaultValue("false") boolean conRutas)
+            throws SQLException, IOException {
+        AnalisisVial.Parametros parametros;
+        try {
+            parametros = AnalisisVial.validar(radioMetros, limite);
+        } catch (IllegalArgumentException e) {
+            throw peticionInvalida(e.getMessage());
+        }
+        try (Connection conn = DataSourceProvider.get().getConnection()) {
+            Map<String, Object> respuesta = new AnalisisVial(RutaService.predeterminado())
+                    .analizar(conn, incidenteId, parametros, soloDisponibles, conRutas);
+            if (respuesta == null) {
+                throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
+                        .type(MediaType.APPLICATION_JSON)
+                        .entity(Map.of("error", "Incidente no encontrado"))
+                        .build());
+            }
+            return respuesta;
         }
     }
 

@@ -1632,3 +1632,45 @@ body {
   align-items: center;
   gap: 6px;
 }
+
+/* Leyenda de la consulta 3: buffer, distancia directa y recorrido por calles. */
+.leyenda-ruta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+  color: var(--tinta-suave, #4a5a68);
+}
+
+.leyenda-ruta li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leyenda-ruta__muestra {
+  flex: none;
+  width: 22px;
+  height: 12px;
+  box-sizing: border-box;
+}
+
+.leyenda-ruta__muestra--buffer {
+  background: rgba(59, 143, 224, 0.25);
+  border: 2px solid #1d6fb8;
+  border-radius: 3px;
+}
+
+.leyenda-ruta__muestra--directa {
+  height: 0;
+  border-top: 3px dashed #6b7280;
+}
+
+.leyenda-ruta__muestra--ruta {
+  height: 4px;
+  border-radius: 2px;
+  background: #16a34a;
+}

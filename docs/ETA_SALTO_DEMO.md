@@ -118,4 +118,6 @@ elimina los volumenes de la base y GeoServer.
   equipo distinto, configurar `VITE_API_URL`, `VITE_GEOSERVER_WMS_URL` y
   la direccion de escucha de Vite segun la red. `localhost` corresponde
   a la computadora donde se abre el navegador.
+- La ruta ETA es la **más rápida** (OSRM optimiza duración), no necesariamente
+  la de menor distancia. Ver [RECURSOS_CERCANOS_RUTAS.md](RECURSOS_CERCANOS_RUTAS.md).
 - Los cambios aqui descritos **no modifican `main`** ni crean un Pull Request.

@@ -19,6 +19,11 @@ function obtenerGeometria(elemento) {
   }
 }
 
+function formatearMetros(metros) {
+  if (metros == null) return "—";
+  return metros >= 1000 ? `${(metros / 1000).toFixed(2)} km` : `${metros} m`;
+}
+
 export default function EtaPage() {
   const [incidentes, setIncidentes] = useState([]);
   const [recursos, setRecursos] = useState([]);
@@ -160,8 +165,8 @@ export default function EtaPage() {
     >
       <div className="panel__seccion">
         <p className="ayuda">
-          Seleccioná un incidente y un recurso de emergencia. OSRM calculará la
-          distancia y la duración por calles.
+          Seleccioná un incidente y un recurso de emergencia. Se calcula el
+          recorrido por calles transitables (OSRM) hasta el incidente.
         </p>
 
         {cargandoDatos && <Aviso>Cargando recursos e incidentes...</Aviso>}
@@ -214,23 +219,35 @@ export default function EtaPage() {
             <h3 className="bloque__titulo">Resultado de la ruta</h3>
             <dl className="datos">
               <div>
-                <dt>Distancia</dt>
-                <dd>{(resultado.distanciaMetros / 1000).toFixed(2)} km</dd>
+                <dt>Distancia por calles</dt>
+                <dd>{formatearMetros(resultado.distanciaMetros)}</dd>
               </div>
               <div>
-                <dt>Duración</dt>
-                <dd>{resultado.duracionSegundos} segundos</dd>
+                <dt>Distancia directa</dt>
+                <dd>{formatearMetros(resultado.distanciaDirectaMetros)}</dd>
               </div>
               <div>
                 <dt>Tiempo estimado</dt>
-                <dd>{resultado.tiempoEstimadoMinutos} minutos</dd>
+                <dd>{resultado.tiempoEstimadoMinutos} min</dd>
+              </div>
+              <div>
+                <dt>Duración</dt>
+                <dd>{resultado.duracionSegundos} s</dd>
+              </div>
+              <div>
+                <dt>Criterio</dt>
+                <dd>Ruta más rápida</dd>
               </div>
               <div>
                 <dt>Motor</dt>
                 <dd>{resultado.motor}</dd>
               </div>
             </dl>
-            <p className="ayuda">Estimación vial sin tráfico en tiempo real.</p>
+            {resultado.advertencia && <Aviso>{resultado.advertencia}</Aviso>}
+            <p className="ayuda">Tiempo estimado sin tráfico en tiempo real.</p>
+            <p className="ayuda">
+              El recorrido optimiza la duración, no la distancia: puede no ser el camino de menor distancia vial.
+            </p>
           </section>
         )}
       </div>

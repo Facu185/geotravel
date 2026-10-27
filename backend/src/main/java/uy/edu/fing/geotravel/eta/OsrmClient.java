@@ -28,6 +28,10 @@ public final class OsrmClient {
         public final double distanciaMetros;
         public final double duracionSegundos;
         public final JsonNode geometriaRuta;
+        /** Metros que OSRM movio el origen hasta la calle mas cercana; null si no informo. */
+        public final Double ajusteOrigenMetros;
+        /** Metros que OSRM movio el destino hasta la calle mas cercana; null si no informo. */
+        public final Double ajusteDestinoMetros;
 
         public Ruta(double distanciaMetros, double duracionSegundos) {
             this(distanciaMetros, duracionSegundos, null);
@@ -38,9 +42,21 @@ public final class OsrmClient {
                 double duracionSegundos,
                 JsonNode geometriaRuta
         ) {
+            this(distanciaMetros, duracionSegundos, geometriaRuta, null, null);
+        }
+
+        public Ruta(
+                double distanciaMetros,
+                double duracionSegundos,
+                JsonNode geometriaRuta,
+                Double ajusteOrigenMetros,
+                Double ajusteDestinoMetros
+        ) {
             this.distanciaMetros = distanciaMetros;
             this.duracionSegundos = duracionSegundos;
             this.geometriaRuta = geometriaRuta;
+            this.ajusteOrigenMetros = ajusteOrigenMetros;
+            this.ajusteDestinoMetros = ajusteDestinoMetros;
         }
 
         public long minutosRedondeados() {
@@ -167,6 +183,18 @@ public final class OsrmClient {
             }
         }
 
-        return new Ruta(distancia, duracion, geometria);
+        JsonNode puntos = raiz.path("waypoints");
+        Double ajusteOrigen = ajusteDe(puntos.path(0));
+        Double ajusteDestino = ajusteDe(puntos.path(1));
+
+        return new Ruta(distancia, duracion, geometria, ajusteOrigen, ajusteDestino);
+    }
+
+    private static Double ajusteDe(JsonNode waypoint) {
+        JsonNode distancia = waypoint.path("distance");
+        if (!distancia.isNumber() || !Double.isFinite(distancia.asDouble())) {
+            return null;
+        }
+        return distancia.asDouble();
     }
 }
