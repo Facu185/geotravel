@@ -45,6 +45,33 @@ public class RutaService {
     public interface MotorRutas {
         OsrmClient.Ruta calcular(double origenLon, double origenLat, double destinoLon, double destinoLat)
                 throws IOException, InterruptedException;
+
+        /** Igual, con un limite estricto de tiempo; los motores que no lo soportan lo ignoran. */
+        default OsrmClient.Ruta calcular(double origenLon, double origenLat, double destinoLon, double destinoLat,
+                                         long timeoutMs) throws IOException, InterruptedException {
+            return calcular(origenLon, origenLat, destinoLon, destinoLat);
+        }
+    }
+
+    /** Motor OSRM real para un criterio. */
+    static final class MotorOsrm implements MotorRutas {
+        private final Criterio criterio;
+
+        MotorOsrm(Criterio criterio) {
+            this.criterio = criterio;
+        }
+
+        @Override
+        public OsrmClient.Ruta calcular(double lonO, double latO, double lonD, double latD)
+                throws IOException, InterruptedException {
+            return OsrmClient.consultar(lonO, latO, lonD, latD, criterio);
+        }
+
+        @Override
+        public OsrmClient.Ruta calcular(double lonO, double latO, double lonD, double latD, long timeoutMs)
+                throws IOException, InterruptedException {
+            return OsrmClient.consultar(lonO, latO, lonD, latD, criterio, timeoutMs);
+        }
     }
 
     public static final class Extremos {
@@ -67,7 +94,8 @@ public class RutaService {
     public enum Estado {
         DISPONIBLE("disponible"),
         SIN_RUTA("sin_ruta"),
-        ERROR("error");
+        ERROR("error"),
+        PLAZO_AGOTADO("plazo_agotado");
 
         public final String codigo;
 
@@ -99,6 +127,10 @@ public class RutaService {
             return new Resultado(Estado.SIN_RUTA, null, mensaje, false);
         }
 
+        public static Resultado plazo(String mensaje) {
+            return new Resultado(Estado.PLAZO_AGOTADO, null, mensaje, false);
+        }
+
         public static Resultado error(String mensaje, boolean motorCaido) {
             return new Resultado(Estado.ERROR, null, mensaje, motorCaido);
         }
@@ -115,8 +147,7 @@ public class RutaService {
     }
 
     private static final RutaService PREDETERMINADO = new RutaService(
-            OsrmClient::consultar,
-            (lonO, latO, lonD, latD) -> OsrmClient.consultarCorta(lonO, latO, lonD, latD));
+            new MotorOsrm(Criterio.MAS_RAPIDA), new MotorOsrm(Criterio.MAS_CORTA));
 
     private final MotorRutas motor;
     private final MotorRutas motorCorta;
@@ -167,6 +198,12 @@ public class RutaService {
     }
 
     public OsrmClient.Ruta consultar(Extremos e, Criterio criterio) throws IOException, InterruptedException {
+        return consultar(e, criterio, OsrmClient.TIMEOUT_POR_DEFECTO_MS);
+    }
+
+    /** timeoutMs limita el pedido al motor (no aplica si la ruta sale de la cache). */
+    public OsrmClient.Ruta consultar(Extremos e, Criterio criterio, long timeoutMs)
+            throws IOException, InterruptedException {
         MotorRutas elegido = criterio == Criterio.MAS_CORTA ? motorCorta : motor;
         if (elegido == null) {
             throw new OsrmClient.NoConfiguradoException("Criterio de ruta no disponible: " + criterio.codigo);
@@ -180,7 +217,7 @@ public class RutaService {
             return guardada.ruta;
         }
 
-        OsrmClient.Ruta ruta = elegido.calcular(e.origenLon, e.origenLat, e.destinoLon, e.destinoLat);
+        OsrmClient.Ruta ruta = elegido.calcular(e.origenLon, e.origenLat, e.destinoLon, e.destinoLat, timeoutMs);
 
         if (cache.size() >= CACHE_MAXIMO) {
             cache.clear();
@@ -195,10 +232,18 @@ public class RutaService {
     }
 
     public Resultado intentar(Extremos e, Criterio criterio) {
+        return intentar(e, criterio, OsrmClient.TIMEOUT_POR_DEFECTO_MS);
+    }
+
+    public Resultado intentar(Extremos e, Criterio criterio, long timeoutMs) {
         try {
-            return Resultado.ok(consultar(e, criterio));
+            return Resultado.ok(consultar(e, criterio, timeoutMs));
         } catch (OsrmClient.SinRutaException ex) {
             return Resultado.sinRuta(ex.getMessage());
+        } catch (OsrmClient.PlazoAgotadoException ex) {
+            return Resultado.plazo(ex.getMessage());
+        } catch (OsrmClient.NoConfiguradoException ex) {
+            return Resultado.error(ex.getMessage(), true);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             return Resultado.error("Consulta de rutas interrumpida", true);

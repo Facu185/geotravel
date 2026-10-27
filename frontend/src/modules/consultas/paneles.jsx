@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Aviso, Insignia, Segmentado, Selector } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
 import { api } from "../../api/client.js";
+import useCriteriosRuta from "../../api/useCriteriosRuta.js";
 import { REGION } from "../../components/region.js";
 import { conGeometria } from "./geometria.js";
 
@@ -283,10 +284,6 @@ const RADIOS_M = [500, 1000, 2000, 5000, 10000];
 const RADIO_INICIAL_M = 2000;
 const CANTIDADES = [1, 2, 3, 5, 10];
 const textoRadio = (m) => (m >= 1000 ? `${m / 1000} km` : `${m} m`);
-const CRITERIOS = [
-  { valor: "mas_rapida", etiqueta: "Más rápida (tiempo)", color: "#2563eb" },
-  { valor: "mas_corta", etiqueta: "Más corta (distancia)", color: "#16a34a" },
-];
 
 /** Leyenda de los colores del mapa de esta consulta (los mismos que dibuja CapaResultado). */
 function LeyendaRutas({ conRutas }) {
@@ -344,6 +341,7 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   const [limite, setLimite] = useState(5);
   const [soloDisponibles, setSoloDisponibles] = useState(true);
   const [criterio, setCriterio] = useState("mas_rapida");
+  const CRITERIOS = useCriteriosRuta();
   const [elegidoId, setElegidoId] = useState(null);
   const [calculo, setCalculo] = useState(null); // rutas pedidas: { base, fase, datos, error }
 

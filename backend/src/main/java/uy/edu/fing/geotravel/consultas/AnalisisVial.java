@@ -237,12 +237,14 @@ public class AnalisisVial {
                 marcarError(c, "El servicio de rutas no respondio");
                 continue;
             }
-            if (System.nanoTime() - limiteNanos > 0) {
-                marcarError(c, "Se agoto el tiempo maximo para calcular rutas");
+            long restanteMs = (limiteNanos - System.nanoTime()) / 1_000_000;
+            if (restanteMs <= 0) {
+                marcarPlazo(c);
                 continue;
             }
 
-            RutaService.Resultado r = rutas.intentar(c.extremos, criterio);
+            RutaService.Resultado r = rutas.intentar(c.extremos, criterio,
+                    Math.min(OsrmClient.TIMEOUT_POR_DEFECTO_MS, restanteMs));
             switch (r.estado) {
                 case DISPONIBLE:
                     completar(c, r.ruta);
@@ -252,6 +254,10 @@ public class AnalisisVial {
                     c.item.put("estadoRuta", r.estado.codigo);
                     c.item.put("mensajeRuta", "Ruta no disponible: " + r.mensaje);
                     break;
+                case PLAZO_AGOTADO:
+                    marcarPlazo(c);
+                    limiteNanos = System.nanoTime();
+                    break;
                 default:
                     motorCaido = r.motorCaido;
                     marcarError(c, r.mensaje);
@@ -259,6 +265,11 @@ public class AnalisisVial {
             }
         }
         return obtenidas;
+    }
+
+    private static void marcarPlazo(Candidato c) {
+        c.item.put("estadoRuta", RutaService.Estado.PLAZO_AGOTADO.codigo);
+        c.item.put("mensajeRuta", "Ruta no disponible: se agoto el tiempo maximo para calcular rutas");
     }
 
     private static void marcarError(Candidato c, String mensaje) {

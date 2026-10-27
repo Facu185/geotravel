@@ -211,7 +211,7 @@ public class ConsultaResource {
             throw new WebApplicationException(Response.status(Response.Status.SERVICE_UNAVAILABLE)
                     .type(MediaType.APPLICATION_JSON)
                     .entity(Map.of("error", "El criterio " + criterio.codigo
-                            + " no esta disponible: falta configurar el OSRM propio (OSRM_URL_CORTA)"))
+                            + " no esta disponible: falta configurar el OSRM propio (OSRM_SHORTEST_URL)"))
                     .build());
         }
         AnalisisVial.Parametros parametros;

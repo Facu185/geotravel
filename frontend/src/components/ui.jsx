@@ -20,8 +20,8 @@ export function Segmentado({ leyenda, nombre, opciones, valor, onChange }) {
       <legend className="campo__etiqueta">{leyenda}</legend>
       <div className="segmentado__opciones">
         {opciones.map((o) => (
-          <label key={o.valor} className={o.valor === valor ? "segmentado__opcion segmentado__opcion--activa" : "segmentado__opcion"}>
-            <input type="radio" name={nombre} value={o.valor} checked={o.valor === valor} onChange={() => onChange(o.valor)} />
+          <label key={o.valor} className={o.valor === valor ? "segmentado__opcion segmentado__opcion--activa" : "segmentado__opcion"} title={o.deshabilitada ? o.motivo : undefined} style={o.deshabilitada ? { opacity: 0.5 } : undefined}>
+            <input type="radio" name={nombre} value={o.valor} checked={o.valor === valor} disabled={o.deshabilitada} onChange={() => onChange(o.valor)} />
             <span className="segmentado__punto" style={{ "--color": o.color }} aria-hidden="true" />
             {o.etiqueta}
           </label>

@@ -30,6 +30,13 @@ paths:
         "200": { description: OK }
 
   # ------------------------------------------------------------ ETA / OSRM
+  /eta/criterios:
+    get:
+      summary: Criterios de ruta disponibles en el servidor
+      description: Informa si están disponibles mas_rapida y mas_corta (esta requiere OSRM_SHORTEST_URL).
+      responses:
+        "200": { description: 'Ej. {"mas_rapida":true,"mas_corta":false}' }
+
   /eta/recursos/{recursoId}/incidentes/{incidenteId}:
     get:
       summary: Calcular tiempo estimado de llegada
@@ -37,7 +44,7 @@ paths:
         Obtiene las ubicaciones del recurso y del incidente desde PostGIS.
         Consulta OSRM para obtener distancia, duración y recorrido vial. Con criterio=mas_rapida (defecto) se
         minimiza la duración (perfil driving); con criterio=mas_corta se minimiza la distancia vial usando el OSRM
-        propio (OSRM_URL_CORTA). La geometría se devuelve como GeoJSON en EPSG:4326.
+        propio (OSRM_SHORTEST_URL). La geometría se devuelve como GeoJSON en EPSG:4326.
         No incorpora tráfico en tiempo real.
       tags: [eta]
       parameters:
@@ -95,7 +102,7 @@ paths:
                     enum: [mas_rapida, mas_corta]
                     description: >
                       mas_rapida minimiza la duración; mas_corta minimiza la distancia vial (requiere
-                      OSRM propio, OSRM_URL_CORTA).
+                      OSRM propio, OSRM_SHORTEST_URL).
                   criterioRutaTexto: { type: string }
                   distanciaDirectaMetros: { type: number, description: Línea recta recurso-incidente }
                   ajusteOrigenMetros: { type: number, nullable: true, description: Distancia a la calle más cercana (origen) }
@@ -132,7 +139,7 @@ paths:
         "422":
           description: OSRM no encontró una ruta vial
         "503":
-          description: Servicio OSRM no disponible, o criterio mas_corta sin OSRM_URL_CORTA configurado
+          description: Servicio OSRM no disponible, o criterio mas_corta sin OSRM_SHORTEST_URL configurado
 
   # ------------------------------------------------------------ Ingreso del administrador
   /auth/login:
@@ -491,12 +498,12 @@ paths:
             totalEnRadio, truncado, criterioRuta ("mas_rapida"|"mas_corta"), criterioRutaTexto, rutasMaximas,
             rutasDisponibles, recursoMejorId (según el criterio), recursoMasRapidoId, recursoMasCortoId,
             items[{ recursoId, identificacion, tipo, estadoOperativo, geom, distanciaDirectaM,
-            lineaDirecta (LineString), estadoRuta (no_calculada|disponible|sin_ruta|error), mensajeRuta,
+            lineaDirecta (LineString), estadoRuta (no_calculada|disponible|sin_ruta|error|plazo_agotado), mensajeRuta,
             distanciaViaM, duracionS, tiempoEstimadoMinutos, geometriaRuta, ajusteOrigenM, ajusteDestinoM,
             advertencia }] }
         "400": { description: radioMetros, limite o criterio inválidos }
         "404": { description: Incidente inexistente }
-        "503": { description: "conRutas=true con criterio mas_corta y OSRM_URL_CORTA sin configurar" }
+        "503": { description: "conRutas=true con criterio mas_corta y OSRM_SHORTEST_URL sin configurar" }
 
   /consultas/incidente-mas-cercano:
     get:

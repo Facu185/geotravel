@@ -31,6 +31,17 @@ public class EtaResource {
         this.rutas = rutas;
     }
 
+    /** Criterios de ruta que el servidor puede calcular (la ruta mas corta requiere OSRM propio). */
+    @GET
+    @Path("/criterios")
+    public Response criterios() {
+        Map<String, Object> cuerpo = new LinkedHashMap<>();
+        for (Criterio c : Criterio.values()) {
+            cuerpo.put(c.codigo, rutas.disponible(c));
+        }
+        return Response.ok(cuerpo).build();
+    }
+
     @GET
     @Path("/recursos/{recursoId}/incidentes/{incidenteId}")
     public Response estimar(
@@ -45,7 +56,7 @@ public class EtaResource {
         }
         if (!rutas.disponible(criterio)) {
             return error(503, "El criterio " + criterio.codigo
-                    + " no esta disponible: falta configurar el OSRM propio (OSRM_URL_CORTA)");
+                    + " no esta disponible: falta configurar el OSRM propio (OSRM_SHORTEST_URL)");
         }
 
         // Validar que ambos identificadores sean positivos

@@ -156,7 +156,30 @@ public class AnalisisVialTest {
         analisis.calcularRutas(lista, System.nanoTime() - 1);
 
         assertEquals(0, llamadas.get());
-        assertEquals("error", lista.get(0).item.get("estadoRuta"));
+        assertEquals("plazo_agotado", lista.get(0).item.get("estadoRuta"));
+    }
+
+    @Test
+    public void unPedidoQueExcedeElPlazoNoRetienePasaLosDemas() {
+        AtomicInteger llamadas = new AtomicInteger();
+        AnalisisVial analisis = new AnalisisVial(new RutaService(new RutaService.MotorRutas() {
+            public OsrmClient.Ruta calcular(double a, double b, double c, double d) {
+                return new OsrmClient.Ruta(1000, 100);
+            }
+            public OsrmClient.Ruta calcular(double a, double b, double c, double d, long t)
+                    throws java.io.IOException {
+                llamadas.incrementAndGet();
+                throw new OsrmClient.PlazoAgotadoException("lento");
+            }
+        }));
+        List<AnalisisVial.Candidato> lista = candidatos(3);
+
+        int obtenidas = analisis.calcularRutas(lista, System.nanoTime() + 5_000_000_000L);
+
+        assertEquals(0, obtenidas);
+        assertEquals(1, llamadas.get());
+        assertEquals("plazo_agotado", lista.get(0).item.get("estadoRuta"));
+        assertEquals("plazo_agotado", lista.get(2).item.get("estadoRuta"));
     }
 
     @Test

@@ -6,6 +6,7 @@ import PaginaMapa from "../../components/PaginaMapa.jsx";
 import Enfocar from "../../components/Enfocar.jsx";
 import { Aviso, Segmentado, Selector } from "../../components/ui.jsx";
 import { api } from "../../api/client.js";
+import useCriteriosRuta from "../../api/useCriteriosRuta.js";
 
 function obtenerGeometria(elemento) {
   if (!elemento?.geom) return null;
@@ -34,6 +35,7 @@ export default function EtaPage() {
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState(null);
   const [criterio, setCriterio] = useState("mas_rapida");
+  const criteriosRuta = useCriteriosRuta();
   const solicitudActual = useRef(0);
 
   useEffect(() => {
@@ -205,10 +207,7 @@ export default function EtaPage() {
             <Segmentado
               leyenda="Criterio de la ruta"
               nombre="criterioEta"
-              opciones={[
-                { valor: "mas_rapida", etiqueta: "Más rápida (tiempo)", color: "#2563eb" },
-                { valor: "mas_corta", etiqueta: "Más corta (distancia)", color: "#16a34a" },
-              ]}
+              opciones={criteriosRuta}
               valor={criterio}
               onChange={(valor) => {
                 limpiarResultado();

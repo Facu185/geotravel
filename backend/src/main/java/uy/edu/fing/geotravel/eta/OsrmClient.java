@@ -11,6 +11,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public final class OsrmClient {
 
@@ -79,9 +83,38 @@ public final class OsrmClient {
         }
     }
 
+    /** Se agoto el tiempo disponible para esta consulta al motor. */
+    public static class PlazoAgotadoException extends IOException {
+
+        public PlazoAgotadoException(String mensaje) {
+            super(mensaje);
+        }
+    }
+
+    public static final long TIMEOUT_POR_DEFECTO_MS = 10_000;
+
+    /** Direccion del motor del criterio: OSRM_FAST_URL (o OSRM_URL, o el OSRM publico) / OSRM_SHORTEST_URL (o OSRM_URL_CORTA). */
+    static String servidorDe(Criterio criterio) {
+        if (criterio == Criterio.MAS_CORTA) {
+            String url = primero("OSRM_SHORTEST_URL", "OSRM_URL_CORTA");
+            return url == null ? null : url.replaceAll("/+$", "");
+        }
+        String url = primero("OSRM_FAST_URL", "OSRM_URL");
+        return (url == null ? "https://router.project-osrm.org" : url).replaceAll("/+$", "");
+    }
+
+    private static String primero(String... nombres) {
+        for (String nombre : nombres) {
+            String valor = System.getenv(nombre);
+            if (valor != null && !valor.isBlank()) {
+                return valor;
+            }
+        }
+        return null;
+    }
+
     public static boolean cortaConfigurada() {
-        String url = System.getenv("OSRM_URL_CORTA");
-        return url != null && !url.isBlank();
+        return servidorDe(Criterio.MAS_CORTA) != null;
     }
 
     public static Ruta consultar(
@@ -109,22 +142,27 @@ public final class OsrmClient {
             double destinoLat,
             Criterio criterio
     ) throws IOException, InterruptedException {
+        return consultar(origenLon, origenLat, destinoLon, destinoLat, criterio, TIMEOUT_POR_DEFECTO_MS);
+    }
 
-        String servidor;
-        if (criterio == Criterio.MAS_CORTA) {
-            servidor = System.getenv("OSRM_URL_CORTA");
-            if (servidor == null || servidor.isBlank()) {
-                throw new NoConfiguradoException(
-                        "El servicio de ruta mas corta (OSRM_URL_CORTA) no esta configurado");
-            }
-        } else {
-            servidor = System.getenv("OSRM_URL");
-            if (servidor == null || servidor.isBlank()) {
-                servidor = "https://router.project-osrm.org";
-            }
+    /** timeoutMs es un limite estricto para toda la respuesta; al vencer se cancela el pedido. */
+    public static Ruta consultar(
+            double origenLon,
+            double origenLat,
+            double destinoLon,
+            double destinoLat,
+            Criterio criterio,
+            long timeoutMs
+    ) throws IOException, InterruptedException {
+
+        String servidor = servidorDe(criterio);
+        if (servidor == null) {
+            throw new NoConfiguradoException(
+                    "El servicio de ruta mas corta (OSRM_SHORTEST_URL) no esta configurado");
         }
-
-        servidor = servidor.replaceAll("/+$", "");
+        if (timeoutMs <= 0) {
+            throw new PlazoAgotadoException("Se agoto el tiempo maximo para calcular rutas");
+        }
 
         String url = String.format(
                 Locale.ROOT,
@@ -139,15 +177,33 @@ public final class OsrmClient {
 
         HttpRequest solicitud = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(10))
+                .timeout(Duration.ofMillis(timeoutMs))
                 .header("Accept", "application/json")
                 .GET()
                 .build();
 
-        HttpResponse<String> respuesta = HTTP.send(
-                solicitud,
-                HttpResponse.BodyHandlers.ofString()
-        );
+        CompletableFuture<HttpResponse<String>> pedido =
+                HTTP.sendAsync(solicitud, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> respuesta;
+        try {
+            respuesta = pedido.get(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            pedido.cancel(true);
+            throw new PlazoAgotadoException("El servicio de rutas no respondio a tiempo");
+        } catch (InterruptedException e) {
+            pedido.cancel(true);
+            throw e;
+        } catch (ExecutionException e) {
+            pedido.cancel(true);
+            Throwable causa = e.getCause();
+            if (causa instanceof java.net.http.HttpConnectTimeoutException) {
+                throw new IOException("No se pudo conectar con el servicio de rutas", causa);
+            }
+            if (causa instanceof java.net.http.HttpTimeoutException) {
+                throw new PlazoAgotadoException("El servicio de rutas no respondio a tiempo");
+            }
+            throw new IOException("No se pudo conectar con el servicio de rutas", causa);
+        }
 
         if (respuesta.statusCode() != 200) {
             // OSRM informa "sin ruta" con HTTP 400 (NoSegment) o 404 (NoRoute): no es una caida del motor
