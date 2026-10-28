@@ -122,6 +122,27 @@ Qué hace cada consulta:
 
 Se sacaron los dos extras (incidentes por km² y dibujar una línea o un polígono para buscar alrededor).
 
+Las consultas 1 a 7 las ve también el **invitado** (sin ingresar); el reporte sigue siendo solo del administrador. Por eso
+`AuthFilter` deja públicas, únicamente de lectura, `GET /consultas/...` (menos `reportes`), el listado de `GET /zonas`,
+`/incidentes` y `/recursos` y `GET /eta/criterios`. Al pie del panel, "¿Qué significa cada ícono?" muestra la misma
+leyenda del mapa público (`LeyendaCapa.jsx`).
+
+## Tiempo de llegada (P2)
+
+La pantalla `/eta` sigue el mismo patrón: el incidente y el recurso se eligen con un clic en el mapa, o en un desplegable
+con búsqueda (`SelectorBuscable`, sobre `GET /consultas/buscar`, que busca en todo el sistema y no solo en la vista).
+Dibujan lo visible `CargaPorZona` y el componente compartido `CapaElegibles` (el mismo de las Consultas); lo elegido
+queda marcado aunque se mueva el mapa.
+
+## Agrupar con un número al alejar el mapa
+
+Con el mapa alejado (zoom 14 o menos) los incidentes y recursos que quedan juntos se agrupan en un círculo con la
+cantidad; del zoom 15 en adelante se ven los íconos. Hay dos mecanismos con la misma regla (celda de 64 px, mismo corte):
+
+- **GeoServer** (mapa público y el fondo cuando se está lejos): `vec:PointStacker` en el SLD, ver `docs/ICONOS.md`.
+- **El navegador** (Consultas, Tiempo de llegada y los ABM de Incidentes y Recursos): `CapaAgrupada.jsx`, con
+  `leaflet.markercluster`. Las líneas y los polígonos de incidentes cuentan en el grupo por su centro.
+
 Probado con `db/pruebas/carga-masiva.sql` (700 zonas, 3.000 recursos): las consultas responden en 10 a 30 ms.
 
 ## Mapa público (P5)

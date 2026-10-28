@@ -1,7 +1,7 @@
 # Consulta 3: recursos cercanos con buffer y rutas por calles
 
 Endpoint: `GET /consultas/recursos-cercanos/{incidenteId}/analisis-vial`
-(el endpoint anterior `/consultas/recursos-cercanos/{id}` no cambió).
+(es el único endpoint de la consulta 3; el anterior `/consultas/recursos-cercanos/{id}` se quitó).
 
 ## Parámetros
 
@@ -110,3 +110,8 @@ directa contra OSRM, ahorrar 146 m (3932 → 3786 m) costó 185 s más (408 → 
 Consultas → "Recursos cercanos": elegir incidente, radio y cantidad. Se ve el buffer (azul),
 las líneas directas (gris punteado) y, con "Calcular rutas por calles", los recorridos (verde).
 La pantalla ETA muestra además la distancia directa, el criterio y las advertencias.
+
+En la pantalla ETA (`/eta`, solo administrador) el incidente y el recurso se eligen **con un clic en el mapa** o en un
+**desplegable con búsqueda** (al hacer clic en el campo se abre la lista; escribiendo se filtra, sobre todo el sistema:
+`GET /consultas/buscar`). Lo elegido queda marcado en el mapa y no se agrupa. Como en las Consultas, no se cargan todos los
+objetos: solo los de la parte visible (`CargaPorZona`) y, con el mapa lejos, los dibuja GeoServer.

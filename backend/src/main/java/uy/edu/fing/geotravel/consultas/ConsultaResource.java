@@ -160,63 +160,7 @@ public class ConsultaResource {
 
     // ---------------------------------------------------- 3. Recursos cercanos a un incidente
     /**
-     * Los recursos operativos (estado "Disponible") más cercanos al incidente dado, ordenados por distancia
-     * en línea recta, con su geometría. Con radioM solo cuenta los que están a esa distancia o menos del
-     * incidente (ST_DWithin), y devuelve en "area" el buffer del incidente (ST_Buffer) para dibujarlo: si el
-     * incidente es una línea o un polígono, el buffer es el pasillo o el área agrandada a su alrededor.
-     * Responde {radioM, area, items, total, truncado}; total es cuántos recursos cumplen, antes del límite.
-     * El camino por calles de cada recurso lo da /eta/recursos/{recursoId}/incidentes/{incidenteId}.
-     */
-    @GET
-    @Path("/recursos-cercanos/{incidenteId}")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Map<String, Object> recursosCercanos(@PathParam("incidenteId") int incidenteId,
-                                                @QueryParam("limite") @DefaultValue("5") int limite,
-                                                @QueryParam("radioM") Double radioM) throws SQLException {
-        int max = limite < 1 ? 5 : Math.min(limite, 50);
-        if (radioM != null && (!Double.isFinite(radioM) || radioM < 1 || radioM > 100000)) {
-            throw peticionInvalida("radioM debe estar entre 1 y 100000 metros");
-        }
-        String sql =
-            "SELECT r.id, r.identificacion, r.tipo, r.estado_operativo, " +
-            "       ST_Distance(r.geom, i.geom) AS distancia_m, " + geomIncidente("r") + ", count(*) OVER () AS total " +
-            "FROM recurso r, incidente i " +
-            "WHERE i.id = ? AND r.estado_operativo = 'Disponible' " +
-            (radioM != null ? "  AND ST_DWithin(r.geom, i.geom, ?) " : "") +
-            "ORDER BY r.geom <-> i.geom " +
-            "LIMIT ?";
-        try (Connection conn = DataSourceProvider.get().getConnection()) {
-            String area = null;
-            if (radioM != null) {
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "SELECT ST_AsGeoJSON(ST_Transform(ST_Buffer(geom, ?), 4326), 6) FROM incidente WHERE id = ?")) {
-                    ps.setDouble(1, radioM);
-                    ps.setInt(2, incidenteId);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (!rs.next()) {
-                            throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
-                                .type(MediaType.APPLICATION_JSON).entity(Map.of("error", "El incidente no existe")).build());
-                        }
-                        area = rs.getString(1);
-                    }
-                }
-            }
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                int n = 1;
-                ps.setInt(n++, incidenteId);
-                if (radioM != null) ps.setDouble(n++, radioM);
-                ps.setInt(n, max);
-                Map<String, Object> resultado = new LinkedHashMap<>();
-                resultado.put("radioM", radioM);
-                resultado.put("area", area);
-                resultado.putAll(conTotal(ps.executeQuery(), "id", "identificacion", "tipo", "estado_operativo", "distancia_m", "geom"));
-                return resultado;
-            }
-        }
-    }
-
-    /**
-     * Consulta 3 ampliada: recursos dentro de un buffer de radioMetros alrededor del incidente, con distancia directa
+     * Consulta 3: recursos dentro de un buffer de radioMetros alrededor del incidente, con distancia directa
      * y, con conRutas=true, la ruta por calles de los más cercanos. Ver AnalisisVial y docs/api/openapi.yaml.
      */
     @GET

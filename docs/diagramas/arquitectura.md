@@ -47,7 +47,7 @@ flowchart LR
 | Datos | PostgreSQL + PostGIS (`db/migrations`) | P1 |
 | Publicación de mapas | GeoServer (`geoserver/styles`) | P1 |
 | API | JEE / Jersey (`backend/`) | P2 (base) + P3/P4/P5 (por módulo) |
-| UI | React + Leaflet (`frontend/`) | P3/P4/P5 por módulo |
+| UI | React + Leaflet, y `leaflet.markercluster` para agrupar (`frontend/`) | P3/P4/P5 por módulo |
 
 ## Modelo de datos
 
@@ -136,6 +136,8 @@ El navegador nunca carga todos los objetos. Según el zoom:
   quedaron objetos afuera. En ese caso el front avisa "Mostrando 500 de N: acercá el mapa".
 - Cuando el front dibuja un tipo de objeto, GeoServer deja de dibujar ese tipo (no se ve doble).
 - Las zonas se simplifican 3 m al devolverlas: se dibujan igual y pesan mucho menos.
+- Con cualquiera de los dos dibujando, los incidentes y recursos que quedan juntos se agrupan con un número hasta el zoom 14
+  (GeoServer con `vec:PointStacker`; el front con `leaflet.markercluster`). Ver `docs/ICONOS.md`.
 - Detalle: `docs/CARGA_POR_ZONA.md`.
 
 ## Por qué las consultas complejas van por REST y no solo por WFS
