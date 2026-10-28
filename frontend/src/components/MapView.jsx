@@ -136,6 +136,9 @@ export default function MapView({
           layers={layers.join(",")}
           format="image/png"
           transparent
+          // Cada tesela dibuja también 32 px más allá de su borde: así un círculo de grupo (ver
+          // geoserver/agrupamiento_sld.py) que cae justo en el límite entre dos teselas no queda cortado.
+          buffer={32}
           {...wmsExtra}
         />
       )}

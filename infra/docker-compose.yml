@@ -105,6 +105,9 @@ services:
       DB_USER: ${POSTGRES_USER:-geotravel}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
       OSRM_URL: ${OSRM_URL:-https://router.project-osrm.org}
+      # Sin valor: el criterio "mas corta" queda desactivado (responde 503). Ver docs/RECURSOS_CERCANOS_RUTAS.md
+      OSRM_FAST_URL: ${OSRM_FAST_URL:-}
+      OSRM_SHORTEST_URL: ${OSRM_SHORTEST_URL:-}
       IDE_DEPARTAMENTO: ${IDE_DEPARTAMENTO:-salto}
       IDE_LOCALIDAD: ${IDE_LOCALIDAD:-salto}
       FOTOS_DIR: /data/fotos
@@ -115,6 +118,28 @@ services:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
       - fotos_data:/data/fotos   # fotos subidas: sobreviven a los redespliegues del .war
+
+  # OSRM propio (opcional, profile "osrm"): dos servicios con datos procesados con perfiles distintos.
+  # Preparar antes los datos con infra/osrm/preparar.ps1 (o .sh) y definir en .env:
+  #   OSRM_FAST_URL=http://osrm-fast:5000   OSRM_SHORTEST_URL=http://osrm-shortest:5000
+  # Levantar con: docker compose --profile osrm up -d --build
+  osrm-fast:
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    profiles: ["osrm"]
+    command: osrm-routed --algorithm mld /data/mapa.osrm
+    volumes:
+      - ./osrm/data/fast:/data:ro
+    ports:
+      - "${OSRM_FAST_PORT:-5001}:5000"
+
+  osrm-shortest:
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    profiles: ["osrm"]
+    command: osrm-routed --algorithm mld /data/mapa.osrm
+    volumes:
+      - ./osrm/data/shortest:/data:ro
+    ports:
+      - "${OSRM_SHORTEST_PORT:-5002}:5000"
 
   geoserver:
     image: kartoza/geoserver:2.25.2

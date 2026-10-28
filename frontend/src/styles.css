@@ -532,6 +532,10 @@ body {
   list-style: none;
 }
 
+.leyenda--suelta {
+  padding: 0;
+}
+
 .leyenda__item {
   display: flex;
   align-items: center;
@@ -1114,6 +1118,13 @@ body {
   color: #4b5b69;
 }
 
+.seleccion__encabezado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .btn--chico {
   padding: 4px 10px;
   font-size: 0.8rem;
@@ -1621,6 +1632,48 @@ body {
   box-shadow: 0 0 0 1px rgba(15, 28, 40, 0.28);
 }
 
+/* Íconos de incidentes: un rombo del color del estado con el dibujo del tipo (components/iconos.jsx). */
+.insignia-rombo {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 21px;
+  height: 21px;
+  margin: 4.5px;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  background: var(--color, #555);
+  box-shadow: 0 1px 4px rgba(15, 28, 40, 0.5);
+  transform: rotate(45deg);
+}
+
+/* El dibujo se centra con posición absoluta y no con la grilla: así no depende del tamaño propio del SVG ni de las
+   reglas de Leaflet para las imágenes de los marcadores (que quitan el max-width y lo descentraban). */
+.insignia-rombo img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  width: 72%;
+  height: 72%;
+  max-width: none;
+  max-height: none;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  pointer-events: none;
+}
+
+.insignia-rombo--chico {
+  width: 17px;
+  height: 17px;
+  margin: 3.5px;
+  box-shadow: 0 0 0 1px rgba(15, 28, 40, 0.28);
+}
+
+.insignia-rombo--resaltado {
+  outline: 3px solid var(--color, #555);
+  outline-offset: 2px;
+}
+
 .insignia-icono--resaltado {
   outline: 3px solid var(--color, #555);
   outline-offset: 2px;
@@ -1641,4 +1694,110 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Leyenda de la consulta 3: buffer, distancia directa y recorrido por calles. */
+.leyenda-ruta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+  color: var(--tinta-suave, #4a5a68);
+}
+
+.leyenda-ruta li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leyenda-ruta__muestra {
+  flex: none;
+  width: 22px;
+  height: 12px;
+  box-sizing: border-box;
+}
+
+.leyenda-ruta__muestra--buffer {
+  background: rgba(59, 143, 224, 0.25);
+  border: 2px solid #1d6fb8;
+  border-radius: 3px;
+}
+
+.leyenda-ruta__muestra--directa {
+  height: 0;
+  border-top: 3px dashed #6b7280;
+}
+
+.leyenda-ruta__muestra--ruta {
+  height: 4px;
+  border-radius: 2px;
+  background: #16a34a;
+}
+
+/* Desplegable con búsqueda (elegir un incidente o un recurso de todo el sistema). */
+.combo__lista {
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 2px;
+  padding: 6px;
+  background: var(--superficie, #fff);
+  border: 1px solid var(--borde, #d6dbd2);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(19, 32, 44, 0.18);
+}
+
+/* "¿Qué significa cada ícono?" al pie del panel de las Consultas. */
+.leyenda-plegable {
+  font-size: 0.9rem;
+}
+
+.leyenda-plegable summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+.leyenda-plegable__capa {
+  margin-top: 10px;
+}
+
+.leyenda-plegable__titulo {
+  margin: 0 0 2px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tinta-tenue);
+}
+
+/* Un grupo de objetos cercanos con el mapa alejado: un círculo con la cantidad (ver components/CapaAgrupada.jsx). */
+.grupo {
+  background: transparent;
+  border: 0;
+}
+
+.grupo__numero.grupo__numero--chico {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  border-width: 1.5px;
+}
+
+.grupo__numero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--color, #13202c);
+  box-shadow: 0 1px 4px rgba(15, 28, 40, 0.45);
+  color: #fff;
+  font-family: var(--fuente);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
 }

@@ -48,3 +48,9 @@ export const CARGA_POR_ZONA = {
   zoomMinimo: numero(import.meta.env.VITE_ZOOM_MINIMO_EDICION, 13),
   limite: numero(import.meta.env.VITE_LIMITE_POR_PANTALLA, 500),
 };
+
+/**
+ * Desde qué zoom se cargan los objetos para ELEGIRLOS en una pantalla de consulta (Consultas, Tiempo de llegada). Es más
+ * permisivo que en los ABM (donde se edita): acá solo se eligen y se miran, y el límite por pedido ya acota la cantidad.
+ */
+export const ZOOM_MINIMO_ELEGIR = Math.max(1, CARGA_POR_ZONA.zoomMinimo - 2);

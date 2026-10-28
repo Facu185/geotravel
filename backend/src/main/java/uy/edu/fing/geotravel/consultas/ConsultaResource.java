@@ -1,6 +1,8 @@
 package uy.edu.fing.geotravel.consultas;
 
 import uy.edu.fing.geotravel.db.DataSourceProvider;
+import uy.edu.fing.geotravel.eta.Criterio;
+import uy.edu.fing.geotravel.eta.RutaService;
 import uy.edu.fing.geotravel.mapa.Bbox;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -158,58 +160,48 @@ public class ConsultaResource {
 
     // ---------------------------------------------------- 3. Recursos cercanos a un incidente
     /**
-     * Los recursos operativos (estado "Disponible") más cercanos al incidente dado, ordenados por distancia
-     * en línea recta, con su geometría. Con radioM solo cuenta los que están a esa distancia o menos del
-     * incidente (ST_DWithin), y devuelve en "area" el buffer del incidente (ST_Buffer) para dibujarlo: si el
-     * incidente es una línea o un polígono, el buffer es el pasillo o el área agrandada a su alrededor.
-     * Responde {radioM, area, items, total, truncado}; total es cuántos recursos cumplen, antes del límite.
-     * El camino por calles de cada recurso lo da /eta/recursos/{recursoId}/incidentes/{incidenteId}.
+     * Consulta 3: recursos dentro de un buffer de radioMetros alrededor del incidente, con distancia directa
+     * y, con conRutas=true, la ruta por calles de los más cercanos. Ver AnalisisVial y docs/api/openapi.yaml.
      */
     @GET
-    @Path("/recursos-cercanos/{incidenteId}")
+    @Path("/recursos-cercanos/{incidenteId}/analisis-vial")
     @Produces(MediaType.APPLICATION_JSON)
-    public Map<String, Object> recursosCercanos(@PathParam("incidenteId") int incidenteId,
-                                                @QueryParam("limite") @DefaultValue("5") int limite,
-                                                @QueryParam("radioM") Double radioM) throws SQLException {
-        int max = limite < 1 ? 5 : Math.min(limite, 50);
-        if (radioM != null && (!Double.isFinite(radioM) || radioM < 1 || radioM > 100000)) {
-            throw peticionInvalida("radioM debe estar entre 1 y 100000 metros");
+    public Map<String, Object> analisisVial(@PathParam("incidenteId") int incidenteId,
+                                            @QueryParam("radioMetros") String radioMetros,
+                                            @QueryParam("limite") String limite,
+                                            @QueryParam("soloDisponibles") @DefaultValue("true") boolean soloDisponibles,
+                                            @QueryParam("conRutas") @DefaultValue("false") boolean conRutas,
+                                            @QueryParam("criterio") String criterioParam)
+            throws SQLException, IOException {
+        Criterio criterio = Criterio.desde(criterioParam);
+        if (criterio == null) {
+            throw peticionInvalida("criterio tiene que ser mas_rapida o mas_corta");
         }
-        String sql =
-            "SELECT r.id, r.identificacion, r.tipo, r.estado_operativo, " +
-            "       ST_Distance(r.geom, i.geom) AS distancia_m, " + geomIncidente("r") + ", count(*) OVER () AS total " +
-            "FROM recurso r, incidente i " +
-            "WHERE i.id = ? AND r.estado_operativo = 'Disponible' " +
-            (radioM != null ? "  AND ST_DWithin(r.geom, i.geom, ?) " : "") +
-            "ORDER BY r.geom <-> i.geom " +
-            "LIMIT ?";
+        RutaService servicio = RutaService.predeterminado();
+        if (conRutas && !servicio.disponible(criterio)) {
+            throw new WebApplicationException(Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .type(MediaType.APPLICATION_JSON)
+                    .entity(Map.of("error", "El criterio " + criterio.codigo
+                            + " no esta disponible: falta configurar el OSRM propio (OSRM_SHORTEST_URL)"))
+                    .build());
+        }
+        AnalisisVial.Parametros parametros;
+        try {
+            parametros = AnalisisVial.validar(
+                    AnalisisVial.entero("radioMetros", radioMetros), AnalisisVial.entero("limite", limite));
+        } catch (IllegalArgumentException e) {
+            throw peticionInvalida(e.getMessage());
+        }
         try (Connection conn = DataSourceProvider.get().getConnection()) {
-            String area = null;
-            if (radioM != null) {
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "SELECT ST_AsGeoJSON(ST_Transform(ST_Buffer(geom, ?), 4326), 6) FROM incidente WHERE id = ?")) {
-                    ps.setDouble(1, radioM);
-                    ps.setInt(2, incidenteId);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (!rs.next()) {
-                            throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
-                                .type(MediaType.APPLICATION_JSON).entity(Map.of("error", "El incidente no existe")).build());
-                        }
-                        area = rs.getString(1);
-                    }
-                }
+            Map<String, Object> respuesta = new AnalisisVial(servicio)
+                    .analizar(conn, incidenteId, parametros, soloDisponibles, conRutas, criterio);
+            if (respuesta == null) {
+                throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
+                        .type(MediaType.APPLICATION_JSON)
+                        .entity(Map.of("error", "Incidente no encontrado"))
+                        .build());
             }
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                int n = 1;
-                ps.setInt(n++, incidenteId);
-                if (radioM != null) ps.setDouble(n++, radioM);
-                ps.setInt(n, max);
-                Map<String, Object> resultado = new LinkedHashMap<>();
-                resultado.put("radioM", radioM);
-                resultado.put("area", area);
-                resultado.putAll(conTotal(ps.executeQuery(), "id", "identificacion", "tipo", "estado_operativo", "distancia_m", "geom"));
-                return resultado;
-            }
+            return respuesta;
         }
     }
 
@@ -344,14 +336,14 @@ public class ConsultaResource {
                 columnas = new String[] {"id", "etiqueta", "nivel_prioridad", "geom"};
                 break;
             case "incidente":
-                columnas = new String[] {"id", "etiqueta", "estado", "geom"};
-                sql = "SELECT i.id, '#' || i.id || ' ' || i.titulo || ' — ' || i.estado AS etiqueta, i.estado, " + geomIncidente("i") + " " +
+                columnas = new String[] {"id", "etiqueta", "titulo", "tipo_incidente", "estado", "prioridad", "geom"};
+                sql = "SELECT i.id, '#' || i.id || ' ' || i.titulo || ' — ' || i.estado AS etiqueta, i.titulo, i.tipo_incidente, i.estado, i.prioridad, " + geomIncidente("i") + " " +
                       "FROM incidente i WHERE i.titulo ILIKE ? OR i.id::text = ? ORDER BY i.fecha_hora_registro DESC LIMIT ?";
                 porNumero = true;
                 break;
             case "recurso":
-                columnas = new String[] {"id", "etiqueta", "estado_operativo", "geom"};
-                sql = "SELECT r.id, r.identificacion || ' — ' || r.tipo AS etiqueta, r.estado_operativo, " + geomIncidente("r") + " " +
+                columnas = new String[] {"id", "etiqueta", "identificacion", "tipo", "estado_operativo", "geom"};
+                sql = "SELECT r.id, r.identificacion || ' — ' || r.tipo AS etiqueta, r.identificacion, r.tipo, r.estado_operativo, " + geomIncidente("r") + " " +
                       "FROM recurso r WHERE r.identificacion ILIKE ? OR r.nombre ILIKE ? ORDER BY r.identificacion LIMIT ?";
                 porNumero = true;
                 break;

@@ -1,7 +1,8 @@
 import L from "leaflet";
 import { CircleMarker, Polygon, Polyline, useMap, useMapEvents } from "react-leaflet";
 import { Insignia } from "../../components/ui.jsx";
-import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
+import { IconoIncidente, IconoRecurso } from "../../components/iconos.jsx";
+import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD, nombreTipoIncidente } from "../../components/colores.js";
 import { GEOSERVER_WMS_URL } from "../../components/MapView.jsx";
 
 /**
@@ -14,7 +15,7 @@ import { GEOSERVER_WMS_URL } from "../../components/MapView.jsx";
 const aLatLng = ([x, y]) => L.CRS.EPSG3857.unproject(L.point(x, y));
 
 const WFS_URL = GEOSERVER_WMS_URL.replace(/\/wms$/, "/ows");
-const ORDEN = { incidente: 0, recurso: 1, acceso: 2, zona_operativa: 3, via: 4 };
+const ORDEN = { incidente: 0, recurso: 1, zona_operativa: 2, via: 3 };
 const capaDe = (objeto) => objeto.id.split(".")[0];
 
 async function consultarObjetos(map, latlng, capas, cql) {
@@ -152,15 +153,18 @@ function Objeto({ objeto }) {
     return (
       <article className="seleccion">
         <header className="detalle__cabecera">
-          <div>
-            <p className="seleccion__tipo">Incidente</p>
-            <h3 className="bloque__titulo">{p.titulo}</h3>
+          <div className="seleccion__encabezado">
+            <IconoIncidente tipo={p.tipo_incidente} estado={p.estado} />
+            <div>
+              <p className="seleccion__tipo">Incidente</p>
+              <h3 className="bloque__titulo">{p.titulo}</h3>
+            </div>
           </div>
           <Insignia color={COLOR_ESTADO_INCIDENTE[p.estado]}>{p.estado}</Insignia>
         </header>
         {p.descripcion && <p className="detalle__descripcion">{p.descripcion}</p>}
         <dl className="datos">
-          <Dato nombre="Tipo">{p.tipo_incidente}</Dato>
+          <Dato nombre="Tipo">{nombreTipoIncidente(p.tipo_incidente)}</Dato>
           <Dato nombre="Prioridad">{p.prioridad}</Dato>
           <Dato nombre="Fecha">{p.fecha_hora_registro && formatoFecha(p.fecha_hora_registro)}</Dato>
           <Dato nombre="Equipo">{p.equipo_responsable}</Dato>
@@ -173,9 +177,12 @@ function Objeto({ objeto }) {
     return (
       <article className="seleccion">
         <header className="detalle__cabecera">
-          <div>
-            <p className="seleccion__tipo">Recurso</p>
-            <h3 className="bloque__titulo">{p.identificacion}</h3>
+          <div className="seleccion__encabezado">
+            <IconoRecurso tipo={p.tipo} estado={p.estado_operativo} />
+            <div>
+              <p className="seleccion__tipo">Recurso</p>
+              <h3 className="bloque__titulo">{p.identificacion}</h3>
+            </div>
           </div>
           <Insignia color={COLOR_ESTADO_RECURSO[p.estado_operativo]}>{p.estado_operativo}</Insignia>
         </header>
@@ -185,22 +192,6 @@ function Objeto({ objeto }) {
           <Dato nombre="Nombre">{p.nombre}</Dato>
           <Dato nombre="Ubicación">{textoUbicacion(objeto.geometry)}</Dato>
         </dl>
-      </article>
-    );
-  }
-
-  if (capa === "acceso") {
-    return (
-      <article className="seleccion">
-        <header className="detalle__cabecera">
-          <div>
-            <p className="seleccion__tipo">Número de puerta</p>
-            <h3 className="bloque__titulo">
-              {p.nom_calle} {p.num_puerta}
-              {p.letra ?? ""}
-            </h3>
-          </div>
-        </header>
       </article>
     );
   }

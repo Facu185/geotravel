@@ -940,19 +940,11 @@
           }
         },
         {
-          "name": "C3. Recursos operativos (Disponible) más cercanos a un incidente",
+          "name": "C3. Recursos cercanos a un incidente (buffer, distancia directa y, con conRutas, rutas por calles)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}?limite=3"
-          }
-        },
-        {
-          "name": "C3b. Recursos cercanos dentro de un radio (devuelve el buffer en area)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}?limite=5&radioM=1500"
+            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}/analisis-vial?radioMetros=2000&limite=5&soloDisponibles=true&conRutas=false&criterio=mas_rapida"
           }
         },
         {

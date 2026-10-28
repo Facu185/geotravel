@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { GeoJSON } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import CargaPorZona, { AvisoCarga, SIN_CARGAR } from "../../components/CargaPorZona.jsx";
 import Enfocar from "../../components/Enfocar.jsx";
+import CapaAgrupada from "../../components/CapaAgrupada.jsx";
+import { posicion } from "../consultas/geometria.js";
 import EditorGeometria, { cargarGeometria, formaDe, geometriaDelGrupo } from "../../components/EditorGeometria.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Insignia, Segmentado } from "../../components/ui.jsx";
-import { COLOR_ESTADO_INCIDENTE, OPCIONES_PRIORIDAD } from "../../components/colores.js";
+import { COLOR_ESTADO_INCIDENTE, OPCIONES_PRIORIDAD, TIPOS_INCIDENTE, nombreTipoIncidente } from "../../components/colores.js";
 import { IconoIncidente, iconoIncidente } from "../../components/iconos.jsx";
 import { api } from "../../api/client.js";
 import { CARGA_POR_ZONA } from "../../components/region.js";
@@ -41,7 +43,7 @@ const TRANSICIONES = {
   Cancelado: [],
 };
 
-const FORM_VACIO = { titulo: "", descripcion: "", tipoIncidente: "", prioridad: 3, equipoResponsable: "" };
+const FORM_VACIO = { titulo: "", descripcion: "", tipoIncidente: "otro", prioridad: 3, equipoResponsable: "" };
 
 const FORMAS = [
   { valor: "Point", etiqueta: "Punto", color: "#13202c" },
@@ -58,7 +60,6 @@ const AYUDA_FORMA = {
 };
 const MARCA_FORMA = { Point: "circulo", LineString: "linea", Polygon: "zona" };
 
-const TIPOS = ["accidente_transito", "incendio", "corte_servicio", "inundacion", "calle_cortada", "otro"];
 
 const formatoFecha = (iso) =>
   new Date(iso).toLocaleString("es-UY", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
@@ -74,12 +75,12 @@ const estiloIncidente = (estado, tipo, resaltado) => {
 
 const comoFeature = (incidente) => ({
   type: "Feature",
-  properties: { id: incidente.id, titulo: incidente.titulo, estado: incidente.estado },
+  properties: { id: incidente.id, titulo: incidente.titulo, estado: incidente.estado, tipoIncidente: incidente.tipoIncidente },
   geometry: JSON.parse(incidente.geom),
 });
 
 /** Un incidente puntual se dibuja con el ícono compartido (components/iconos.jsx): el color es el estado. */
-const marcador = (resaltado) => (f, latlng) => L.marker(latlng, { icon: iconoIncidente(f.properties.estado, { resaltado }) });
+const marcador = (resaltado) => (f, latlng) => L.marker(latlng, { icon: iconoIncidente(f.properties.tipoIncidente, f.properties.estado, { resaltado }) });
 
 export default function IncidentesPage() {
   const [carga, setCarga] = useState(SIN_CARGAR); // incidentes de la vista actual (ver CargaPorZona)
@@ -251,11 +252,31 @@ export default function IncidentesPage() {
     ? (TRANSICIONES[seleccionado.estado] ?? []).map((estado) => ({ valor: estado, etiqueta: estado, color: COLOR_ESTADO_INCIDENTE[estado] }))
     : [];
 
-  // Los demás incidentes, de fondo (el que se edita va en el grupo editable, y el del detalle, resaltado).
+  // Los demás incidentes, de fondo (el que se edita va en el grupo editable, y el del detalle, resaltado). Los puntos se
+  // agrupan con un número al alejar el mapa (CapaAgrupada); las líneas y polígonos se dibujan como forma y además cuentan
+  // en el grupo por su centro.
+  const demas = useMemo(() => incidentes.filter((i) => i.id !== seleccionado?.id), [incidentes, seleccionado]);
   const fondo = {
     type: "FeatureCollection",
-    features: incidentes.filter((i) => i.id !== seleccionado?.id).map(comoFeature),
+    features: demas.map(comoFeature).filter((f) => f.geometry.type !== "Point"),
   };
+  const agrupables = useMemo(
+    () =>
+      demas.map((i) => {
+        const geometria = JSON.parse(i.geom);
+        return {
+          id: i.id,
+          pos: posicion(geometria),
+          icon: iconoIncidente(i.tipoIncidente, i.estado),
+          etiqueta: `${i.titulo} — ${i.estado}`,
+          alClick: () => seleccionar(i),
+          soloAgrupado: geometria.type !== "Point",
+        };
+      }),
+    // seleccionar solo usa estado de la página que no cambia lo que se dibuja
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [demas],
+  );
   const lejos = carga.estado === "lejos";
   const formaSeleccionado = seleccionado ? formaDe(JSON.parse(seleccionado.geom)) : null;
 
@@ -266,13 +287,13 @@ export default function IncidentesPage() {
       <GeoJSON
         key={`${version}-${seleccionado?.id ?? "ninguno"}`}
         data={fondo}
-        pointToLayer={marcador(false)}
         style={(f) => estiloIncidente(f.properties.estado, f.geometry.type, false)}
         onEachFeature={(f, capa) => {
           capa.bindTooltip(`${f.properties.titulo} — ${f.properties.estado}`);
           capa.on("click", () => seleccionar(incidentes.find((i) => i.id === f.properties.id)));
         }}
       />
+      <CapaAgrupada items={agrupables} />
       {vista === "detalle" && seleccionado && (
         <GeoJSON
           key={`resaltado-${seleccionado.id}-${seleccionado.estado}-${version}`}
@@ -328,7 +349,7 @@ export default function IncidentesPage() {
                     }}
                   >
                     {tipo === "Point" ? (
-                      <IconoIncidente estado={i.estado} chico />
+                      <IconoIncidente tipo={i.tipoIncidente} estado={i.estado} chico />
                     ) : (
                       <span className={`item__marca item__marca--${MARCA_FORMA[tipo]}`} style={{ "--color": COLOR_ESTADO_INCIDENTE[i.estado] }} aria-hidden="true" />
                     )}
@@ -361,7 +382,7 @@ export default function IncidentesPage() {
           <dl className="datos">
             <div>
               <dt>Tipo</dt>
-              <dd>{seleccionado.tipoIncidente}</dd>
+              <dd>{nombreTipoIncidente(seleccionado.tipoIncidente)}</dd>
             </div>
             <div>
               <dt>Prioridad</dt>
@@ -454,15 +475,19 @@ export default function IncidentesPage() {
             <span className="campo__etiqueta">Descripción</span>
             <textarea rows={2} {...campo("descripcion")} />
           </label>
-          <label className="campo">
-            <span className="campo__etiqueta">Tipo</span>
-            <input required list="tipos-incidente" placeholder="Ej.: incendio" {...campo("tipoIncidente")} />
-            <datalist id="tipos-incidente">
-              {TIPOS.map((t) => (
-                <option key={t} value={t} />
+          <fieldset className="segmentado">
+            <legend className="campo__etiqueta">Tipo (define el ícono del incidente)</legend>
+            <div className="segmentado__opciones">
+              {/* Un tipo que no está en la lista (datos viejos) se conserva y se dibuja como "otro". */}
+              {(TIPOS_INCIDENTE.includes(form.tipoIncidente) ? TIPOS_INCIDENTE : [...TIPOS_INCIDENTE, form.tipoIncidente]).map((t) => (
+                <label key={t} className={t === form.tipoIncidente ? "segmentado__opcion segmentado__opcion--activa" : "segmentado__opcion"}>
+                  <input type="radio" name="tipoIncidente" value={t} checked={t === form.tipoIncidente} onChange={() => setForm({ ...form, tipoIncidente: t })} />
+                  <IconoIncidente tipo={t} chico />
+                  {nombreTipoIncidente(t)}
+                </label>
               ))}
-            </datalist>
-          </label>
+            </div>
+          </fieldset>
           <Segmentado
             leyenda="Prioridad (1 = máxima, 5 = mínima)"
             nombre="prioridad"

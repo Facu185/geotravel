@@ -47,3 +47,19 @@ export const OPCIONES_PRIORIDAD = [1, 2, 3, 4, 5].map((n) => ({
   etiqueta: String(n),
   color: COLOR_PRIORIDAD[n],
 }));
+
+// Tipos de incidente que conocen los íconos (frontend/public/iconos/incidente-<tipo>.svg y los estilos de GeoServer).
+// El valor guardado es el de la izquierda; cualquier otro texto se dibuja como "otro".
+export const TIPOS_INCIDENTE = ["accidente_transito", "incendio", "corte_servicio", "inundacion", "calle_cortada", "otro"];
+
+export const ETIQUETA_TIPO_INCIDENTE = {
+  accidente_transito: "Accidente de tránsito",
+  incendio: "Incendio",
+  corte_servicio: "Corte de servicio",
+  inundacion: "Inundación",
+  calle_cortada: "Calle cortada",
+  otro: "Otro",
+};
+
+/** Nombre legible de un tipo; si es uno desconocido (datos viejos) se muestra tal cual. */
+export const nombreTipoIncidente = (tipo) => ETIQUETA_TIPO_INCIDENTE[tipo] ?? tipo;

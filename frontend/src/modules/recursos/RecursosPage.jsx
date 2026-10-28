@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Marker, Tooltip, useMapEvents } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import CargaPorZona, { AvisoCarga, SIN_CARGAR } from "../../components/CargaPorZona.jsx";
 import Enfocar from "../../components/Enfocar.jsx";
+import CapaAgrupada from "../../components/CapaAgrupada.jsx";
 import { IconoRecurso, iconoRecurso } from "../../components/iconos.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Segmentado } from "../../components/ui.jsx";
 import { COLOR_ESTADO_RECURSO, TIPOS_RECURSO, nombreTipoRecurso } from "../../components/colores.js";
@@ -137,6 +138,26 @@ export default function RecursosPage() {
     onChange: (e) => setForm({ ...form, [nombre]: e.target.value }),
   });
 
+  // Los demás recursos, de fondo: se agrupan con un número al alejar el mapa (CapaAgrupada).
+  const agrupables = useMemo(
+    () =>
+      recursos
+        .filter((r) => r.id !== seleccionado?.id)
+        .map((r) => {
+          const { lat, lng } = posicionDe(r);
+          return {
+            id: r.id,
+            pos: [lat, lng],
+            icon: iconoRecurso(r.tipo, r.estadoOperativo),
+            etiqueta: `${r.identificacion} — ${nombreTipoRecurso(r.tipo)}`,
+            alClick: () => seleccionar(r),
+          };
+        }),
+    // seleccionar solo usa estado de la página que no cambia lo que se dibuja
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [recursos, seleccionado],
+  );
+
   const hijosMapa = (
     <>
       <CargaPorZona ruta="/recursos" recarga={recarga} alCambiar={setCarga} />
@@ -144,26 +165,9 @@ export default function RecursosPage() {
       <ClickEnMapa alClick={(ubicacion) => vista === "form" && setPunto(ubicacion)} />
 
       {/* Los demás recursos, de fondo: la forma del ícono es el tipo y el color es el estado
-          (ver components/iconos.jsx). bubblingMouseEvents=false evita que el clic sobre un
-          marcador también cuente como clic en el mapa (y mueva la ubicación en edición). */}
-      {recursos
-        .filter((r) => r.id !== seleccionado?.id)
-        .map((r) => {
-          const { lat, lng } = posicionDe(r);
-          return (
-            <Marker
-              key={r.id}
-              position={[lat, lng]}
-              icon={iconoRecurso(r.tipo, r.estadoOperativo)}
-              bubblingMouseEvents={false}
-              eventHandlers={{ click: () => seleccionar(r) }}
-            >
-              <Tooltip>
-                {r.identificacion} — {nombreTipoRecurso(r.tipo)}
-              </Tooltip>
-            </Marker>
-          );
-        })}
+          (ver components/iconos.jsx). Un clic sobre un marcador no cuenta como clic en el mapa
+          (no mueve la ubicación en edición). */}
+      <CapaAgrupada items={agrupables} color="#0f766e" />
 
       {/* La ubicación que se está eligiendo (nueva o en edición): el mismo ícono, resaltado. */}
       {vista === "form" && punto && (

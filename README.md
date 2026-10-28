@@ -68,6 +68,10 @@ IDs fijos. La pantalla `/eta` muestra distancia, duracion y la ruta vial
 GeoJSON sobre Leaflet. El calculo de rutas utiliza un servicio OSRM con acceso
 a internet.
 
+**Ruta más corta (opcional):** el criterio `mas_corta` (minimiza distancia) usa un OSRM propio. Preparar los datos
+con `infra/osrm/preparar.ps1` (o `.sh`), definir `OSRM_URL`/`OSRM_SHORTEST_URL` en `infra/.env` y levantar con
+`docker compose --profile osrm up -d --build`. Detalles en [docs/RECURSOS_CERCANOS_RUTAS.md](docs/RECURSOS_CERCANOS_RUTAS.md).
+
 **Guia de instalacion en otra computadora y verificaciones:**
 [docs/ETA_SALTO_DEMO.md](docs/ETA_SALTO_DEMO.md).
 
@@ -172,15 +176,16 @@ Hay dos vistas, separadas por un login básico:
 
 | Vista | Cómo se entra | Qué ve |
 |---|---|---|
-| **Invitado** | Sin ingresar: es la pantalla inicial | El mapa público, con filtros, conteos y detalle |
-| **Administrador** | `/login` (botón "Ingresar") | Todo lo anterior, más zonas, recursos, incidentes y consultas |
+| **Invitado** | Sin ingresar: es la pantalla inicial | El mapa público (filtros, conteos y detalle) y las Consultas geográficas, con la leyenda de los íconos |
+| **Administrador** | `/login` (botón "Ingresar") | Todo lo anterior, más zonas, recursos, incidentes, tiempo de llegada y el reporte de incidentes |
 
 - **Usuario de prueba:** `admin` / `urbansafe`. Se cambian con `ADMIN_USUARIO` y `ADMIN_CLAVE` en `infra/.env`
   (ver `infra/.env.example`). Hay un único usuario; no hay ABM de usuarios.
 - **Cómo funciona:** `POST /auth/login` devuelve un token (vale 8 horas, vive en la memoria del backend: si se
   reinicia hay que ingresar de nuevo) que el frontend manda en `Authorization: Bearer ...`. Un filtro del backend
   (`auth/AuthFilter.java`) **protege toda la API por defecto**: solo son públicos `/health`, `/auth/login`,
-  `/auth/logout`, `GET /consultas/tipos-incidente` y `GET /fotos/...`. El mapa público dibuja con GeoServer.
+  `/auth/logout`, `GET /fotos/...` y la lectura de las Consultas del invitado (`GET /consultas/...` salvo el reporte,
+  el listado `GET /zonas|/incidentes|/recursos` y `GET /eta/criterios`). Escribir siempre exige sesión. El mapa público dibuja con GeoServer.
 - **En el frontend:** `frontend/src/auth/` (sesión, pantalla de ingreso y `RutaAdmin`, que manda al ingreso si no
   hay sesión). En Postman, correr primero la carpeta 0, que guarda el token.
 
@@ -233,7 +238,7 @@ documentado en el código (buscar "SUPUESTO").
 
 Base reestructurada para UrbanSafe: esquema de datos, endpoints núcleo (ABM
 completo de zonas y recursos, incidentes con máquina de estados por ramas y
-avanzar/historial, las 7 consultas geográficas + 1 reporte, búsqueda por dirección con números de puerta, cruce de calles y mapa público con filtros y detalle), carga a demanda (solo lo visible, con tope; el resto lo dibuja GeoServer), incidentes como punto, línea o polígono, datos de prueba en Salto y Montevideo, frontend con
+avanzar/historial, las 7 consultas geográficas + 1 reporte, búsqueda por dirección con números de puerta, cruce de calles y mapa público con filtros y detalle), carga a demanda (solo lo visible, con tope; el resto lo dibuja GeoServer), incidentes como punto, línea o polígono (con un ícono distinto por tipo de incidente), objetos cercanos agrupados con un número al alejar el mapa, tiempo de llegada con selección por clic o desplegable con búsqueda, datos de prueba en Salto y Montevideo, frontend con
 navegación entre módulos, docker-compose para el ambiente local, y CI de
 backend/frontend. Verificado de punta a punta (compilación, casos de API,
 navegador) antes de subir — ver el detalle en el historial de commits.
