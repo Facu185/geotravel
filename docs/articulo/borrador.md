@@ -40,6 +40,50 @@ comunican — ver `docs/diagramas/arquitectura.md`.]
 
 ## Implementación
 
+### Zonas operativas y recursos de emergencia (P3)
+
+Este módulo permite al administrador crear, editar y eliminar las **zonas operativas** (polígonos con un nivel de
+prioridad de 1 a 5) y los **recursos de emergencia** (puntos con un tipo y un estado operativo). El servicio REST está
+en `ZonaResource` y `RecursoResource` (Jersey, JDBC y PostGIS) y la interfaz en React con Leaflet.
+
+**Sistemas de coordenadas.** La base guarda las geometrías en EPSG:32721 (UTM 21S, en metros), que cubre Salto y casi
+todo el país y permite medir distancias en metros; Leaflet y GeoJSON trabajan en EPSG:4326 (grados). La conversión se hace
+siempre dentro de la consulta SQL, con las capacidades de la base: al guardar,
+`ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326), 32721)`; al leer, `ST_AsGeoJSON(ST_Transform(geom, 4326))`. Un
+detalle que da errores sutiles es el orden de las coordenadas: GeoJSON usa `[lon, lat]` y Leaflet `[lat, lon]`, por lo que
+en el módulo de recursos la conversión está aislada en dos funciones.
+
+**Validaciones.** El backend rechaza con `400` una zona sin nombre, con prioridad fuera de 1 a 5 o con una geometría que no
+sea un polígono válido (`ST_IsValid` y `GeometryType = 'POLYGON'`, lo que descarta también polígonos que se cruzan a sí
+mismos y GeoJSON mal formado). Un recurso solo se acepta si su tipo está en una lista cerrada (ambulancia, bomberos,
+patrulla, centro de atención u otro, normalizado a minúsculas), si su estado operativo es válido y si su ubicación es un
+punto. Las zonas **pueden superponerse** (definición del tutor), por lo que un punto, un recurso o un incidente puede
+pertenecer a más de una zona y las consultas por punto devuelven todas.
+
+**Dibujo y edición en el mapa.** Las zonas se dibujan y se modifican arrastrando sus vértices (`leaflet-draw`); al guardar
+se lee la forma directamente de la capa del mapa, para que valga lo que el usuario está viendo aunque no haya confirmado el
+cambio en la barra de dibujo. Los recursos se ubican con un clic. Cada tipo de recurso tiene su propio ícono (la **forma** es
+el tipo y el **color** es el estado operativo) y son los mismos archivos SVG que usa GeoServer, para que todos los mapas se
+vean igual (ver `docs/ICONOS.md`).
+
+**Carga a demanda.** Con miles de zonas y recursos no es viable que el navegador reciba todos los objetos. Los listados
+aceptan `?bbox=oeste,sur,este,norte&limit=N` y devuelven `{items, total, truncado}`: la consulta filtra con
+`geom && ST_Transform(ST_MakeEnvelope(...), 32721)`, que usa el índice espacial GiST, calcula el total real con
+`COUNT(*) OVER ()` antes de aplicar el límite (500 por defecto, 2000 como máximo) y recorta el rectángulo a la extensión de
+Uruguay antes de transformarlo. En el frontend, un componente compartido pide solo lo visible, espera 300 ms tras mover el
+mapa, cancela el pedido anterior y reemplaza la capa en lugar de acumularla; con el mapa alejado no pide nada y deja que
+GeoServer dibuje todos los objetos como imagen (WMS). Si hay más objetos que el límite, la pantalla avisa ("Mostrando 500
+de 3000"). Se probó con una carga masiva de 700 zonas y 3000 recursos en Salto (`db/pruebas/carga-masiva.sql`).
+
+**Pruebas.** Hay pruebas unitarias del rectángulo y del límite (`BboxTest`) y pruebas de integración contra PostGIS
+(`ZonasRecursosIntegrationTest`, se ejecutan con `URBANSAFE_INTEGRATION_TESTS=true`): comprueban que una zona idéntica a otra
+se acepta, que se rechazan los polígonos inválidos, la prioridad fuera de rango y los tipos de recurso no permitidos, y que lo
+creado aparece en el listado de su rectángulo y no en uno lejano.
+
+**Limitaciones.** Al eliminar un recurso se quita de las asignaciones de incidentes (borrado en cascada); la pantalla avisa
+cuántas son antes de confirmar, pero no se conserva ese historial. Las listas no se pueden filtrar por tipo, estado o
+prioridad, y los polígonos no se simplifican según el zoom.
+
 ### Productos y herramientas
 
 | Producto | Puntos fuertes | Puntos débiles | Evaluación general |

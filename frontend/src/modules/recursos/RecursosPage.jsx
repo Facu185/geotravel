@@ -122,7 +122,17 @@ export default function RecursosPage() {
   };
 
   const eliminar = async () => {
-    if (!window.confirm(`¿Eliminar "${seleccionado.identificacion}"?`)) return;
+    // Borrar un recurso lo quita de las asignaciones de incidentes (ON DELETE CASCADE): se avisa cuántas son.
+    let aviso = "";
+    try {
+      const { total } = await api.get(`/consultas/incidentes-por-recurso/${seleccionado.id}?limit=1`);
+      if (total > 0) {
+        aviso = `\n\nEstá asignado a ${total} ${total === 1 ? "incidente" : "incidentes"}: se quitará de ${total === 1 ? "esa asignación" : "esas asignaciones"} y se perderá ese registro.`;
+      }
+    } catch {
+      // si no se pudo consultar, se pregunta igual
+    }
+    if (!window.confirm(`¿Eliminar "${seleccionado.identificacion}"?${aviso}`)) return;
     try {
       await api.del(`/recursos/${seleccionado.id}`);
       volverALista();
