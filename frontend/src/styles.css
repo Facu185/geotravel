@@ -1733,3 +1733,15 @@ body {
   border-radius: 2px;
   background: #16a34a;
 }
+
+/* Desplegable con búsqueda (elegir un incidente o un recurso de todo el sistema). */
+.combo__lista {
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 2px;
+  padding: 6px;
+  background: var(--superficie, #fff);
+  border: 1px solid var(--borde, #d6dbd2);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(19, 32, 44, 0.18);
+}

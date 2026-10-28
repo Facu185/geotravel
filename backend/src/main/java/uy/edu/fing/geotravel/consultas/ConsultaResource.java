@@ -392,14 +392,14 @@ public class ConsultaResource {
                 columnas = new String[] {"id", "etiqueta", "nivel_prioridad", "geom"};
                 break;
             case "incidente":
-                columnas = new String[] {"id", "etiqueta", "estado", "geom"};
-                sql = "SELECT i.id, '#' || i.id || ' ' || i.titulo || ' — ' || i.estado AS etiqueta, i.estado, " + geomIncidente("i") + " " +
+                columnas = new String[] {"id", "etiqueta", "titulo", "tipo_incidente", "estado", "prioridad", "geom"};
+                sql = "SELECT i.id, '#' || i.id || ' ' || i.titulo || ' — ' || i.estado AS etiqueta, i.titulo, i.tipo_incidente, i.estado, i.prioridad, " + geomIncidente("i") + " " +
                       "FROM incidente i WHERE i.titulo ILIKE ? OR i.id::text = ? ORDER BY i.fecha_hora_registro DESC LIMIT ?";
                 porNumero = true;
                 break;
             case "recurso":
-                columnas = new String[] {"id", "etiqueta", "estado_operativo", "geom"};
-                sql = "SELECT r.id, r.identificacion || ' — ' || r.tipo AS etiqueta, r.estado_operativo, " + geomIncidente("r") + " " +
+                columnas = new String[] {"id", "etiqueta", "identificacion", "tipo", "estado_operativo", "geom"};
+                sql = "SELECT r.id, r.identificacion || ' — ' || r.tipo AS etiqueta, r.identificacion, r.tipo, r.estado_operativo, " + geomIncidente("r") + " " +
                       "FROM recurso r WHERE r.identificacion ILIKE ? OR r.nombre ILIKE ? ORDER BY r.identificacion LIMIT ?";
                 porNumero = true;
                 break;

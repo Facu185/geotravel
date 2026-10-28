@@ -176,7 +176,7 @@ function FilaRecurso({ r, dato }) {
 const NOMBRE_OBJETO = { zona: "zonas", incidente: "incidentes", recurso: "recursos" };
 
 /** Los objetos de la parte visible del mapa (con la geometría ya leída), o null si no hay nada para elegir todavía. */
-function useObjetosDeLaVista(carga) {
+export function useObjetosDeLaVista(carga) {
   return useMemo(() => {
     if (carga.estado === "lejos" || (carga.estado === "cargando" && carga.items.length === 0)) return null;
     return carga.items.map(conGeometria);
@@ -191,8 +191,29 @@ function useElegibles(setElegibles, tipo, items, elegido, elegir) {
   useEffect(() => () => setElegibles(null), [setElegibles]);
 }
 
+/** Un objeto para elegir en una lista (zona, incidente o recurso): ícono, nombre y detalle, con un clic se elige. */
+function ItemElegible({ tipo, objeto: o, activo, onElegir }) {
+  return (
+    <li>
+      <button type="button" className={activo ? "item item--activo" : "item"} onClick={() => onElegir(o)}>
+        {tipo === "zona" && <span className="item__marca item__marca--zona" style={{ "--color": COLOR_PRIORIDAD[o.nivelPrioridad] }} aria-hidden="true" />}
+        {tipo === "incidente" && <IconoIncidente tipo={o.tipoIncidente} estado={o.estado} chico />}
+        {tipo === "recurso" && <IconoRecurso tipo={o.tipo} estado={o.estadoOperativo} chico />}
+        <span className="item__texto">
+          <span className="item__titulo">{tipo === "zona" ? o.nombre : tipo === "incidente" ? o.titulo : o.identificacion}</span>
+          <span className="item__detalle">
+            {tipo === "zona" && `Prioridad ${o.nivelPrioridad}`}
+            {tipo === "incidente" && `${o.estado} · prioridad ${o.prioridad}`}
+            {tipo === "recurso" && `${nombreTipoRecurso(o.tipo)} · ${o.estadoOperativo}`}
+          </span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
 /** La lista de los objetos de la vista: se elige uno con un clic (igual que en el mapa). */
-function ListaElegible({ carga, tipo, objetos, elegido, onElegir }) {
+export function ListaElegible({ carga, tipo, objetos, elegido, onElegir }) {
   const nombre = NOMBRE_OBJETO[tipo];
   if (carga.estado === "lejos") return <Aviso tipo="info">Acercá el mapa para ver y elegir {nombre}.</Aviso>;
   if (carga.estado === "error") return <Aviso tipo="error">No se pudieron cargar {nombre}: {carga.error}</Aviso>;
@@ -207,24 +228,95 @@ function ListaElegible({ carga, tipo, objetos, elegido, onElegir }) {
       </p>
       <ul className="items">
         {objetos.map((o) => (
-          <li key={o.id}>
-            <button type="button" className={elegido?.id === o.id ? "item item--activo" : "item"} onClick={() => onElegir(o)}>
-              {tipo === "zona" && <span className="item__marca item__marca--zona" style={{ "--color": COLOR_PRIORIDAD[o.nivelPrioridad] }} aria-hidden="true" />}
-              {tipo === "incidente" && <IconoIncidente tipo={o.tipoIncidente} estado={o.estado} chico />}
-              {tipo === "recurso" && <IconoRecurso tipo={o.tipo} estado={o.estadoOperativo} chico />}
-              <span className="item__texto">
-                <span className="item__titulo">{tipo === "zona" ? o.nombre : tipo === "incidente" ? o.titulo : o.identificacion}</span>
-                <span className="item__detalle">
-                  {tipo === "zona" && `Prioridad ${o.nivelPrioridad}`}
-                  {tipo === "incidente" && `${o.estado} · prioridad ${o.prioridad}`}
-                  {tipo === "recurso" && `${nombreTipoRecurso(o.tipo)} · ${o.estadoOperativo}`}
-                </span>
-              </span>
-            </button>
-          </li>
+          <ItemElegible key={o.id} tipo={tipo} objeto={o} activo={elegido?.id === o.id} onElegir={onElegir} />
         ))}
       </ul>
     </>
+  );
+}
+
+/**
+ * Desplegable para elegir un incidente o un recurso de TODO el sistema (no solo de la parte visible del mapa): al hacer
+ * clic en el campo se abre la lista y escribiendo se filtra. Pide pocos resultados a /consultas/buscar. `filtrar`
+ * (opcional) descarta resultados, por ejemplo los incidentes ya resueltos.
+ */
+export function SelectorBuscable({ etiqueta, tipo, onElegir, filtrar, placeholder }) {
+  const [texto, setTexto] = useState("");
+  const [abierto, setAbierto] = useState(false);
+  const [resultados, setResultados] = useState(null);
+  const [error, setError] = useState(null);
+  const id = useId();
+
+  useEffect(() => {
+    if (!abierto) return undefined;
+    let vigente = true;
+    const espera = setTimeout(() => {
+      api
+        .get(`/consultas/buscar${query({ tipo, q: texto, limite: 25 })}`)
+        .then((lista) => {
+          if (!vigente) return;
+          setError(null);
+          setResultados(lista.map(conGeometria));
+        })
+        .catch((e) => vigente && setError(e.message));
+    }, 200);
+    return () => {
+      vigente = false;
+      clearTimeout(espera);
+    };
+  }, [tipo, texto, abierto]);
+
+  const mostrados = resultados && (filtrar ? resultados.filter(filtrar) : resultados);
+
+  return (
+    <div className="combo">
+      <label className="campo" htmlFor={id}>
+        <span className="campo__etiqueta">{etiqueta}</span>
+        <input
+          id={id}
+          type="search"
+          role="combobox"
+          aria-expanded={abierto}
+          aria-controls={`${id}-lista`}
+          value={texto}
+          placeholder={placeholder}
+          autoComplete="off"
+          onFocus={() => setAbierto(true)}
+          onClick={() => setAbierto(true)}
+          onBlur={() => setAbierto(false)}
+          onKeyDown={(e) => e.key === "Escape" && e.currentTarget.blur()}
+          onChange={(e) => {
+            setTexto(e.target.value);
+            setAbierto(true);
+          }}
+        />
+      </label>
+      {abierto && (
+        // onMouseDown evita que el campo pierda el foco (y se cierre la lista) antes de que llegue el clic.
+        <div className="combo__lista" id={`${id}-lista`} role="listbox" onMouseDown={(e) => e.preventDefault()}>
+          {error && <p className="item__detalle item__detalle--error">No se pudo buscar: {error}</p>}
+          {!error && !mostrados && <p className="ayuda">Buscando…</p>}
+          {mostrados && mostrados.length === 0 && <p className="ayuda">No hay coincidencias.</p>}
+          {mostrados && mostrados.length > 0 && (
+            <ul className="items">
+              {mostrados.map((o) => (
+                <ItemElegible
+                  key={o.id}
+                  tipo={tipo}
+                  objeto={o}
+                  activo={false}
+                  onElegir={(objeto) => {
+                    setAbierto(false);
+                    document.activeElement?.blur?.();
+                    onElegir(objeto);
+                  }}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
