@@ -5,7 +5,8 @@
  * Si se cambia un color allá, hay que cambiarlo acá para que la leyenda no mienta.
  *
  * Incidentes y recursos se dibujan con íconos (ver docs/ICONOS.md): en la leyenda, un ítem con `tipoIncidente` o `recurso`
- * muestra el ícono de ese tipo, y uno con `color`, un punto del color del estado.
+ * muestra el ícono de ese tipo, uno con `color`, un punto del color del estado, y uno con `grupo`, el círculo con número en
+ * que se agrupan los objetos cercanos con el mapa alejado (ver CapaAgrupada.jsx y geoserver/agrupamiento_sld.py).
  *
  * El orden importa: la primera capa queda abajo y la última arriba en el mapa
  * (las calles son líneas de referencia, las zonas son áreas, y los incidentes y recursos
@@ -57,6 +58,7 @@ export const CAPAS = [
       { color: "#7a3b8f", etiqueta: "Derivado" },
       { color: "#1f7a5c", etiqueta: "Resuelto" },
       { color: "#a8392b", etiqueta: "Cancelado" },
+      { grupo: "#13202c", etiqueta: "Varios juntos (el número es la cantidad)" },
     ],
   },
   {
@@ -74,6 +76,7 @@ export const CAPAS = [
       { color: "#1f7a5c", etiqueta: "Disponible" },
       { color: "#9a5a12", etiqueta: "En servicio" },
       { color: "#a8392b", etiqueta: "Fuera de servicio" },
+      { grupo: "#0f766e", etiqueta: "Varios juntos (el número es la cantidad)" },
     ],
   },
 ];

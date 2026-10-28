@@ -15,7 +15,7 @@
         <Rule>
           <Name>Registrado_Point_accidente_transito</Name>
           <Title>Registrado - accidente_transito (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -61,7 +61,7 @@
         <Rule>
           <Name>Registrado_Point_incendio</Name>
           <Title>Registrado - incendio (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -107,7 +107,7 @@
         <Rule>
           <Name>Registrado_Point_corte_servicio</Name>
           <Title>Registrado - corte_servicio (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -153,7 +153,7 @@
         <Rule>
           <Name>Registrado_Point_inundacion</Name>
           <Title>Registrado - inundacion (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -199,7 +199,7 @@
         <Rule>
           <Name>Registrado_Point_calle_cortada</Name>
           <Title>Registrado - calle_cortada (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -245,7 +245,7 @@
         <Rule>
           <Name>Registrado_Point_otro</Name>
           <Title>Registrado - otro (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -291,7 +291,7 @@
         <Rule>
           <Name>Registrado_Point_desconocido</Name>
           <Title>Registrado - tipo desconocido (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -415,7 +415,7 @@
         <Rule>
           <Name>En_atención_Point_accidente_transito</Name>
           <Title>En atención - accidente_transito (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -461,7 +461,7 @@
         <Rule>
           <Name>En_atención_Point_incendio</Name>
           <Title>En atención - incendio (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -507,7 +507,7 @@
         <Rule>
           <Name>En_atención_Point_corte_servicio</Name>
           <Title>En atención - corte_servicio (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -553,7 +553,7 @@
         <Rule>
           <Name>En_atención_Point_inundacion</Name>
           <Title>En atención - inundacion (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -599,7 +599,7 @@
         <Rule>
           <Name>En_atención_Point_calle_cortada</Name>
           <Title>En atención - calle_cortada (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -645,7 +645,7 @@
         <Rule>
           <Name>En_atención_Point_otro</Name>
           <Title>En atención - otro (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -691,7 +691,7 @@
         <Rule>
           <Name>En_atención_Point_desconocido</Name>
           <Title>En atención - tipo desconocido (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -815,7 +815,7 @@
         <Rule>
           <Name>Derivado_Point_accidente_transito</Name>
           <Title>Derivado - accidente_transito (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -861,7 +861,7 @@
         <Rule>
           <Name>Derivado_Point_incendio</Name>
           <Title>Derivado - incendio (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -907,7 +907,7 @@
         <Rule>
           <Name>Derivado_Point_corte_servicio</Name>
           <Title>Derivado - corte_servicio (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -953,7 +953,7 @@
         <Rule>
           <Name>Derivado_Point_inundacion</Name>
           <Title>Derivado - inundacion (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -999,7 +999,7 @@
         <Rule>
           <Name>Derivado_Point_calle_cortada</Name>
           <Title>Derivado - calle_cortada (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1045,7 +1045,7 @@
         <Rule>
           <Name>Derivado_Point_otro</Name>
           <Title>Derivado - otro (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1091,7 +1091,7 @@
         <Rule>
           <Name>Derivado_Point_desconocido</Name>
           <Title>Derivado - tipo desconocido (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1215,7 +1215,7 @@
         <Rule>
           <Name>Resuelto_Point_accidente_transito</Name>
           <Title>Resuelto - accidente_transito (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1261,7 +1261,7 @@
         <Rule>
           <Name>Resuelto_Point_incendio</Name>
           <Title>Resuelto - incendio (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1307,7 +1307,7 @@
         <Rule>
           <Name>Resuelto_Point_corte_servicio</Name>
           <Title>Resuelto - corte_servicio (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1353,7 +1353,7 @@
         <Rule>
           <Name>Resuelto_Point_inundacion</Name>
           <Title>Resuelto - inundacion (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1399,7 +1399,7 @@
         <Rule>
           <Name>Resuelto_Point_calle_cortada</Name>
           <Title>Resuelto - calle_cortada (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1445,7 +1445,7 @@
         <Rule>
           <Name>Resuelto_Point_otro</Name>
           <Title>Resuelto - otro (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1491,7 +1491,7 @@
         <Rule>
           <Name>Resuelto_Point_desconocido</Name>
           <Title>Resuelto - tipo desconocido (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1615,7 +1615,7 @@
         <Rule>
           <Name>Cancelado_Point_accidente_transito</Name>
           <Title>Cancelado - accidente_transito (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1661,7 +1661,7 @@
         <Rule>
           <Name>Cancelado_Point_incendio</Name>
           <Title>Cancelado - incendio (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1707,7 +1707,7 @@
         <Rule>
           <Name>Cancelado_Point_corte_servicio</Name>
           <Title>Cancelado - corte_servicio (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1753,7 +1753,7 @@
         <Rule>
           <Name>Cancelado_Point_inundacion</Name>
           <Title>Cancelado - inundacion (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1799,7 +1799,7 @@
         <Rule>
           <Name>Cancelado_Point_calle_cortada</Name>
           <Title>Cancelado - calle_cortada (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1845,7 +1845,7 @@
         <Rule>
           <Name>Cancelado_Point_otro</Name>
           <Title>Cancelado - otro (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1891,7 +1891,7 @@
         <Rule>
           <Name>Cancelado_Point_desconocido</Name>
           <Title>Cancelado - tipo desconocido (punto)</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>20000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -2011,6 +2011,151 @@
               <CssParameter name="stroke-width">1.5</CssParameter>
             </Stroke>
           </PolygonSymbolizer>
+        </Rule>
+      </FeatureTypeStyle>
+      <FeatureTypeStyle>
+        <Transformation>
+          <ogc:Function name="vec:PointStacker">
+            <ogc:Function name="parameter"><ogc:Literal>data</ogc:Literal></ogc:Function>
+            <ogc:Function name="parameter"><ogc:Literal>cellSize</ogc:Literal><ogc:Literal>64</ogc:Literal></ogc:Function>
+            <ogc:Function name="parameter"><ogc:Literal>weightClusterPosition</ogc:Literal><ogc:Literal>false</ogc:Literal></ogc:Function>
+            <ogc:Function name="parameter"><ogc:Literal>preserveLocation</ogc:Literal><ogc:Literal>Single</ogc:Literal></ogc:Function>
+            <ogc:Function name="parameter"><ogc:Literal>outputBBOX</ogc:Literal><ogc:Function name="env"><ogc:Literal>wms_bbox</ogc:Literal></ogc:Function></ogc:Function>
+            <ogc:Function name="parameter"><ogc:Literal>outputWidth</ogc:Literal><ogc:Function name="env"><ogc:Literal>wms_width</ogc:Literal></ogc:Function></ogc:Function>
+            <ogc:Function name="parameter"><ogc:Literal>outputHeight</ogc:Literal><ogc:Function name="env"><ogc:Literal>wms_height</ogc:Literal></ogc:Function></ogc:Function>
+          </ogc:Function>
+        </Transformation>
+        <Rule>
+          <Name>agrupado_uno</Name>
+          <Title>Uno solo</Title>
+          <MinScaleDenominator>20000</MinScaleDenominator>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter><ogc:PropertyIsEqualTo><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>1</ogc:Literal></ogc:PropertyIsEqualTo></ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>circle</WellKnownName>
+                <Fill><CssParameter name="fill">#13202c</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">2</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>12</Size>
+              <Displacement><DisplacementX>-9</DisplacementX><DisplacementY>9</DisplacementY></Displacement>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>agrupado_2_a_9</Name>
+          <Title>De 2 a 9</Title>
+          <MinScaleDenominator>20000</MinScaleDenominator>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter><ogc:And><ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>2</ogc:Literal></ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyIsLessThan><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>10</ogc:Literal></ogc:PropertyIsLessThan></ogc:And></ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>circle</WellKnownName>
+                <Fill><CssParameter name="fill">#13202c</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">2</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>28</Size>
+              <Displacement><DisplacementX>-9</DisplacementX><DisplacementY>9</DisplacementY></Displacement>
+            </Graphic>
+          </PointSymbolizer>
+          <TextSymbolizer>
+            <Label><ogc:PropertyName>count</ogc:PropertyName></Label>
+            <Font>
+              <CssParameter name="font-family">SansSerif</CssParameter>
+              <CssParameter name="font-size">13</CssParameter>
+              <CssParameter name="font-weight">bold</CssParameter>
+            </Font>
+            <LabelPlacement>
+              <PointPlacement>
+                <AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint>
+                <Displacement><DisplacementX>-9</DisplacementX><DisplacementY>-9</DisplacementY></Displacement>
+              </PointPlacement>
+            </LabelPlacement>
+            <Fill><CssParameter name="fill">#ffffff</CssParameter></Fill>
+            <VendorOption name="conflictResolution">false</VendorOption>
+          </TextSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>agrupado_10_a_99</Name>
+          <Title>De 10 a 99</Title>
+          <MinScaleDenominator>20000</MinScaleDenominator>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter><ogc:And><ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>10</ogc:Literal></ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyIsLessThan><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>100</ogc:Literal></ogc:PropertyIsLessThan></ogc:And></ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>circle</WellKnownName>
+                <Fill><CssParameter name="fill">#13202c</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">2</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>34</Size>
+              <Displacement><DisplacementX>-9</DisplacementX><DisplacementY>9</DisplacementY></Displacement>
+            </Graphic>
+          </PointSymbolizer>
+          <TextSymbolizer>
+            <Label><ogc:PropertyName>count</ogc:PropertyName></Label>
+            <Font>
+              <CssParameter name="font-family">SansSerif</CssParameter>
+              <CssParameter name="font-size">13</CssParameter>
+              <CssParameter name="font-weight">bold</CssParameter>
+            </Font>
+            <LabelPlacement>
+              <PointPlacement>
+                <AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint>
+                <Displacement><DisplacementX>-9</DisplacementX><DisplacementY>-9</DisplacementY></Displacement>
+              </PointPlacement>
+            </LabelPlacement>
+            <Fill><CssParameter name="fill">#ffffff</CssParameter></Fill>
+            <VendorOption name="conflictResolution">false</VendorOption>
+          </TextSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>agrupado_100_o_mas</Name>
+          <Title>100 o más</Title>
+          <MinScaleDenominator>20000</MinScaleDenominator>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter><ogc:And><ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>100</ogc:Literal></ogc:PropertyIsGreaterThanOrEqualTo></ogc:And></ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>circle</WellKnownName>
+                <Fill><CssParameter name="fill">#13202c</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">2</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>40</Size>
+              <Displacement><DisplacementX>-9</DisplacementX><DisplacementY>9</DisplacementY></Displacement>
+            </Graphic>
+          </PointSymbolizer>
+          <TextSymbolizer>
+            <Label><ogc:PropertyName>count</ogc:PropertyName></Label>
+            <Font>
+              <CssParameter name="font-family">SansSerif</CssParameter>
+              <CssParameter name="font-size">14</CssParameter>
+              <CssParameter name="font-weight">bold</CssParameter>
+            </Font>
+            <LabelPlacement>
+              <PointPlacement>
+                <AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint>
+                <Displacement><DisplacementX>-9</DisplacementX><DisplacementY>-9</DisplacementY></Displacement>
+              </PointPlacement>
+            </LabelPlacement>
+            <Fill><CssParameter name="fill">#ffffff</CssParameter></Fill>
+            <VendorOption name="conflictResolution">false</VendorOption>
+          </TextSymbolizer>
         </Rule>
       </FeatureTypeStyle>
     </UserStyle>

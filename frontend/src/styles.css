@@ -1772,3 +1772,32 @@ body {
   letter-spacing: 0.04em;
   color: var(--tinta-tenue);
 }
+
+/* Un grupo de objetos cercanos con el mapa alejado: un círculo con la cantidad (ver components/CapaAgrupada.jsx). */
+.grupo {
+  background: transparent;
+  border: 0;
+}
+
+.grupo__numero.grupo__numero--chico {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  border-width: 1.5px;
+}
+
+.grupo__numero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--color, #13202c);
+  box-shadow: 0 1px 4px rgba(15, 28, 40, 0.45);
+  color: #fff;
+  font-family: var(--fuente);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}

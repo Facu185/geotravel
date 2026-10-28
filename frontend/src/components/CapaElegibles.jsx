@@ -1,29 +1,58 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import L from "leaflet";
 import { GeoJSON } from "react-leaflet";
+import CapaAgrupada from "./CapaAgrupada.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_PRIORIDAD } from "./colores.js";
 import { iconoIncidente, iconoRecurso } from "./iconos.jsx";
 
 /** Texto del rótulo de un objeto para elegir. */
 const etiquetaDe = (tipo, o) => (tipo === "zona" ? o.nombre : tipo === "incidente" ? `${o.titulo} — ${o.estado}` : `${o.identificacion} — ${o.tipo}`);
 
+const COLOR_GRUPO = { incidente: "#13202c", recurso: "#0f766e" };
+
 /**
  * Los objetos de la vista que se pueden elegir con un clic en el mapa: zonas, incidentes o recursos, cada uno con su
- * color (prioridad, estado) o su ícono. El elegido se dibuja más marcado. Va dentro del mapa, todo en UNA capa GeoJSON.
+ * color (prioridad, estado) o su ícono. El elegido se dibuja más marcado. Va dentro del mapa.
  * La usan las Consultas y la pantalla de tiempo de llegada.
  *
- *   elegibles: { tipo: "zona" | "incidente" | "recurso", items (con `geometria`, ver consultas/geometria.js),
+ * Los incidentes y recursos se agrupan con un número cuando el mapa está alejado (ver CapaAgrupada): los puntos con su
+ * ícono, y las líneas y polígonos con su forma, que además cuentan en el grupo por su centro.
+ *
+ *   elegibles: { tipo: "zona" | "incidente" | "recurso", items (con `geometria` y `pos`, ver consultas/geometria.js),
  *                elegidoId, elegir(objeto) }; las zonas pueden traer "intensidad" (0 a 1).
  */
 export default function CapaElegibles({ elegibles }) {
   const ultimo = useRef(elegibles);
   ultimo.current = elegibles;
-  if (!elegibles || elegibles.items.length === 0) return null;
 
-  const { tipo, items, elegidoId } = elegibles;
+  const tipo = elegibles?.tipo;
+  const items = elegibles?.items;
+  const elegidoId = elegibles?.elegidoId;
+
+  // Lo que se agrupa: los íconos (y el centro de lo que no es un punto). Las zonas no se agrupan.
+  const agrupables = useMemo(() => {
+    if (!items || tipo === "zona") return [];
+    return items.map((o) => {
+      const resaltado = o.id === elegidoId;
+      return {
+        id: o.id,
+        pos: o.pos,
+        icon: tipo === "recurso" ? iconoRecurso(o.tipo, o.estadoOperativo, { resaltado }) : iconoIncidente(o.tipoIncidente, o.estado, { resaltado }),
+        etiqueta: etiquetaDe(tipo, o),
+        alClick: () => ultimo.current.elegir(o),
+        soloAgrupado: o.geometria.type !== "Point",
+        libre: resaltado,
+      };
+    });
+  }, [items, tipo, elegidoId]);
+
+  if (!elegibles || items.length === 0) return null;
+
+  // Se dibujan aparte las formas: las zonas (todas) y las líneas y polígonos de incidentes.
+  const formas = tipo === "zona" ? items : items.filter((o) => o.geometria.type !== "Point");
   const datos = {
     type: "FeatureCollection",
-    features: items.map((o) => ({ type: "Feature", properties: { id: o.id }, geometry: o.geometria })),
+    features: formas.map((o) => ({ type: "Feature", properties: { id: o.id }, geometry: o.geometria })),
   };
   const porId = new Map(items.map((o) => [o.id, o]));
 
@@ -40,30 +69,28 @@ export default function CapaElegibles({ elegibles }) {
       };
     }
     const color = tipo === "incidente" ? (COLOR_ESTADO_INCIDENTE[o.estado] ?? "#555") : "#555";
-    if (forma === "Point") return { color: elegido ? "#13202c" : "#ffffff", weight: elegido ? 4 : 1.5, fillColor: color, fillOpacity: 0.9 };
     if (forma === "LineString") return { color: elegido ? "#13202c" : color, weight: elegido ? 8 : 5, opacity: 0.9 };
     return { color: elegido ? "#13202c" : color, weight: elegido ? 4 : 2, fillColor: color, fillOpacity: elegido ? 0.45 : 0.3 };
   };
 
   return (
-    <GeoJSON
-      key={`${tipo}|${elegidoId}|${items.map((o) => `${o.id}:${o.intensidad ?? ""}`).join(",")}`}
-      data={datos}
-      pointToLayer={(f, latlng) => {
-        const o = porId.get(f.properties.id);
-        const resaltado = o.id === elegidoId;
-        if (tipo === "recurso") return L.marker(latlng, { icon: iconoRecurso(o.tipo, o.estadoOperativo, { resaltado }) });
-        return L.marker(latlng, { icon: iconoIncidente(o.tipoIncidente, o.estado, { resaltado }) });
-      }}
-      style={estilo}
-      onEachFeature={(f, capa) => {
-        const o = porId.get(f.properties.id);
-        capa.bindTooltip(etiquetaDe(tipo, o), { sticky: true });
-        capa.on("click", (e) => {
-          L.DomEvent.stopPropagation(e);
-          ultimo.current.elegir(o);
-        });
-      }}
-    />
+    <>
+      {formas.length > 0 && (
+        <GeoJSON
+          key={`${tipo}|${elegidoId}|${formas.map((o) => `${o.id}:${o.intensidad ?? ""}`).join(",")}`}
+          data={datos}
+          style={estilo}
+          onEachFeature={(f, capa) => {
+            const o = porId.get(f.properties.id);
+            capa.bindTooltip(etiquetaDe(tipo, o), { sticky: true });
+            capa.on("click", (e) => {
+              L.DomEvent.stopPropagation(e);
+              ultimo.current.elegir(o);
+            });
+          }}
+        />
+      )}
+      {agrupables.length > 0 && <CapaAgrupada items={agrupables} color={COLOR_GRUPO[tipo]} />}
+    </>
   );
 }

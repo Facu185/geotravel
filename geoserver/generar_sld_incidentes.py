@@ -15,8 +15,13 @@ Convención (docs/ICONOS.md, la misma que frontend/src/components/iconos.jsx):
     todo el cuadro (el signo de "otro", por ejemplo).
   - una LÍNEA (calle cortada) y un POLÍGONO (área afectada) se dibujan con su forma y el color del estado.
 Un tipo que no esté en la lista se dibuja como "otro".
+
+Con el mapa alejado (zoom 14 o menos, ver agrupamiento_sld.py) los incidentes se agrupan: un círculo con la cantidad,
+contando también las líneas y los polígonos (por su centroide). Las líneas y los polígonos se dibujan igual de todos modos.
 """
 import os
+
+import agrupamiento_sld
 
 # estado: (color del relleno, color del borde de los polígonos)
 ESTADOS = {
@@ -27,7 +32,8 @@ ESTADOS = {
     "Cancelado": ("#a8392b", "#7d2a20"),
 }
 TIPOS = ["accidente_transito", "incendio", "corte_servicio", "inundacion", "calle_cortada", "otro"]  # y "otro" también para cualquier tipo que no esté acá
-ESCALA_MAXIMA = 200000
+ESCALA_MAXIMA = agrupamiento_sld.ESCALA_MAXIMA
+ESCALA_ICONOS = agrupamiento_sld.ESCALA_ICONOS  # los íconos de los puntos solo se ven más cerca que esto; más lejos, agrupados
 CARPETA_ESTILOS = "file:///opt/geoserver/data_dir/styles"
 TAMANO_ROMBO = 21  # el cuadrado rotado 45 grados mide unos 30 px de punta a punta, como los círculos de los recursos
 TAMANO_DIBUJO = 13
@@ -47,8 +53,7 @@ CABECERA = """<?xml version="1.0" encoding="UTF-8"?>
       <Title>Incidentes por estado y tipo</Title>
       <FeatureTypeStyle>
 """
-PIE = """      </FeatureTypeStyle>
-    </UserStyle>
+PIE = """    </UserStyle>
   </NamedLayer>
 </StyledLayerDescriptor>
 """
@@ -70,12 +75,12 @@ def dimension(n):
               </ogc:PropertyIsEqualTo>"""
 
 
-def regla(nombre, titulo, condiciones, simbolizadores):
+def regla(nombre, titulo, condiciones, simbolizadores, escala=ESCALA_MAXIMA):
     cond = "\n              ".join(condiciones)
     return f"""        <Rule>
           <Name>{nombre}</Name>
           <Title>{titulo}</Title>
-          <MaxScaleDenominator>{ESCALA_MAXIMA}</MaxScaleDenominator>
+          <MaxScaleDenominator>{escala}</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               {cond}
@@ -140,14 +145,14 @@ def generar():
         clave = estado.replace(" ", "_")
         for tipo in TIPOS:
             reglas.append(regla(f"{clave}_Point_{tipo}", f"{estado} - {tipo} (punto)",
-                                [igual("estado", estado), dimension(0), igual("tipo_incidente", tipo)], punto(color, tipo)))
+                                [igual("estado", estado), dimension(0), igual("tipo_incidente", tipo)], punto(color, tipo), ESCALA_ICONOS))
         # un tipo que no esté en la lista se dibuja como "otro"
         alguno = "\n                  ".join(igual("tipo_incidente", t) for t in TIPOS)
         ninguno = f"<ogc:Not>\n                <ogc:Or>\n                  {alguno}\n                </ogc:Or>\n              </ogc:Not>"
-        reglas.append(regla(f"{clave}_Point_desconocido", f"{estado} - tipo desconocido (punto)", [igual("estado", estado), dimension(0), ninguno], punto(color, "otro")))
+        reglas.append(regla(f"{clave}_Point_desconocido", f"{estado} - tipo desconocido (punto)", [igual("estado", estado), dimension(0), ninguno], punto(color, "otro"), ESCALA_ICONOS))
         reglas.append(regla(f"{clave}_Line", f"{estado} - Línea", [igual("estado", estado), dimension(1)], linea(color)))
         reglas.append(regla(f"{clave}_Polygon", f"{estado} - Polígono", [igual("estado", estado), dimension(2)], poligono(color, borde)))
-    return CABECERA + "".join(reglas) + PIE
+    return CABECERA + "".join(reglas) + "      </FeatureTypeStyle>\n" + agrupamiento_sld.feature_type_style(agrupamiento_sld.COLOR_INCIDENTES, agrupamiento_sld.DESPLAZAMIENTO_INCIDENTES) + PIE
 
 
 if __name__ == "__main__":

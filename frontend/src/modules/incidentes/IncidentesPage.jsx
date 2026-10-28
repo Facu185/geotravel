@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { GeoJSON } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import CargaPorZona, { AvisoCarga, SIN_CARGAR } from "../../components/CargaPorZona.jsx";
 import Enfocar from "../../components/Enfocar.jsx";
+import CapaAgrupada from "../../components/CapaAgrupada.jsx";
+import { posicion } from "../consultas/geometria.js";
 import EditorGeometria, { cargarGeometria, formaDe, geometriaDelGrupo } from "../../components/EditorGeometria.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Insignia, Segmentado } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, OPCIONES_PRIORIDAD, TIPOS_INCIDENTE, nombreTipoIncidente } from "../../components/colores.js";
@@ -250,11 +252,31 @@ export default function IncidentesPage() {
     ? (TRANSICIONES[seleccionado.estado] ?? []).map((estado) => ({ valor: estado, etiqueta: estado, color: COLOR_ESTADO_INCIDENTE[estado] }))
     : [];
 
-  // Los demás incidentes, de fondo (el que se edita va en el grupo editable, y el del detalle, resaltado).
+  // Los demás incidentes, de fondo (el que se edita va en el grupo editable, y el del detalle, resaltado). Los puntos se
+  // agrupan con un número al alejar el mapa (CapaAgrupada); las líneas y polígonos se dibujan como forma y además cuentan
+  // en el grupo por su centro.
+  const demas = useMemo(() => incidentes.filter((i) => i.id !== seleccionado?.id), [incidentes, seleccionado]);
   const fondo = {
     type: "FeatureCollection",
-    features: incidentes.filter((i) => i.id !== seleccionado?.id).map(comoFeature),
+    features: demas.map(comoFeature).filter((f) => f.geometry.type !== "Point"),
   };
+  const agrupables = useMemo(
+    () =>
+      demas.map((i) => {
+        const geometria = JSON.parse(i.geom);
+        return {
+          id: i.id,
+          pos: posicion(geometria),
+          icon: iconoIncidente(i.tipoIncidente, i.estado),
+          etiqueta: `${i.titulo} — ${i.estado}`,
+          alClick: () => seleccionar(i),
+          soloAgrupado: geometria.type !== "Point",
+        };
+      }),
+    // seleccionar solo usa estado de la página que no cambia lo que se dibuja
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [demas],
+  );
   const lejos = carga.estado === "lejos";
   const formaSeleccionado = seleccionado ? formaDe(JSON.parse(seleccionado.geom)) : null;
 
@@ -265,13 +287,13 @@ export default function IncidentesPage() {
       <GeoJSON
         key={`${version}-${seleccionado?.id ?? "ninguno"}`}
         data={fondo}
-        pointToLayer={marcador(false)}
         style={(f) => estiloIncidente(f.properties.estado, f.geometry.type, false)}
         onEachFeature={(f, capa) => {
           capa.bindTooltip(`${f.properties.titulo} — ${f.properties.estado}`);
           capa.on("click", () => seleccionar(incidentes.find((i) => i.id === f.properties.id)));
         }}
       />
+      <CapaAgrupada items={agrupables} />
       {vista === "detalle" && seleccionado && (
         <GeoJSON
           key={`resaltado-${seleccionado.id}-${seleccionado.estado}-${version}`}

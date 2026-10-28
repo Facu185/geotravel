@@ -17,6 +17,10 @@ export function LeyendaCapa({ capa, suelta = false }) {
             <IconoIncidente tipo={item.tipoIncidente} chico />
           ) : item.recurso ? (
             <IconoRecurso tipo={item.recurso} estado="" chico />
+          ) : item.grupo ? (
+            <span className="grupo__numero grupo__numero--chico" style={{ "--color": item.grupo }} aria-hidden="true">
+              3
+            </span>
           ) : (
             <span className={`leyenda__marca leyenda__marca--${capa.id === "recursos" || capa.id === "incidentes" ? "circulo" : capa.forma}`} style={{ "--color": item.color }} aria-hidden="true" />
           )}

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import L from "leaflet";
-import { CircleMarker, GeoJSON, Marker, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import { CircleMarker, GeoJSON, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import CargaPorZona, { SIN_CARGAR } from "../../components/CargaPorZona.jsx";
 import { ZOOM_MINIMO_ELEGIR } from "../../components/region.js";
 import CapaElegibles from "../../components/CapaElegibles.jsx";
+import CapaAgrupada from "../../components/CapaAgrupada.jsx";
 import LeyendaIconos from "../../components/LeyendaCapa.jsx";
 import { useAuth } from "../../auth/AuthContext.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_PRIORIDAD } from "../../components/colores.js";
@@ -110,6 +111,31 @@ function CapaResultado({ resultado, punto }) {
   const pocasZonas = resultado.zonas.length <= 8; // con muchas, los rótulos se amontonan
   const hayRutaElegida = resultado.rutas.some((r) => r.elegida);
 
+  // Los incidentes y recursos del resultado se agrupan con un número al alejar el mapa; el elegido nunca se agrupa.
+  const incidentes = useMemo(
+    () =>
+      resultado.incidentes.map((i) => ({
+        id: i.id,
+        pos: i.pos,
+        icon: iconoIncidente(i.tipoIncidente, i.estado),
+        etiqueta: `${i.titulo} — ${i.estado}`,
+        soloAgrupado: i.geometria.type !== "Point",
+      })),
+    [resultado.incidentes],
+  );
+  const recursos = useMemo(
+    () =>
+      resultado.recursos.map((r) => ({
+        id: r.id,
+        pos: r.pos,
+        icon: iconoRecurso(r.tipo, r.estadoOperativo, { resaltado: Boolean(r.elegido) }),
+        etiqueta: `${r.identificacion} — ${r.tipo ?? r.estadoOperativo}`,
+        alClick: r.alElegir,
+        libre: Boolean(r.elegido),
+      })),
+    [resultado.recursos],
+  );
+
   return (
     <>
       {resultado.buffer && (
@@ -173,36 +199,18 @@ function CapaResultado({ resultado, punto }) {
         </GeoJSON>
       ))}
 
-      {resultado.incidentes.map((i) =>
-        i.geometria.type === "Point" ? (
-          <Marker key={`I${i.id}`} position={i.pos} icon={iconoIncidente(i.tipoIncidente, i.estado)} bubblingMouseEvents={false}>
-            <Tooltip>
-              {i.titulo} — {i.estado}
-            </Tooltip>
-          </Marker>
-        ) : (
-          // Un incidente lineal (calle cortada) o un polígono: se dibuja con su forma y el color de su estado.
+      {/* Un incidente lineal (calle cortada) o un polígono: se dibuja con su forma y el color de su estado. */}
+      {resultado.incidentes
+        .filter((i) => i.geometria.type !== "Point")
+        .map((i) => (
           <GeoJSON key={`I${i.id}`} data={i.geometria} bubblingMouseEvents={false} style={{ color: colorEstado(i), weight: 6, opacity: 0.9, fillOpacity: 0.25 }}>
             <Tooltip sticky>
               {i.titulo} — {i.estado}
             </Tooltip>
           </GeoJSON>
-        ),
-      )}
-
-      {resultado.recursos.map((r) => (
-        <Marker
-          key={`R${r.id}-${r.elegido ? "e" : ""}`}
-          position={r.pos}
-          icon={iconoRecurso(r.tipo, r.estadoOperativo, { resaltado: Boolean(r.elegido) })}
-          bubblingMouseEvents={false}
-          eventHandlers={r.alElegir ? { click: r.alElegir } : undefined}
-        >
-          <Tooltip>
-            {r.identificacion} — {r.tipo ?? r.estadoOperativo}
-          </Tooltip>
-        </Marker>
-      ))}
+        ))}
+      <CapaAgrupada items={incidentes} color="#13202c" />
+      <CapaAgrupada items={recursos} color="#0f766e" />
 
       {punto && (
         <CircleMarker center={punto} radius={12} pathOptions={{ color: "#13202c", weight: 4, fillOpacity: 0.25 }}>
