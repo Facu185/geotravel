@@ -1114,6 +1114,13 @@ body {
   color: #4b5b69;
 }
 
+.seleccion__encabezado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .btn--chico {
   padding: 4px 10px;
   font-size: 0.8rem;

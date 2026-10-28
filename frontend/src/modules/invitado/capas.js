@@ -4,6 +4,9 @@
  * Los colores salen de los estilos SLD que publica GeoServer (geoserver/styles/*.sld).
  * Si se cambia un color allá, hay que cambiarlo acá para que la leyenda no mienta.
  *
+ * Incidentes y recursos se dibujan con íconos (ver docs/ICONOS.md): en la leyenda, un ítem con `incidente: estado`
+ * muestra el triángulo del color de ese estado, y uno con `recurso: tipo` muestra el ícono de ese tipo de recurso.
+ *
  * El orden importa: la primera capa queda abajo y la última arriba en el mapa
  * (las calles son líneas de referencia, las zonas son áreas, y los incidentes y recursos
  * son puntos encima). `activaPorDefecto: false` la deja apagada hasta que se prenda.
@@ -49,28 +52,31 @@ export const CAPAS = [
     id: "incidentes",
     capa: "geotravel:incidente",
     nombre: "Incidentes",
-    descripcion: "Eventos urbanos, según su estado",
+    descripcion: "Eventos urbanos: el color es el estado",
     forma: "circulo",
     leyenda: [
-      { color: "#2b6b9e", etiqueta: "Registrado" },
-      { color: "#9a5a12", etiqueta: "En atención" },
-      { color: "#7a3b8f", etiqueta: "Derivado" },
-      { color: "#1f7a5c", etiqueta: "Resuelto" },
-      { color: "#a8392b", etiqueta: "Cancelado" },
+      { incidente: "Registrado", etiqueta: "Registrado" },
+      { incidente: "En atención", etiqueta: "En atención" },
+      { incidente: "Derivado", etiqueta: "Derivado" },
+      { incidente: "Resuelto", etiqueta: "Resuelto" },
+      { incidente: "Cancelado", etiqueta: "Cancelado" },
     ],
   },
   {
     id: "recursos",
     capa: "geotravel:recurso",
     nombre: "Recursos",
-    descripcion: "Ambulancias, bomberos y patrullas, según su tipo",
+    descripcion: "La forma del ícono es el tipo; el color, el estado operativo",
     forma: "cuadrado",
     leyenda: [
-      { color: "#c0392b", etiqueta: "Ambulancia" },
-      { color: "#a0522d", etiqueta: "Bomberos" },
-      { color: "#2980b9", etiqueta: "Patrulla" },
-      { color: "#27ae60", etiqueta: "Centro de atención" },
-      { color: "#7f8c8d", etiqueta: "Otro" },
+      { recurso: "ambulancia", etiqueta: "Ambulancia" },
+      { recurso: "bomberos", etiqueta: "Bomberos" },
+      { recurso: "patrulla", etiqueta: "Patrulla" },
+      { recurso: "centro_atencion", etiqueta: "Centro de atención" },
+      { recurso: "otro", etiqueta: "Otro" },
+      { color: "#1f7a5c", etiqueta: "Disponible" },
+      { color: "#9a5a12", etiqueta: "En servicio" },
+      { color: "#a8392b", etiqueta: "Fuera de servicio" },
     ],
   },
 ];

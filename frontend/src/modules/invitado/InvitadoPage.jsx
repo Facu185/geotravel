@@ -5,6 +5,7 @@ import PaginaMapa from "../../components/PaginaMapa.jsx";
 import { Selector } from "../../components/ui.jsx";
 import { api } from "../../api/client.js";
 import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, TIPOS_RECURSO } from "../../components/colores.js";
+import { IconoIncidente, IconoRecurso } from "../../components/iconos.jsx";
 import { CAPAS } from "./capas.js";
 import { ClickConsulta, DetalleFlotante, Seleccion } from "./detalle.jsx";
 import { FILTROS_VACIOS, cqlDeCapa, cqlParaCapas } from "./filtros.js";
@@ -304,7 +305,13 @@ export default function InvitadoPage() {
                 <ul className="leyenda" aria-label={`Leyenda de ${c.nombre}`}>
                   {c.leyenda.map((item) => (
                     <li key={item.etiqueta} className="leyenda__item">
-                      <span className={`leyenda__marca leyenda__marca--${c.forma}`} style={{ "--color": item.color }} aria-hidden="true" />
+                      {item.incidente ? (
+                        <IconoIncidente estado={item.incidente} chico />
+                      ) : item.recurso ? (
+                        <IconoRecurso tipo={item.recurso} estado="" chico />
+                      ) : (
+                        <span className={`leyenda__marca leyenda__marca--${c.id === "recursos" ? "circulo" : c.forma}`} style={{ "--color": item.color }} aria-hidden="true" />
+                      )}
                       {item.etiqueta}
                     </li>
                   ))}

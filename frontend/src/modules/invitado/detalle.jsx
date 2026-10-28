@@ -1,6 +1,7 @@
 import L from "leaflet";
 import { CircleMarker, Polygon, Polyline, useMap, useMapEvents } from "react-leaflet";
 import { Insignia } from "../../components/ui.jsx";
+import { IconoIncidente, IconoRecurso } from "../../components/iconos.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
 import { GEOSERVER_WMS_URL } from "../../components/MapView.jsx";
 
@@ -152,9 +153,12 @@ function Objeto({ objeto }) {
     return (
       <article className="seleccion">
         <header className="detalle__cabecera">
-          <div>
-            <p className="seleccion__tipo">Incidente</p>
-            <h3 className="bloque__titulo">{p.titulo}</h3>
+          <div className="seleccion__encabezado">
+            <IconoIncidente estado={p.estado} />
+            <div>
+              <p className="seleccion__tipo">Incidente</p>
+              <h3 className="bloque__titulo">{p.titulo}</h3>
+            </div>
           </div>
           <Insignia color={COLOR_ESTADO_INCIDENTE[p.estado]}>{p.estado}</Insignia>
         </header>
@@ -173,9 +177,12 @@ function Objeto({ objeto }) {
     return (
       <article className="seleccion">
         <header className="detalle__cabecera">
-          <div>
-            <p className="seleccion__tipo">Recurso</p>
-            <h3 className="bloque__titulo">{p.identificacion}</h3>
+          <div className="seleccion__encabezado">
+            <IconoRecurso tipo={p.tipo} estado={p.estado_operativo} />
+            <div>
+              <p className="seleccion__tipo">Recurso</p>
+              <h3 className="bloque__titulo">{p.identificacion}</h3>
+            </div>
           </div>
           <Insignia color={COLOR_ESTADO_RECURSO[p.estado_operativo]}>{p.estado_operativo}</Insignia>
         </header>

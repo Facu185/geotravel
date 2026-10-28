@@ -49,7 +49,7 @@ del estado** (`COLOR_ESTADO_INCIDENTE`): `iconoIncidente(estado)` para el mapa e
 `frontend/src/components/iconos.jsx`. Lo usan la pantalla Incidentes y las Consultas. Los incidentes de **línea**
 (calle cortada) y **polígono** (área afectada) se siguen dibujando con su forma y el color del estado.
 
-Pendiente en GeoServer (P1): que `incidentes_estado.sld` dibuje los puntos con este mismo ícono (un
-`PointSymbolizer` con `ExternalGraphic` sobre un círculo del color del estado), y que la leyenda del mapa público
-(`modules/invitado/capas.js`) se actualice cuando el SLD cambie. Si se quiere un ícono por tipo de incidente,
+En GeoServer, `incidentes_estado.sld` y `recursos_tipo.sld` (P1) dibujan los mismos SVG. La leyenda y el detalle del mapa
+público (`modules/invitado/capas.js` y `detalle.jsx`) usan los mismos íconos; si se cambia un SLD, hay que cambiarlos ahí también.
+Si se quiere un ícono por tipo de incidente,
 agregar los SVG a la misma carpeta con el nombre `incidente-<tipo>.svg`.
