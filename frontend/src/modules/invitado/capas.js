@@ -4,8 +4,8 @@
  * Los colores salen de los estilos SLD que publica GeoServer (geoserver/styles/*.sld).
  * Si se cambia un color allá, hay que cambiarlo acá para que la leyenda no mienta.
  *
- * Incidentes y recursos se dibujan con íconos (ver docs/ICONOS.md): en la leyenda, un ítem con `incidente: estado`
- * muestra el triángulo del color de ese estado, y uno con `recurso: tipo` muestra el ícono de ese tipo de recurso.
+ * Incidentes y recursos se dibujan con íconos (ver docs/ICONOS.md): en la leyenda, un ítem con `tipoIncidente` o `recurso`
+ * muestra el ícono de ese tipo, y uno con `color`, un punto del color del estado.
  *
  * El orden importa: la primera capa queda abajo y la última arriba en el mapa
  * (las calles son líneas de referencia, las zonas son áreas, y los incidentes y recursos
@@ -43,14 +43,20 @@ export const CAPAS = [
     id: "incidentes",
     capa: "geotravel:incidente",
     nombre: "Incidentes",
-    descripcion: "Eventos urbanos: el color es el estado",
+    descripcion: "La forma del ícono es el tipo; el color, el estado",
     forma: "circulo",
     leyenda: [
-      { incidente: "Registrado", etiqueta: "Registrado" },
-      { incidente: "En atención", etiqueta: "En atención" },
-      { incidente: "Derivado", etiqueta: "Derivado" },
-      { incidente: "Resuelto", etiqueta: "Resuelto" },
-      { incidente: "Cancelado", etiqueta: "Cancelado" },
+      { tipoIncidente: "accidente_transito", etiqueta: "Accidente de tránsito" },
+      { tipoIncidente: "incendio", etiqueta: "Incendio" },
+      { tipoIncidente: "corte_servicio", etiqueta: "Corte de servicio" },
+      { tipoIncidente: "inundacion", etiqueta: "Inundación" },
+      { tipoIncidente: "calle_cortada", etiqueta: "Calle cortada" },
+      { tipoIncidente: "otro", etiqueta: "Otro" },
+      { color: "#2b6b9e", etiqueta: "Registrado" },
+      { color: "#9a5a12", etiqueta: "En atención" },
+      { color: "#7a3b8f", etiqueta: "Derivado" },
+      { color: "#1f7a5c", etiqueta: "Resuelto" },
+      { color: "#a8392b", etiqueta: "Cancelado" },
     ],
   },
   {

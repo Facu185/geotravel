@@ -305,12 +305,12 @@ export default function InvitadoPage() {
                 <ul className="leyenda" aria-label={`Leyenda de ${c.nombre}`}>
                   {c.leyenda.map((item) => (
                     <li key={item.etiqueta} className="leyenda__item">
-                      {item.incidente ? (
-                        <IconoIncidente estado={item.incidente} chico />
+                      {item.tipoIncidente ? (
+                        <IconoIncidente tipo={item.tipoIncidente} chico />
                       ) : item.recurso ? (
                         <IconoRecurso tipo={item.recurso} estado="" chico />
                       ) : (
-                        <span className={`leyenda__marca leyenda__marca--${c.id === "recursos" ? "circulo" : c.forma}`} style={{ "--color": item.color }} aria-hidden="true" />
+                        <span className={`leyenda__marca leyenda__marca--${c.id === "recursos" || c.id === "incidentes" ? "circulo" : c.forma}`} style={{ "--color": item.color }} aria-hidden="true" />
                       )}
                       {item.etiqueta}
                     </li>

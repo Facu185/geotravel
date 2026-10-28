@@ -178,7 +178,7 @@ function CapaResultado({ resultado, punto }) {
 
       {resultado.incidentes.map((i) =>
         i.geometria.type === "Point" ? (
-          <Marker key={`I${i.id}`} position={i.pos} icon={iconoIncidente(i.estado)} bubblingMouseEvents={false}>
+          <Marker key={`I${i.id}`} position={i.pos} icon={iconoIncidente(i.tipoIncidente, i.estado)} bubblingMouseEvents={false}>
             <Tooltip>
               {i.titulo} — {i.estado}
             </Tooltip>
@@ -262,7 +262,7 @@ function CapaElegibles({ elegibles }) {
         const o = porId.get(f.properties.id);
         const resaltado = o.id === elegidoId;
         if (tipo === "recurso") return L.marker(latlng, { icon: iconoRecurso(o.tipo, o.estadoOperativo, { resaltado }) });
-        return L.marker(latlng, { icon: iconoIncidente(o.estado, { resaltado }) });
+        return L.marker(latlng, { icon: iconoIncidente(o.tipoIncidente, o.estado, { resaltado }) });
       }}
       style={estilo}
       onEachFeature={(f, capa) => {

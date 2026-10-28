@@ -1,5 +1,5 @@
 import L from "leaflet";
-import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, TIPOS_RECURSO, nombreTipoRecurso } from "./colores.js";
+import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, TIPOS_INCIDENTE, TIPOS_RECURSO, nombreTipoIncidente, nombreTipoRecurso } from "./colores.js";
 
 /**
  * Íconos de los recursos de emergencia. Convención (la misma para el mapa de administración,
@@ -7,8 +7,7 @@ import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, TIPOS_RECURSO, nombreTipo
  *   - la FORMA dice el tipo de recurso (ambulancia, bomberos, patrulla, centro de atención, otro);
  *   - el COLOR dice el estado operativo (disponible, en servicio, fuera de servicio).
  *
- * Los dibujos son archivos SVG blancos en frontend/public/iconos/ (recurso-<tipo>.svg e
- * incidente.svg). Se dibujan sobre un círculo del color del estado. Son los mismos archivos que se
+ * Los dibujos son archivos SVG blancos en frontend/public/iconos/ (recurso-<tipo>.svg e incidente-<tipo>.svg). Se dibujan sobre un círculo del color del estado. Son los mismos archivos que se
  * pueden subir a GeoServer (ExternalGraphic en el SLD) para que ambos mapas se vean igual.
  */
 
@@ -19,7 +18,6 @@ const COLOR_DESCONOCIDO = "#555555";
 const tipoConocido = (tipo) => (TIPOS_RECURSO.includes(tipo) ? tipo : "otro");
 
 export const urlIconoRecurso = (tipo) => `${BASE}iconos/recurso-${tipoConocido(tipo)}.svg`;
-export const urlIconoIncidente = `${BASE}iconos/incidente.svg`;
 export const colorEstadoRecurso = (estado) => COLOR_ESTADO_RECURSO[estado] ?? COLOR_DESCONOCIDO;
 
 const TAMANO_MARCADOR = 30;
@@ -67,22 +65,27 @@ export function IconoRecurso({ tipo, estado, chico = false }) {
 // ------------------------------------------------------------------------------------------ incidentes
 
 /**
- * Íconos de los incidentes puntuales (las líneas y los polígonos se dibujan con su forma): el dibujo es siempre el
- * mismo (el triángulo de advertencia, incidente.svg) y el COLOR dice el estado, el mismo de COLOR_ESTADO_INCIDENTE.
+ * Íconos de los incidentes puntuales (las líneas y los polígonos se dibujan con su forma). Misma idea que los
+ * recursos: la FORMA del dibujo dice el TIPO (accidente, incendio, corte de servicio, inundación, calle cortada, otro)
+ * y el COLOR dice el estado (COLOR_ESTADO_INCIDENTE). Van sobre un ROMBO, para no confundirlos con los recursos, que
+ * van sobre un círculo. Los dibujos son frontend/public/iconos/incidente-<tipo>.svg (los mismos que usa GeoServer).
  */
+const tipoIncidenteConocido = (tipo) => (TIPOS_INCIDENTE.includes(tipo) ? tipo : "otro");
+
+export const urlIconoIncidente = (tipo) => `${BASE}iconos/incidente-${tipoIncidenteConocido(tipo)}.svg`;
 export const colorEstadoIncidente = (estado) => COLOR_ESTADO_INCIDENTE[estado] ?? COLOR_DESCONOCIDO;
 
 /** Ícono de Leaflet de un incidente puntual, para un <Marker icon={...}>. `resaltado` marca el que se está eligiendo. */
-export function iconoIncidente(estado, { resaltado = false } = {}) {
-  const clave = `incidente|${estado}|${resaltado}`;
+export function iconoIncidente(tipo, estado, { resaltado = false } = {}) {
+  const clave = `incidente|${tipoIncidenteConocido(tipo)}|${estado}|${resaltado}`;
   if (!cache.has(clave)) {
     cache.set(
       clave,
       L.divIcon({
         className: "marcador-recurso",
         html:
-          `<span class="insignia-icono${resaltado ? " insignia-icono--resaltado" : ""}" style="--color:${colorEstadoIncidente(estado)}">` +
-          `<img src="${urlIconoIncidente}" alt="" draggable="false"></span>`,
+          `<span class="insignia-rombo${resaltado ? " insignia-rombo--resaltado" : ""}" style="--color:${colorEstadoIncidente(estado)}">` +
+          `<img src="${urlIconoIncidente(tipo)}" alt="" draggable="false"></span>`,
         iconSize: [TAMANO_MARCADOR, TAMANO_MARCADOR],
         iconAnchor: [TAMANO_MARCADOR / 2, TAMANO_MARCADOR / 2],
         tooltipAnchor: [TAMANO_MARCADOR / 2, 0],
@@ -92,16 +95,16 @@ export function iconoIncidente(estado, { resaltado = false } = {}) {
   return cache.get(clave);
 }
 
-/** El mismo ícono para listas y leyendas (fuera del mapa). */
-export function IconoIncidente({ estado, chico = false }) {
+/** El mismo ícono para listas y leyendas (fuera del mapa). Sin estado, se dibuja con el color neutro. */
+export function IconoIncidente({ tipo, estado, chico = false }) {
   return (
     <span
-      className={chico ? "insignia-icono insignia-icono--chico" : "insignia-icono"}
+      className={chico ? "insignia-rombo insignia-rombo--chico" : "insignia-rombo"}
       style={{ "--color": colorEstadoIncidente(estado) }}
       role="img"
-      aria-label={estado ? `Incidente (${estado})` : "Incidente"}
+      aria-label={estado ? `${nombreTipoIncidente(tipo)} (${estado})` : nombreTipoIncidente(tipo)}
     >
-      <img src={urlIconoIncidente} alt="" draggable="false" />
+      <img src={urlIconoIncidente(tipo)} alt="" draggable="false" />
     </span>
   );
 }

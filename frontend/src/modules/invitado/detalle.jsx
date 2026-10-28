@@ -2,7 +2,7 @@ import L from "leaflet";
 import { CircleMarker, Polygon, Polyline, useMap, useMapEvents } from "react-leaflet";
 import { Insignia } from "../../components/ui.jsx";
 import { IconoIncidente, IconoRecurso } from "../../components/iconos.jsx";
-import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD } from "../../components/colores.js";
+import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, COLOR_PRIORIDAD, nombreTipoIncidente } from "../../components/colores.js";
 import { GEOSERVER_WMS_URL } from "../../components/MapView.jsx";
 
 /**
@@ -154,7 +154,7 @@ function Objeto({ objeto }) {
       <article className="seleccion">
         <header className="detalle__cabecera">
           <div className="seleccion__encabezado">
-            <IconoIncidente estado={p.estado} />
+            <IconoIncidente tipo={p.tipo_incidente} estado={p.estado} />
             <div>
               <p className="seleccion__tipo">Incidente</p>
               <h3 className="bloque__titulo">{p.titulo}</h3>
@@ -164,7 +164,7 @@ function Objeto({ objeto }) {
         </header>
         {p.descripcion && <p className="detalle__descripcion">{p.descripcion}</p>}
         <dl className="datos">
-          <Dato nombre="Tipo">{p.tipo_incidente}</Dato>
+          <Dato nombre="Tipo">{nombreTipoIncidente(p.tipo_incidente)}</Dato>
           <Dato nombre="Prioridad">{p.prioridad}</Dato>
           <Dato nombre="Fecha">{p.fecha_hora_registro && formatoFecha(p.fecha_hora_registro)}</Dato>
           <Dato nombre="Equipo">{p.equipo_responsable}</Dato>

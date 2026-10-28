@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Generado por geoserver/generar_sld_incidentes.py: no editar a mano. -->
 <StyledLayerDescriptor version="1.0.0"
     xmlns="http://www.opengis.net/sld"
     xmlns:ogc="http://www.opengis.net/ogc"
@@ -9,12 +10,11 @@
     <Name>geotravel:incidente</Name>
     <UserStyle>
       <Name>incidentes_estado</Name>
-      <Title>Incidentes por estado</Title>
+      <Title>Incidentes por estado y tipo</Title>
       <FeatureTypeStyle>
-        <!-- REGISTRADO - PUNTO (dimension = 0) -->
         <Rule>
-          <Name>Registrado_Point</Name>
-          <Title>Registrado - Punto</Title>
+          <Name>Registrado_Point_accidente_transito</Name>
+          <Title>Registrado - accidente_transito (punto)</Title>
           <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
@@ -28,28 +28,336 @@
                 </ogc:Function>
                 <ogc:Literal>0</ogc:Literal>
               </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>accidente_transito</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
             </ogc:And>
           </ogc:Filter>
           <PointSymbolizer>
             <Graphic>
               <Mark>
-                <WellKnownName>circle</WellKnownName>
+                <WellKnownName>square</WellKnownName>
                 <Fill><CssParameter name="fill">#2b6b9e</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
               </Mark>
-              <Size>30</Size>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
             </Graphic>
           </PointSymbolizer>
           <PointSymbolizer>
             <Graphic>
               <ExternalGraphic>
-                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente.svg" xlink:type="simple"/>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-accidente_transito.svg" xlink:type="simple"/>
                 <Format>image/svg+xml</Format>
               </ExternalGraphic>
-              <Size>14</Size>
+              <Size>13</Size>
             </Graphic>
           </PointSymbolizer>
         </Rule>
-        <!-- REGISTRADO - LINEA (dimension = 1) -->
+        <Rule>
+          <Name>Registrado_Point_incendio</Name>
+          <Title>Registrado - incendio (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Registrado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>incendio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#2b6b9e</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-incendio.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Registrado_Point_corte_servicio</Name>
+          <Title>Registrado - corte_servicio (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Registrado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>corte_servicio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#2b6b9e</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-corte_servicio.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Registrado_Point_inundacion</Name>
+          <Title>Registrado - inundacion (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Registrado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>inundacion</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#2b6b9e</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-inundacion.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Registrado_Point_calle_cortada</Name>
+          <Title>Registrado - calle_cortada (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Registrado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>calle_cortada</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#2b6b9e</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-calle_cortada.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Registrado_Point_otro</Name>
+          <Title>Registrado - otro (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Registrado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>otro</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#2b6b9e</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-otro.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Registrado_Point_desconocido</Name>
+          <Title>Registrado - tipo desconocido (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Registrado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:Not>
+                <ogc:Or>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>accidente_transito</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>incendio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>corte_servicio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>inundacion</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>calle_cortada</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>otro</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                </ogc:Or>
+              </ogc:Not>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#2b6b9e</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-otro.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
         <Rule>
           <Name>Registrado_Line</Name>
           <Title>Registrado - Línea</Title>
@@ -75,7 +383,6 @@
             </Stroke>
           </LineSymbolizer>
         </Rule>
-        <!-- REGISTRADO - POLIGONO (dimension = 2) -->
         <Rule>
           <Name>Registrado_Polygon</Name>
           <Title>Registrado - Polígono</Title>
@@ -105,10 +412,9 @@
             </Stroke>
           </PolygonSymbolizer>
         </Rule>
-        <!-- EN ATENCION - PUNTO -->
         <Rule>
-          <Name>En atención_Point</Name>
-          <Title>En atención - Punto</Title>
+          <Name>En_atención_Point_accidente_transito</Name>
+          <Title>En atención - accidente_transito (punto)</Title>
           <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
@@ -122,30 +428,338 @@
                 </ogc:Function>
                 <ogc:Literal>0</ogc:Literal>
               </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>accidente_transito</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
             </ogc:And>
           </ogc:Filter>
           <PointSymbolizer>
             <Graphic>
               <Mark>
-                <WellKnownName>circle</WellKnownName>
+                <WellKnownName>square</WellKnownName>
                 <Fill><CssParameter name="fill">#9a5a12</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
               </Mark>
-              <Size>30</Size>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
             </Graphic>
           </PointSymbolizer>
           <PointSymbolizer>
             <Graphic>
               <ExternalGraphic>
-                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente.svg" xlink:type="simple"/>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-accidente_transito.svg" xlink:type="simple"/>
                 <Format>image/svg+xml</Format>
               </ExternalGraphic>
-              <Size>14</Size>
+              <Size>13</Size>
             </Graphic>
           </PointSymbolizer>
         </Rule>
-        <!-- EN ATENCION - LINEA -->
         <Rule>
-          <Name>En atención_Line</Name>
+          <Name>En_atención_Point_incendio</Name>
+          <Title>En atención - incendio (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>En atención</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>incendio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#9a5a12</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-incendio.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>En_atención_Point_corte_servicio</Name>
+          <Title>En atención - corte_servicio (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>En atención</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>corte_servicio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#9a5a12</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-corte_servicio.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>En_atención_Point_inundacion</Name>
+          <Title>En atención - inundacion (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>En atención</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>inundacion</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#9a5a12</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-inundacion.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>En_atención_Point_calle_cortada</Name>
+          <Title>En atención - calle_cortada (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>En atención</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>calle_cortada</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#9a5a12</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-calle_cortada.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>En_atención_Point_otro</Name>
+          <Title>En atención - otro (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>En atención</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>otro</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#9a5a12</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-otro.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>En_atención_Point_desconocido</Name>
+          <Title>En atención - tipo desconocido (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>En atención</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:Not>
+                <ogc:Or>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>accidente_transito</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>incendio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>corte_servicio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>inundacion</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>calle_cortada</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>otro</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                </ogc:Or>
+              </ogc:Not>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#9a5a12</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-otro.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>En_atención_Line</Name>
           <Title>En atención - Línea</Title>
           <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
@@ -169,9 +783,8 @@
             </Stroke>
           </LineSymbolizer>
         </Rule>
-        <!-- EN ATENCION - POLIGONO -->
         <Rule>
-          <Name>En atención_Polygon</Name>
+          <Name>En_atención_Polygon</Name>
           <Title>En atención - Polígono</Title>
           <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
@@ -199,10 +812,9 @@
             </Stroke>
           </PolygonSymbolizer>
         </Rule>
-        <!-- DERIVADO - PUNTO -->
         <Rule>
-          <Name>Derivado_Point</Name>
-          <Title>Derivado - Punto</Title>
+          <Name>Derivado_Point_accidente_transito</Name>
+          <Title>Derivado - accidente_transito (punto)</Title>
           <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
@@ -216,28 +828,336 @@
                 </ogc:Function>
                 <ogc:Literal>0</ogc:Literal>
               </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>accidente_transito</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
             </ogc:And>
           </ogc:Filter>
           <PointSymbolizer>
             <Graphic>
               <Mark>
-                <WellKnownName>circle</WellKnownName>
+                <WellKnownName>square</WellKnownName>
                 <Fill><CssParameter name="fill">#7a3b8f</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
               </Mark>
-              <Size>30</Size>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
             </Graphic>
           </PointSymbolizer>
           <PointSymbolizer>
             <Graphic>
               <ExternalGraphic>
-                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente.svg" xlink:type="simple"/>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-accidente_transito.svg" xlink:type="simple"/>
                 <Format>image/svg+xml</Format>
               </ExternalGraphic>
-              <Size>14</Size>
+              <Size>13</Size>
             </Graphic>
           </PointSymbolizer>
         </Rule>
-        <!-- DERIVADO - LINEA -->
+        <Rule>
+          <Name>Derivado_Point_incendio</Name>
+          <Title>Derivado - incendio (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Derivado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>incendio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#7a3b8f</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-incendio.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Derivado_Point_corte_servicio</Name>
+          <Title>Derivado - corte_servicio (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Derivado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>corte_servicio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#7a3b8f</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-corte_servicio.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Derivado_Point_inundacion</Name>
+          <Title>Derivado - inundacion (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Derivado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>inundacion</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#7a3b8f</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-inundacion.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Derivado_Point_calle_cortada</Name>
+          <Title>Derivado - calle_cortada (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Derivado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>calle_cortada</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#7a3b8f</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-calle_cortada.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Derivado_Point_otro</Name>
+          <Title>Derivado - otro (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Derivado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>otro</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#7a3b8f</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-otro.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Derivado_Point_desconocido</Name>
+          <Title>Derivado - tipo desconocido (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Derivado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:Not>
+                <ogc:Or>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>accidente_transito</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>incendio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>corte_servicio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>inundacion</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>calle_cortada</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>otro</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                </ogc:Or>
+              </ogc:Not>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#7a3b8f</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-otro.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
         <Rule>
           <Name>Derivado_Line</Name>
           <Title>Derivado - Línea</Title>
@@ -263,7 +1183,6 @@
             </Stroke>
           </LineSymbolizer>
         </Rule>
-        <!-- DERIVADO - POLIGONO -->
         <Rule>
           <Name>Derivado_Polygon</Name>
           <Title>Derivado - Polígono</Title>
@@ -293,10 +1212,9 @@
             </Stroke>
           </PolygonSymbolizer>
         </Rule>
-        <!-- RESUELTO - PUNTO -->
         <Rule>
-          <Name>Resuelto_Point</Name>
-          <Title>Resuelto - Punto</Title>
+          <Name>Resuelto_Point_accidente_transito</Name>
+          <Title>Resuelto - accidente_transito (punto)</Title>
           <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
@@ -310,28 +1228,336 @@
                 </ogc:Function>
                 <ogc:Literal>0</ogc:Literal>
               </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>accidente_transito</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
             </ogc:And>
           </ogc:Filter>
           <PointSymbolizer>
             <Graphic>
               <Mark>
-                <WellKnownName>circle</WellKnownName>
+                <WellKnownName>square</WellKnownName>
                 <Fill><CssParameter name="fill">#1f7a5c</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
               </Mark>
-              <Size>30</Size>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
             </Graphic>
           </PointSymbolizer>
           <PointSymbolizer>
             <Graphic>
               <ExternalGraphic>
-                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente.svg" xlink:type="simple"/>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-accidente_transito.svg" xlink:type="simple"/>
                 <Format>image/svg+xml</Format>
               </ExternalGraphic>
-              <Size>14</Size>
+              <Size>13</Size>
             </Graphic>
           </PointSymbolizer>
         </Rule>
-        <!-- RESUELTO - LINEA -->
+        <Rule>
+          <Name>Resuelto_Point_incendio</Name>
+          <Title>Resuelto - incendio (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Resuelto</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>incendio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#1f7a5c</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-incendio.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Resuelto_Point_corte_servicio</Name>
+          <Title>Resuelto - corte_servicio (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Resuelto</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>corte_servicio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#1f7a5c</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-corte_servicio.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Resuelto_Point_inundacion</Name>
+          <Title>Resuelto - inundacion (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Resuelto</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>inundacion</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#1f7a5c</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-inundacion.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Resuelto_Point_calle_cortada</Name>
+          <Title>Resuelto - calle_cortada (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Resuelto</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>calle_cortada</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#1f7a5c</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-calle_cortada.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Resuelto_Point_otro</Name>
+          <Title>Resuelto - otro (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Resuelto</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>otro</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#1f7a5c</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-otro.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Resuelto_Point_desconocido</Name>
+          <Title>Resuelto - tipo desconocido (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Resuelto</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:Not>
+                <ogc:Or>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>accidente_transito</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>incendio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>corte_servicio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>inundacion</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>calle_cortada</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>otro</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                </ogc:Or>
+              </ogc:Not>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#1f7a5c</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-otro.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
         <Rule>
           <Name>Resuelto_Line</Name>
           <Title>Resuelto - Línea</Title>
@@ -357,7 +1583,6 @@
             </Stroke>
           </LineSymbolizer>
         </Rule>
-        <!-- RESUELTO - POLIGONO -->
         <Rule>
           <Name>Resuelto_Polygon</Name>
           <Title>Resuelto - Polígono</Title>
@@ -387,10 +1612,9 @@
             </Stroke>
           </PolygonSymbolizer>
         </Rule>
-        <!-- CANCELADO - PUNTO -->
         <Rule>
-          <Name>Cancelado_Point</Name>
-          <Title>Cancelado - Punto</Title>
+          <Name>Cancelado_Point_accidente_transito</Name>
+          <Title>Cancelado - accidente_transito (punto)</Title>
           <MaxScaleDenominator>200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
@@ -404,28 +1628,336 @@
                 </ogc:Function>
                 <ogc:Literal>0</ogc:Literal>
               </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>accidente_transito</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
             </ogc:And>
           </ogc:Filter>
           <PointSymbolizer>
             <Graphic>
               <Mark>
-                <WellKnownName>circle</WellKnownName>
+                <WellKnownName>square</WellKnownName>
                 <Fill><CssParameter name="fill">#a8392b</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
               </Mark>
-              <Size>30</Size>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
             </Graphic>
           </PointSymbolizer>
           <PointSymbolizer>
             <Graphic>
               <ExternalGraphic>
-                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente.svg" xlink:type="simple"/>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-accidente_transito.svg" xlink:type="simple"/>
                 <Format>image/svg+xml</Format>
               </ExternalGraphic>
-              <Size>14</Size>
+              <Size>13</Size>
             </Graphic>
           </PointSymbolizer>
         </Rule>
-        <!-- CANCELADO - LINEA -->
+        <Rule>
+          <Name>Cancelado_Point_incendio</Name>
+          <Title>Cancelado - incendio (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Cancelado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>incendio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#a8392b</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-incendio.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Cancelado_Point_corte_servicio</Name>
+          <Title>Cancelado - corte_servicio (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Cancelado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>corte_servicio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#a8392b</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-corte_servicio.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Cancelado_Point_inundacion</Name>
+          <Title>Cancelado - inundacion (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Cancelado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>inundacion</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#a8392b</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-inundacion.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Cancelado_Point_calle_cortada</Name>
+          <Title>Cancelado - calle_cortada (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Cancelado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>calle_cortada</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#a8392b</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-calle_cortada.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Cancelado_Point_otro</Name>
+          <Title>Cancelado - otro (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Cancelado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>otro</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#a8392b</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-otro.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
+        <Rule>
+          <Name>Cancelado_Point_desconocido</Name>
+          <Title>Cancelado - tipo desconocido (punto)</Title>
+          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>estado</ogc:PropertyName>
+                <ogc:Literal>Cancelado</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:PropertyIsEqualTo>
+                <ogc:Function name="dimension">
+                  <ogc:PropertyName>geom</ogc:PropertyName>
+                </ogc:Function>
+                <ogc:Literal>0</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+              <ogc:Not>
+                <ogc:Or>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>accidente_transito</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>incendio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>corte_servicio</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>inundacion</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>calle_cortada</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                  <ogc:PropertyIsEqualTo>
+                <ogc:PropertyName>tipo_incidente</ogc:PropertyName>
+                <ogc:Literal>otro</ogc:Literal>
+              </ogc:PropertyIsEqualTo>
+                </ogc:Or>
+              </ogc:Not>
+            </ogc:And>
+          </ogc:Filter>
+          <PointSymbolizer>
+            <Graphic>
+              <Mark>
+                <WellKnownName>square</WellKnownName>
+                <Fill><CssParameter name="fill">#a8392b</CssParameter></Fill>
+                <Stroke>
+                  <CssParameter name="stroke">#ffffff</CssParameter>
+                  <CssParameter name="stroke-width">1.5</CssParameter>
+                </Stroke>
+              </Mark>
+              <Size>21</Size>
+              <Rotation>45</Rotation>
+            </Graphic>
+          </PointSymbolizer>
+          <PointSymbolizer>
+            <Graphic>
+              <ExternalGraphic>
+                <OnlineResource xlink:href="file:///opt/geoserver/data_dir/styles/incidente-otro.svg" xlink:type="simple"/>
+                <Format>image/svg+xml</Format>
+              </ExternalGraphic>
+              <Size>13</Size>
+            </Graphic>
+          </PointSymbolizer>
+        </Rule>
         <Rule>
           <Name>Cancelado_Line</Name>
           <Title>Cancelado - Línea</Title>
@@ -451,7 +1983,6 @@
             </Stroke>
           </LineSymbolizer>
         </Rule>
-        <!-- CANCELADO - POLIGONO -->
         <Rule>
           <Name>Cancelado_Polygon</Name>
           <Title>Cancelado - Polígono</Title>

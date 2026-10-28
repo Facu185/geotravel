@@ -1628,6 +1628,48 @@ body {
   box-shadow: 0 0 0 1px rgba(15, 28, 40, 0.28);
 }
 
+/* Íconos de incidentes: un rombo del color del estado con el dibujo del tipo (components/iconos.jsx). */
+.insignia-rombo {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 21px;
+  height: 21px;
+  margin: 4.5px;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  background: var(--color, #555);
+  box-shadow: 0 1px 4px rgba(15, 28, 40, 0.5);
+  transform: rotate(45deg);
+}
+
+/* El dibujo se centra con posición absoluta y no con la grilla: así no depende del tamaño propio del SVG ni de las
+   reglas de Leaflet para las imágenes de los marcadores (que quitan el max-width y lo descentraban). */
+.insignia-rombo img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  width: 72%;
+  height: 72%;
+  max-width: none;
+  max-height: none;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  pointer-events: none;
+}
+
+.insignia-rombo--chico {
+  width: 17px;
+  height: 17px;
+  margin: 3.5px;
+  box-shadow: 0 0 0 1px rgba(15, 28, 40, 0.28);
+}
+
+.insignia-rombo--resaltado {
+  outline: 3px solid var(--color, #555);
+  outline-offset: 2px;
+}
+
 .insignia-icono--resaltado {
   outline: 3px solid var(--color, #555);
   outline-offset: 2px;

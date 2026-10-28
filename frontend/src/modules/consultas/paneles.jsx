@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Aviso, Insignia, Segmentado, Selector } from "../../components/ui.jsx";
-import { COLOR_ESTADO_INCIDENTE, COLOR_PRIORIDAD, nombreTipoRecurso } from "../../components/colores.js";
+import { COLOR_ESTADO_INCIDENTE, COLOR_PRIORIDAD, nombreTipoIncidente, nombreTipoRecurso } from "../../components/colores.js";
 import { IconoIncidente, IconoRecurso } from "../../components/iconos.jsx";
 import { api } from "../../api/client.js";
 import useCriteriosRuta from "../../api/useCriteriosRuta.js";
@@ -141,12 +141,12 @@ function Truncado({ r, nombre }) {
 }
 
 function FilaIncidente({ i, extra }) {
-  const detalle = [i.tipoIncidente, i.prioridad ? `prioridad ${i.prioridad}` : null, i.fechaHoraRegistro?.slice(0, 16)]
+  const detalle = [nombreTipoIncidente(i.tipoIncidente), i.prioridad ? `prioridad ${i.prioridad}` : null, i.fechaHoraRegistro?.slice(0, 16)]
     .filter(Boolean)
     .join(" · ");
   return (
     <li className="fila">
-      <IconoIncidente estado={i.estado} chico />
+      <IconoIncidente tipo={i.tipoIncidente} estado={i.estado} chico />
       <span className="item__texto">
         <span className="item__titulo">{i.titulo}</span>
         {detalle && <span className="item__detalle">{detalle}</span>}
@@ -210,7 +210,7 @@ function ListaElegible({ carga, tipo, objetos, elegido, onElegir }) {
           <li key={o.id}>
             <button type="button" className={elegido?.id === o.id ? "item item--activo" : "item"} onClick={() => onElegir(o)}>
               {tipo === "zona" && <span className="item__marca item__marca--zona" style={{ "--color": COLOR_PRIORIDAD[o.nivelPrioridad] }} aria-hidden="true" />}
-              {tipo === "incidente" && <IconoIncidente estado={o.estado} chico />}
+              {tipo === "incidente" && <IconoIncidente tipo={o.tipoIncidente} estado={o.estado} chico />}
               {tipo === "recurso" && <IconoRecurso tipo={o.tipo} estado={o.estadoOperativo} chico />}
               <span className="item__texto">
                 <span className="item__titulo">{tipo === "zona" ? o.nombre : tipo === "incidente" ? o.titulo : o.identificacion}</span>
