@@ -21,6 +21,27 @@ public class OsrmClientTest {
     }
 
     @Test
+    public void interpretaElAjusteALaCalle() throws Exception {
+        String json = "{\"code\":\"Ok\",\"routes\":[{\"distance\":1151,\"duration\":175}],"
+                + "\"waypoints\":[{\"distance\":4.2},{\"distance\":130.5}]}";
+
+        OsrmClient.Ruta ruta = OsrmClient.parsearRuta(json);
+
+        assertEquals(4.2, ruta.ajusteOrigenMetros, 0.001);
+        assertEquals(130.5, ruta.ajusteDestinoMetros, 0.001);
+    }
+
+    @Test
+    public void sinWaypointsNoHayAjuste() throws Exception {
+        String json = "{\"code\":\"Ok\",\"routes\":[{\"distance\":1151,\"duration\":175}]}";
+
+        OsrmClient.Ruta ruta = OsrmClient.parsearRuta(json);
+
+        org.junit.Assert.assertNull(ruta.ajusteOrigenMetros);
+        org.junit.Assert.assertNull(ruta.ajusteDestinoMetros);
+    }
+
+    @Test
     public void noRedondeaUnMinutoExacto() throws Exception {
         String json = "{\"code\":\"Ok\",\"routes\":[{\"distance\":500,\"duration\":60}]}";
 
@@ -43,6 +64,11 @@ public class OsrmClientTest {
         String json = "{\"code\":\"NoRoute\",\"routes\":[]}";
 
         OsrmClient.parsearRuta(json);
+    }
+
+    @Test(expected = OsrmClient.SinRutaException.class)
+    public void sinCalleCercanaEsSinRutaYNoCaidaDelMotor() throws Exception {
+        OsrmClient.parsearRuta("{\"code\":\"NoSegment\",\"message\":\"Could not find a matching segment\"}");
     }
 
     @Test(expected = IOException.class)

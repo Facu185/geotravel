@@ -1,6 +1,8 @@
 package uy.edu.fing.geotravel.consultas;
 
 import uy.edu.fing.geotravel.db.DataSourceProvider;
+import uy.edu.fing.geotravel.eta.Criterio;
+import uy.edu.fing.geotravel.eta.RutaService;
 import uy.edu.fing.geotravel.mapa.Bbox;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -210,6 +212,52 @@ public class ConsultaResource {
                 resultado.putAll(conTotal(ps.executeQuery(), "id", "identificacion", "tipo", "estado_operativo", "distancia_m", "geom"));
                 return resultado;
             }
+        }
+    }
+
+    /**
+     * Consulta 3 ampliada: recursos dentro de un buffer de radioMetros alrededor del incidente, con distancia directa
+     * y, con conRutas=true, la ruta por calles de los más cercanos. Ver AnalisisVial y docs/api/openapi.yaml.
+     */
+    @GET
+    @Path("/recursos-cercanos/{incidenteId}/analisis-vial")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Map<String, Object> analisisVial(@PathParam("incidenteId") int incidenteId,
+                                            @QueryParam("radioMetros") String radioMetros,
+                                            @QueryParam("limite") String limite,
+                                            @QueryParam("soloDisponibles") @DefaultValue("true") boolean soloDisponibles,
+                                            @QueryParam("conRutas") @DefaultValue("false") boolean conRutas,
+                                            @QueryParam("criterio") String criterioParam)
+            throws SQLException, IOException {
+        Criterio criterio = Criterio.desde(criterioParam);
+        if (criterio == null) {
+            throw peticionInvalida("criterio tiene que ser mas_rapida o mas_corta");
+        }
+        RutaService servicio = RutaService.predeterminado();
+        if (conRutas && !servicio.disponible(criterio)) {
+            throw new WebApplicationException(Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .type(MediaType.APPLICATION_JSON)
+                    .entity(Map.of("error", "El criterio " + criterio.codigo
+                            + " no esta disponible: falta configurar el OSRM propio (OSRM_SHORTEST_URL)"))
+                    .build());
+        }
+        AnalisisVial.Parametros parametros;
+        try {
+            parametros = AnalisisVial.validar(
+                    AnalisisVial.entero("radioMetros", radioMetros), AnalisisVial.entero("limite", limite));
+        } catch (IllegalArgumentException e) {
+            throw peticionInvalida(e.getMessage());
+        }
+        try (Connection conn = DataSourceProvider.get().getConnection()) {
+            Map<String, Object> respuesta = new AnalisisVial(servicio)
+                    .analizar(conn, incidenteId, parametros, soloDisponibles, conRutas, criterio);
+            if (respuesta == null) {
+                throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
+                        .type(MediaType.APPLICATION_JSON)
+                        .entity(Map.of("error", "Incidente no encontrado"))
+                        .build());
+            }
+            return respuesta;
         }
     }
 

@@ -30,16 +30,33 @@ paths:
         "200": { description: OK }
 
   # ------------------------------------------------------------ ETA / OSRM
+  /eta/criterios:
+    get:
+      summary: Criterios de ruta disponibles en el servidor
+      description: >
+        Disponibilidad real de cada motor OSRM (no solo que la URL esté configurada). Se verifica con una ruta
+        de prueba (timeout 2 s) y el resultado se cachea 5 s. mas_corta requiere OSRM_SHORTEST_URL.
+      responses:
+        "200": { description: 'Ej. {"mas_rapida":true,"mas_corta":false,"motivos":{"mas_corta":"El servicio OSRM no responde"}}' }
+
   /eta/recursos/{recursoId}/incidentes/{incidenteId}:
     get:
       summary: Calcular tiempo estimado de llegada
       description: >
         Obtiene las ubicaciones del recurso y del incidente desde PostGIS.
-        Consulta OSRM con perfil driving para obtener distancia, duración y
-        recorrido vial. La geometría se devuelve como GeoJSON en EPSG:4326.
+        Consulta OSRM para obtener distancia, duración y recorrido vial. Con criterio=mas_rapida (defecto) se
+        minimiza la duración (perfil driving); con criterio=mas_corta se minimiza la distancia vial usando el OSRM
+        propio (OSRM_SHORTEST_URL). La geometría se devuelve como GeoJSON en EPSG:4326.
         No incorpora tráfico en tiempo real.
       tags: [eta]
       parameters:
+        - name: criterio
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [mas_rapida, mas_corta]
+            default: mas_rapida
         - name: recursoId
           in: path
           required: true
@@ -82,6 +99,17 @@ paths:
                   tiempoEstimadoMinutos:
                     type: integer
                     minimum: 0
+                  criterioRuta:
+                    type: string
+                    enum: [mas_rapida, mas_corta]
+                    description: >
+                      mas_rapida minimiza la duración; mas_corta minimiza la distancia vial (requiere
+                      OSRM propio, OSRM_SHORTEST_URL).
+                  criterioRutaTexto: { type: string }
+                  distanciaDirectaMetros: { type: number, description: Línea recta recurso-incidente }
+                  ajusteOrigenMetros: { type: number, nullable: true, description: Distancia a la calle más cercana (origen) }
+                  ajusteDestinoMetros: { type: number, nullable: true, description: Distancia a la calle más cercana (destino) }
+                  advertencia: { type: string, nullable: true, description: Presente si el ajuste a la calle es >= 100 m }
                   geometriaRuta:
                     type: object
                     description: >
@@ -113,7 +141,7 @@ paths:
         "422":
           description: OSRM no encontró una ruta vial
         "503":
-          description: Servicio OSRM no disponible
+          description: Servicio OSRM no disponible, o criterio mas_corta sin OSRM_SHORTEST_URL configurado
 
   # ------------------------------------------------------------ Ingreso del administrador
   /auth/login:
@@ -454,6 +482,37 @@ paths:
         "200": { description: OK }
         "400": { description: radioM fuera de rango }
         "404": { description: El incidente no existe (con radioM) }
+
+  /consultas/recursos-cercanos/{incidenteId}/analisis-vial:
+    get:
+      summary: >
+        C3 con buffer. Recursos dentro de un buffer (ST_Buffer/ST_DWithin) alrededor del incidente, con distancia
+        directa y línea directa (ST_Distance/ST_ShortestLine) y, con conRutas=true, el recorrido por calles (OSRM)
+        de los 5 más cercanos. El parámetro criterio elige qué minimiza la ruta: mas_rapida (defecto, duración) o
+        mas_corta (distancia vial por calles permitidas, requiere el OSRM propio). Son criterios distintos: la ruta
+        más corta puede tardar más. Para incidentes LineString/Polygon se usa el punto del incidente más
+        cercano al recurso. Los tiempos no incluyen tráfico en tiempo real.
+      tags: [consultas]
+      parameters:
+        - { name: incidenteId, in: path, required: true, schema: { type: integer } }
+        - { name: criterio, in: query, required: false, schema: { type: string, enum: [mas_rapida, mas_corta], default: mas_rapida } }
+        - { name: radioMetros, in: query, required: false, schema: { type: number, default: 2000, minimum: 1, maximum: 10000 } }
+        - { name: limite, in: query, required: false, schema: { type: integer, default: 5, minimum: 1, maximum: 10 } }
+        - { name: soloDisponibles, in: query, required: false, schema: { type: boolean, default: true } }
+        - { name: conRutas, in: query, required: false, schema: { type: boolean, default: false }, description: "true: consulta OSRM (máx. 5 recursos, plazo total 25 s)" }
+      responses:
+        "200":
+          description: >
+            { incidenteId, radioMetros, soloDisponibles, conRutas, incidente, bufferGeom (GeoJSON Polygon 4326),
+            totalEnRadio, truncado, criterioRuta ("mas_rapida"|"mas_corta"), criterioRutaTexto, rutasMaximas,
+            rutasDisponibles, recursoMejorId (según el criterio), recursoMasRapidoId, recursoMasCortoId,
+            items[{ recursoId, identificacion, tipo, estadoOperativo, geom, distanciaDirectaM,
+            lineaDirecta (LineString), estadoRuta (no_calculada|disponible|sin_ruta|error|plazo_agotado), mensajeRuta,
+            distanciaViaM, duracionS, tiempoEstimadoMinutos, geometriaRuta, ajusteOrigenM, ajusteDestinoM,
+            advertencia }] }
+        "400": { description: radioMetros, limite o criterio inválidos }
+        "404": { description: Incidente inexistente }
+        "503": { description: "conRutas=true con criterio mas_corta y OSRM_SHORTEST_URL sin configurar" }
 
   /consultas/incidente-mas-cercano:
     get:

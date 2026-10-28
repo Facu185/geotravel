@@ -7,13 +7,12 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import java.io.IOException;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -22,60 +21,72 @@ import java.util.Map;
 @Produces(MediaType.APPLICATION_JSON)
 public class EtaResource {
 
-    private static final String SQL =
-            "SELECT " +
-            "ST_X(ST_Transform(r.geom, 4326)) AS origen_lon, " +
-            "ST_Y(ST_Transform(r.geom, 4326)) AS origen_lat, " +
-            "ST_X(ST_Transform(ST_ClosestPoint(i.geom, r.geom), 4326)) AS destino_lon, " +
-            "ST_Y(ST_Transform(ST_ClosestPoint(i.geom, r.geom), 4326)) AS destino_lat " +
-            "FROM recurso r CROSS JOIN incidente i " +
-            "WHERE r.id = ? AND i.id = ?";
+    private final RutaService rutas;
+
+    public EtaResource() {
+        this(RutaService.predeterminado());
+    }
+
+    EtaResource(RutaService rutas) {
+        this.rutas = rutas;
+    }
+
+    /**
+     * Criterios de ruta realmente disponibles: el motor debe estar configurado y responder.
+     * La comprobacion se cachea 5 s (OsrmClient.SALUD_VIGENCIA_MS), asi una caida se refleja en pocos segundos.
+     */
+    @GET
+    @Path("/criterios")
+    public Response criterios() {
+        Map<String, Object> cuerpo = new LinkedHashMap<>();
+        Map<String, Object> motivos = new LinkedHashMap<>();
+        for (Criterio c : Criterio.values()) {
+            boolean configurado = rutas.disponible(c);
+            boolean ok = rutas.saludable(c);
+            cuerpo.put(c.codigo, ok);
+            if (!ok) {
+                motivos.put(c.codigo, configurado ? "El servicio OSRM no responde" : "El servicio OSRM no esta configurado");
+            }
+        }
+        cuerpo.put("motivos", motivos);
+        return Response.ok(cuerpo).build();
+    }
 
     @GET
     @Path("/recursos/{recursoId}/incidentes/{incidenteId}")
     public Response estimar(
             @PathParam("recursoId") int recursoId,
-            @PathParam("incidenteId") int incidenteId)
+            @PathParam("incidenteId") int incidenteId,
+            @QueryParam("criterio") String criterioParam)
             throws SQLException {
+
+        Criterio criterio = Criterio.desde(criterioParam);
+        if (criterio == null) {
+            return error(400, "criterio tiene que ser mas_rapida o mas_corta");
+        }
+        if (!rutas.disponible(criterio)) {
+            return error(503, "El criterio " + criterio.codigo
+                    + " no esta disponible: falta configurar el OSRM propio (OSRM_SHORTEST_URL)");
+        }
 
         // Validar que ambos identificadores sean positivos
         if (recursoId <= 0 || incidenteId <= 0) {
             return error(400, "Identificadores invalidos");
         }
 
-        double origenLon;
-        double origenLat;
-        double destinoLon;
-        double destinoLat;
-
         // 2. Obtener las coordenadas desde PostGIS
-        try (Connection conexion = DataSourceProvider.get().getConnection();
-             PreparedStatement consulta = conexion.prepareStatement(SQL)) {
+        RutaService.Extremos extremos;
+        try (Connection conexion = DataSourceProvider.get().getConnection()) {
+            extremos = rutas.extremos(conexion, recursoId, incidenteId);
+        }
 
-            consulta.setInt(1, recursoId);
-            consulta.setInt(2, incidenteId);
-
-            try (ResultSet resultado = consulta.executeQuery()) {
-
-                if (!resultado.next()) {
-                    return error(404, "Recurso o incidente no encontrado");
-                }
-
-                origenLon = resultado.getDouble("origen_lon");
-                origenLat = resultado.getDouble("origen_lat");
-                destinoLon = resultado.getDouble("destino_lon");
-                destinoLat = resultado.getDouble("destino_lat");
-            }
+        if (extremos == null) {
+            return error(404, "Recurso o incidente no encontrado");
         }
 
         // 3. Consultar OSRM para calcular la ruta
         try {
-            OsrmClient.Ruta ruta = OsrmClient.consultar(
-                    origenLon,
-                    origenLat,
-                    destinoLon,
-                    destinoLat
-            );
+            OsrmClient.Ruta ruta = rutas.consultar(extremos, criterio);
 
             // 4. Construir la respuesta JSON
             Map<String, Object> respuesta = new LinkedHashMap<>();
@@ -86,8 +97,14 @@ public class EtaResource {
             respuesta.put("duracionSegundos", Math.round(ruta.duracionSegundos));
             respuesta.put("tiempoEstimadoMinutos", ruta.minutosRedondeados());
             respuesta.put("geometriaRuta", ruta.geometriaRuta);
-            respuesta.put("motor", "OSRM driving");
+            respuesta.put("motor", criterio.motor);
             respuesta.put("aclaracion", "Estimacion sin trafico en tiempo real");
+            respuesta.put("criterioRuta", criterio.codigo);
+            respuesta.put("criterioRutaTexto", criterio.texto);
+            respuesta.put("distanciaDirectaMetros", Math.round(extremos.distanciaDirectaM));
+            respuesta.put("ajusteOrigenMetros", redondeado(ruta.ajusteOrigenMetros));
+            respuesta.put("ajusteDestinoMetros", redondeado(ruta.ajusteDestinoMetros));
+            respuesta.put("advertencia", RutaService.advertencia(ruta));
 
             return Response.ok(respuesta).build();
 
@@ -101,6 +118,10 @@ public class EtaResource {
         } catch (IOException e) {
             return error(503, "No se pudo consultar OSRM");
         }
+    }
+
+    private static Long redondeado(Double valor) {
+        return valor == null ? null : Math.round(valor);
     }
 
     // Metodo auxiliar para construir respuestas de error

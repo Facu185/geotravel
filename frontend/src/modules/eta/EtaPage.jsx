@@ -4,8 +4,9 @@ import { GeoJSON } from "react-leaflet";
 
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import Enfocar from "../../components/Enfocar.jsx";
-import { Aviso, Selector } from "../../components/ui.jsx";
+import { Aviso, Segmentado, Selector } from "../../components/ui.jsx";
 import { api } from "../../api/client.js";
+import useCriteriosRuta from "../../api/useCriteriosRuta.js";
 
 function obtenerGeometria(elemento) {
   if (!elemento?.geom) return null;
@@ -19,6 +20,11 @@ function obtenerGeometria(elemento) {
   }
 }
 
+function formatearMetros(metros) {
+  if (metros == null) return "—";
+  return metros >= 1000 ? `${(metros / 1000).toFixed(2)} km` : `${metros} m`;
+}
+
 export default function EtaPage() {
   const [incidentes, setIncidentes] = useState([]);
   const [recursos, setRecursos] = useState([]);
@@ -28,6 +34,9 @@ export default function EtaPage() {
   const [calculando, setCalculando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState(null);
+  const [criterio, setCriterio] = useState("mas_rapida");
+  const { opciones: criteriosRuta, mensajeDe } = useCriteriosRuta();
+  const avisoCriterio = mensajeDe(criterio);
   const solicitudActual = useRef(0);
 
   useEffect(() => {
@@ -90,7 +99,7 @@ export default function EtaPage() {
   }
 
   async function calcular() {
-    if (!incidenteId || !recursoId) return;
+    if (!incidenteId || !recursoId || avisoCriterio) return;
 
     const numeroSolicitud = ++solicitudActual.current;
     setCalculando(true);
@@ -99,7 +108,7 @@ export default function EtaPage() {
 
     try {
       const datos = await api.get(
-        `/eta/recursos/${recursoId}/incidentes/${incidenteId}`
+        `/eta/recursos/${recursoId}/incidentes/${incidenteId}?criterio=${criterio}`
       );
       if (numeroSolicitud === solicitudActual.current) setResultado(datos);
     } catch (e) {
@@ -160,8 +169,8 @@ export default function EtaPage() {
     >
       <div className="panel__seccion">
         <p className="ayuda">
-          Seleccioná un incidente y un recurso de emergencia. OSRM calculará la
-          distancia y la duración por calles.
+          Seleccioná un incidente y un recurso de emergencia. Se calcula el
+          recorrido por calles transitables (OSRM) hasta el incidente.
         </p>
 
         {cargandoDatos && <Aviso>Cargando recursos e incidentes...</Aviso>}
@@ -196,11 +205,22 @@ export default function EtaPage() {
               vacio="Seleccioná un recurso"
             />
 
+            <Segmentado
+              leyenda="Criterio de la ruta"
+              nombre="criterioEta"
+              opciones={criteriosRuta}
+              valor={criterio}
+              onChange={(valor) => {
+                limpiarResultado();
+                setCriterio(valor);
+              }}
+            />
+
             <button
               type="button"
               className="btn btn--primario btn--ancho"
               onClick={calcular}
-              disabled={!incidenteId || !recursoId || calculando}
+              disabled={!incidenteId || !recursoId || calculando || Boolean(avisoCriterio)}
             >
               {calculando ? "Calculando..." : "Calcular llegada"}
             </button>
@@ -208,29 +228,44 @@ export default function EtaPage() {
         )}
 
         {error && <Aviso tipo="error">{error}</Aviso>}
+        {avisoCriterio && <Aviso tipo="error">{avisoCriterio}</Aviso>}
 
         {resultado && (
           <section className="bloque">
             <h3 className="bloque__titulo">Resultado de la ruta</h3>
             <dl className="datos">
               <div>
-                <dt>Distancia</dt>
-                <dd>{(resultado.distanciaMetros / 1000).toFixed(2)} km</dd>
+                <dt>Distancia por calles</dt>
+                <dd>{formatearMetros(resultado.distanciaMetros)}</dd>
               </div>
               <div>
-                <dt>Duración</dt>
-                <dd>{resultado.duracionSegundos} segundos</dd>
+                <dt>Distancia directa</dt>
+                <dd>{formatearMetros(resultado.distanciaDirectaMetros)}</dd>
               </div>
               <div>
                 <dt>Tiempo estimado</dt>
-                <dd>{resultado.tiempoEstimadoMinutos} minutos</dd>
+                <dd>{resultado.tiempoEstimadoMinutos} min</dd>
+              </div>
+              <div>
+                <dt>Duración</dt>
+                <dd>{resultado.duracionSegundos} s</dd>
+              </div>
+              <div>
+                <dt>Criterio</dt>
+                <dd>{resultado.criterioRutaTexto}</dd>
               </div>
               <div>
                 <dt>Motor</dt>
                 <dd>{resultado.motor}</dd>
               </div>
             </dl>
-            <p className="ayuda">Estimación vial sin tráfico en tiempo real.</p>
+            {resultado.advertencia && <Aviso>{resultado.advertencia}</Aviso>}
+            <p className="ayuda">Tiempo estimado sin tráfico en tiempo real.</p>
+            <p className="ayuda">
+              {resultado.criterioRuta === "mas_corta"
+                ? "El recorrido minimiza la distancia por calles permitidas; su duración puede ser mayor que la de la ruta más rápida."
+                : "El recorrido optimiza la duración, no la distancia: puede no ser el camino de menor distancia vial."}
+            </p>
           </section>
         )}
       </div>

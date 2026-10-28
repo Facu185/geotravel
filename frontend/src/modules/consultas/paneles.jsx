@@ -1,8 +1,9 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Aviso, Insignia, Selector } from "../../components/ui.jsx";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Aviso, Insignia, Segmentado, Selector } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_PRIORIDAD, nombreTipoRecurso } from "../../components/colores.js";
 import { IconoIncidente, IconoRecurso } from "../../components/iconos.jsx";
 import { api } from "../../api/client.js";
+import useCriteriosRuta from "../../api/useCriteriosRuta.js";
 import { REGION } from "../../components/region.js";
 import { conGeometria } from "./geometria.js";
 
@@ -27,9 +28,10 @@ export const RESULTADO_VACIO = {
   zonas: [], // [{ id, nombre, nivelPrioridad, geometria, intensidad entre 0 y 1 }]
   incidentes: [], // [{ id, titulo, estado, geometria, pos }]
   recursos: [], // [{ id, identificacion, estadoOperativo, geometria, pos }]
-  lineas: [], // [{ desde: [lat, lng], hasta: [lat, lng], texto }]: la línea directa (punteada)
-  rutas: [], // [{ id, geometria, texto }]: el camino por calles (continuo, de otro color)
-  area: null, // GeoJSON (lon/lat) de un área buscada, p. ej. el buffer alrededor de un incidente
+  lineas: [], // [{ desde: [lat, lng], hasta: [lat, lng], texto, color?, elegida? }]: la línea directa (punteada)
+  buffer: null, // geometría GeoJSON (lon/lat) del área de búsqueda alrededor del incidente (consulta 3)
+  rutas: [], // [{ id, geometria (LineString GeoJSON), texto, elegida }]: recorridos por calles (consulta 3)
+  area: null, // GeoJSON (lon/lat) de un área buscada genérica (se dibuja punteada)
   ajuste: null, // si se pone, el mapa se vuelve a encuadrar solo cuando esta clave cambia (no con cada cambio del resultado)
 };
 
@@ -281,141 +283,233 @@ const PanelRecursosZona = (props) => <PanelPorZona {...props} tipo="recursos" />
 
 // ------------------------------------------------------ 3: recursos cercanos a un incidente
 
-/** El valor de un campo, pero recién cuando se deja de escribir (para no pedir en cada tecla). */
-function useDemora(valor, ms = 400) {
-  const [demorado, setDemorado] = useState(valor);
-  useEffect(() => {
-    const espera = setTimeout(() => setDemorado(valor), ms);
-    return () => clearTimeout(espera);
-  }, [valor, ms]);
-  return demorado;
+const RADIOS_M = [500, 1000, 2000, 5000, 10000];
+const RADIO_INICIAL_M = 2000;
+const CANTIDADES = [1, 2, 3, 5, 10];
+const textoRadio = (m) => (m >= 1000 ? `${m / 1000} km` : `${m} m`);
+
+/** Leyenda de los colores del mapa de esta consulta (los mismos que dibuja CapaResultado). */
+function LeyendaRutas({ conRutas }) {
+  return (
+    <ul className="leyenda-ruta" aria-label="Leyenda del mapa">
+      <li>
+        <span className="leyenda-ruta__muestra leyenda-ruta__muestra--buffer" aria-hidden="true" />
+        Azul: buffer de búsqueda
+      </li>
+      <li>
+        <span className="leyenda-ruta__muestra leyenda-ruta__muestra--directa" aria-hidden="true" />
+        Gris punteado: distancia directa
+      </li>
+      {conRutas && (
+        <li>
+          <span className="leyenda-ruta__muestra leyenda-ruta__muestra--ruta" aria-hidden="true" />
+          Verde continuo: recorrido transitable
+        </li>
+      )}
+    </ul>
+  );
 }
 
-/**
- * Recursos operativos (Disponible) más cercanos a un incidente elegido entre los de la vista, dentro de un radio.
- * En el mapa: el buffer del incidente (ST_Buffer; el backend lo devuelve en "area"), la línea directa (punteada) a
- * cada recurso y, a pedido, el camino por calles (/eta, servicio de rutas: necesita internet) de otro color.
- */
+/** Una tarjeta por recurso: distancia directa, distancia por calles, tiempo y disponibilidad de la ruta. */
+function FilaRecursoCercano({ it, elegido, mejor, criterio, onElegir }) {
+  const hayRuta = it.estadoRuta === "disponible";
+  const sinRuta = it.estadoRuta === "sin_ruta" || it.estadoRuta === "error";
+  return (
+    <li>
+      <button type="button" className={elegido ? "item item--activo" : "item"} onClick={onElegir} aria-pressed={elegido}>
+        <IconoRecurso tipo={it.tipo} estado={it.estadoOperativo} chico />
+        <span className="item__texto">
+          <span className="item__titulo">{it.identificacion}</span>
+          <span className="item__detalle">
+            {nombreTipoRecurso(it.tipo)} · {it.estadoOperativo}
+          </span>
+          <span className="item__detalle">Directa: {metros(it.distanciaDirectaM)}</span>
+          {hayRuta && (
+            <span className="item__detalle">
+              Por calles: {metros(it.distanciaViaM)} · {it.tiempoEstimadoMinutos} min
+            </span>
+          )}
+          {sinRuta && <span className="item__detalle">Ruta no disponible</span>}
+          {hayRuta && it.advertencia && <span className="item__detalle">⚠ {it.advertencia}</span>}
+        </span>
+        {mejor && <Insignia color="#16a34a">{criterio === "mas_corta" ? "Más corto" : "Más rápido"}</Insignia>}
+      </button>
+    </li>
+  );
+}
+
 function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   const [incidente, setIncidente] = useState(null);
-  const [limite, setLimite] = useState(3);
-  const [radio, setRadio] = useState(1000);
-  const [caminos, setCaminos] = useState({}); // "incidente-recurso" -> { estado, geometria, distanciaM, minutos, error }
-  const cantidad = Math.min(10, Math.max(1, Number(limite) || 3));
-  const radioM = Math.min(100000, Math.max(1, Number(useDemora(radio)) || 1000));
+  const [radio, setRadio] = useState(RADIO_INICIAL_M);
+  const [limite, setLimite] = useState(5);
+  const [soloDisponibles, setSoloDisponibles] = useState(true);
+  const [criterio, setCriterio] = useState("mas_rapida");
+  const { opciones: CRITERIOS, mensajeDe } = useCriteriosRuta();
+  const avisoCriterio = mensajeDe(criterio);
+  const [elegidoId, setElegidoId] = useState(null);
+  const [calculo, setCalculo] = useState(null); // rutas pedidas: { base, fase, datos, error }
 
   const incidentes = useObjetosDeLaVista(carga);
-  useElegibles(setElegibles, "incidente", incidentes, incidente, setIncidente);
+  const elegirIncidente = useCallback((objeto) => {
+    setIncidente(objeto);
+    setElegidoId(null);
+  }, []);
+  useElegibles(setElegibles, "incidente", incidentes, incidente, elegirIncidente);
 
-  const ruta = incidente ? `/consultas/recursos-cercanos/${incidente.id}${query({ limite: cantidad, radioM })}` : null;
-  const { fase, datos: r, error } = useRuta(ruta);
-  const recursos = useMemo(() => (r ? r.items.map(conGeometria) : null), [r]);
-  const clave = (recurso) => `${incidente.id}-${recurso.id}`;
+  // Buscar recursos en el buffer solo usa PostGIS; las rutas (OSRM) se piden recién con el botón.
+  const base = incidente ? `/consultas/recursos-cercanos/${incidente.id}/analisis-vial${query({ radioMetros: radio, limite, soloDisponibles, criterio })}` : null;
+  const { fase, datos: previo, error } = useRuta(base);
 
-  const calcularCamino = async (recurso) => {
-    const k = clave(recurso);
-    setCaminos((c) => ({ ...c, [k]: { estado: "calculando" } }));
-    try {
-      const d = await api.get(`/eta/recursos/${recurso.id}/incidentes/${incidente.id}`);
-      setCaminos((c) => ({ ...c, [k]: { estado: "ok", geometria: d.geometriaRuta, distanciaM: d.distanciaMetros, minutos: d.tiempoEstimadoMinutos } }));
-    } catch (e) {
-      setCaminos((c) => ({ ...c, [k]: { estado: "error", error: e.message } }));
-    }
-  };
-  const calcularTodos = async () => {
-    for (const recurso of recursos) {
-      if (caminos[clave(recurso)]?.estado !== "ok") await calcularCamino(recurso);
-    }
+  const calculoVigente = calculo && calculo.base === base ? calculo : null;
+  const datos = calculoVigente?.datos ?? previo;
+  const calculando = calculoVigente?.fase === "cargando";
+  const conRutas = Boolean(calculoVigente?.datos);
+
+  const calcularRutas = () => {
+    if (!base || avisoCriterio) return;
+    setCalculo({ base, fase: "cargando", datos: null, error: null });
+    api
+      .get(`${base}&conRutas=true`)
+      .then((d) => setCalculo((c) => (c?.base === base ? { base, fase: "ok", datos: d, error: null } : c)))
+      .catch((e) => setCalculo((c) => (c?.base === base ? { base, fase: "error", datos: null, error: e.message } : c)));
   };
 
   useEffect(() => {
-    if (!recursos || !r || !incidente) {
+    if (!datos || !incidente) {
       setResultado(RESULTADO_VACIO);
       return;
     }
-    const lineas = recursos.map((rec) => ({ desde: incidente.pos, hasta: rec.pos, texto: `${rec.identificacion}: ${metros(rec.distanciaM)} en línea recta` }));
-    const rutas = recursos
-      .filter((rec) => caminos[`${incidente.id}-${rec.id}`]?.estado === "ok")
-      .map((rec) => {
-        const c = caminos[`${incidente.id}-${rec.id}`];
-        return { id: rec.id, geometria: c.geometria, texto: `${rec.identificacion}: ${metros(c.distanciaM)} por calles (${c.minutos} min)` };
-      });
+    const recursos = datos.items.map((it) => ({
+      ...conGeometria(it),
+      id: it.recursoId,
+      elegido: it.recursoId === elegidoId,
+      alElegir: () => setElegidoId(it.recursoId),
+    }));
+    const lineas = datos.items.map((it) => {
+      const [desde, hasta] = it.lineaDirecta.coordinates;
+      return {
+        desde: [desde[1], desde[0]],
+        hasta: [hasta[1], hasta[0]],
+        texto: `${it.identificacion}: ${metros(it.distanciaDirectaM)} en línea recta`,
+        elegida: it.recursoId === elegidoId,
+        color: "#6b7280",
+      };
+    });
+    const rutas = datos.items
+      .filter((it) => it.estadoRuta === "disponible")
+      .map((it) => ({
+        id: it.recursoId,
+        geometria: it.geometriaRuta,
+        texto: `${it.identificacion}: ${metros(it.distanciaViaM)} por calles · ${it.tiempoEstimadoMinutos} min`,
+        elegida: it.recursoId === elegidoId,
+      }));
     setResultado({
       ...RESULTADO_VACIO,
       incidentes: [incidente],
       recursos,
       lineas,
       rutas,
-      area: r.area ? JSON.parse(r.area) : null,
-      ajuste: `${incidente.id}|${radioM}|${cantidad}`, // llegar un camino por calles no mueve el mapa
+      buffer: datos.bufferGeom,
+      ajuste: `${incidente.id}|${radio}|${limite}|${soloDisponibles}`, // elegir un recurso o ver sus rutas no mueve el mapa
     });
-  }, [recursos, r, incidente, caminos, radioM, cantidad, setResultado]);
+  }, [datos, incidente, elegidoId, radio, limite, soloDisponibles, setResultado]);
+
+  const items = datos?.items ?? [];
+  const sinCalcular = items.length > 0 && !conRutas;
 
   return (
     <>
-      <div className="campos-2">
-        <label className="campo">
-          <span className="campo__etiqueta">Radio (metros)</span>
-          <input type="number" min="1" max="100000" step="100" value={radio} onChange={(e) => setRadio(e.target.value)} />
-        </label>
-        <label className="campo">
-          <span className="campo__etiqueta">Cuántos recursos</span>
-          <input type="number" min="1" max="10" value={limite} onChange={(e) => setLimite(e.target.value)} />
-        </label>
-      </div>
-      <p className="ayuda">Solo se consideran los recursos operativos (en estado Disponible).</p>
+      <label className="campo">
+        <span className="campo__etiqueta">Radio de búsqueda</span>
+        <select value={radio} onChange={(e) => setRadio(Number(e.target.value))}>
+          {RADIOS_M.map((m) => (
+            <option key={m} value={m}>
+              {textoRadio(m)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="campo">
+        <span className="campo__etiqueta">Cuántos recursos (los más cercanos)</span>
+        <select value={limite} onChange={(e) => setLimite(Number(e.target.value))}>
+          {CANTIDADES.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="casilla">
+        <input type="checkbox" checked={soloDisponibles} onChange={(e) => setSoloDisponibles(e.target.checked)} />
+        Solo recursos disponibles
+      </label>
+      <Segmentado leyenda="Criterio de la ruta" nombre="criterioRuta" opciones={CRITERIOS} valor={criterio} onChange={setCriterio} />
+      {avisoCriterio && <Aviso tipo="error">{avisoCriterio}</Aviso>}
+
+      {!incidente && <ListaElegible carga={carga} tipo="incidente" objetos={incidentes} elegido={incidente} onElegir={elegirIncidente} />}
+
       {incidente && (
         <section className="bloque">
           <h4 className="resultado__grupo">{incidente.titulo}</h4>
-          <Estado fase={fase} error={error} />
-          {r && recursos.length === 0 && <p className="ayuda">No hay recursos disponibles a menos de {metros(radioM)} del incidente.</p>}
-          {r && recursos.length > 0 && (
+          {fase === "cargando" && <p className="ayuda">Buscando recursos en {textoRadio(radio)} a la redonda…</p>}
+          {fase === "error" && <Aviso tipo="error">{error}</Aviso>}
+          {datos && items.length === 0 && (
+            <p className="ayuda">No hay recursos {soloDisponibles ? "disponibles " : ""}a menos de {textoRadio(radio)} del incidente. Probá con un radio mayor.</p>
+          )}
+          {datos && items.length > 0 && (
             <>
               <p className="ayuda">
-                {r.total} {r.total === 1 ? "recurso disponible" : "recursos disponibles"} a menos de {metros(radioM)}
-                {r.truncado ? `; se muestran los ${recursos.length} más cercanos` : ""}. En el mapa: el área punteada es el radio, la línea
-                punteada es la distancia en línea recta y la línea verde, el camino por calles.
+                {datos.totalEnRadio} {datos.totalEnRadio === 1 ? "recurso" : "recursos"} dentro del buffer de {textoRadio(radio)}
+                {datos.truncado ? `; se muestran los ${items.length} más cercanos` : ""}. Elegí uno para resaltarlo en el mapa.
               </p>
               <ul className="items">
-                {recursos.map((rec) => {
-                  const c = caminos[clave(rec)];
-                  return (
-                    <li key={rec.id} className="fila">
-                      <IconoRecurso tipo={rec.tipo} estado={rec.estadoOperativo} chico />
-                      <span className="item__texto">
-                        <span className="item__titulo">{rec.identificacion}</span>
-                        <span className="item__detalle">
-                          {nombreTipoRecurso(rec.tipo)} · {metros(rec.distanciaM)} en línea recta
-                          {c?.estado === "ok" && ` · ${metros(c.distanciaM)} por calles, ${c.minutos} min`}
-                        </span>
-                        {c?.estado === "error" && <span className="item__detalle item__detalle--error">{c.error}</span>}
-                      </span>
-                      {c?.estado !== "ok" && (
-                        <button type="button" className="btn btn--secundario btn--chico" disabled={c?.estado === "calculando"} onClick={() => calcularCamino(rec)}>
-                          {c?.estado === "calculando" ? "Calculando…" : "Ver camino"}
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
+                {items.map((it) => (
+                  <FilaRecursoCercano
+                    key={it.recursoId}
+                    it={it}
+                    elegido={it.recursoId === elegidoId}
+                    mejor={conRutas && it.recursoId === datos.recursoMejorId}
+                    criterio={criterio}
+                    onElegir={() => setElegidoId(it.recursoId === elegidoId ? null : it.recursoId)}
+                  />
+                ))}
               </ul>
-              {recursos.length > 1 && (
-                <button type="button" className="btn btn--secundario" onClick={calcularTodos}>
-                  Ver el camino por calles de todos
-                </button>
+              {sinCalcular && (
+                <>
+                  <button type="button" className="btn btn--primario btn--ancho" onClick={calcularRutas} disabled={calculando || Boolean(avisoCriterio)}>
+                    {calculando ? "Calculando rutas…" : "Calcular rutas por calles"}
+                  </button>
+                  <p className="ayuda">Se calculan las rutas de los {Math.min(items.length, datos.rutasMaximas)} recursos más cercanos.</p>
+                </>
               )}
-              <p className="ayuda">El camino por calles necesita internet (servicio de rutas) y no considera el tránsito en tiempo real.</p>
+              {calculando && <p className="ayuda">Calculando rutas por calles…</p>}
+              {calculoVigente?.fase === "error" && <Aviso tipo="error">{calculoVigente.error}</Aviso>}
+              {conRutas && datos.rutasDisponibles === 0 && <Aviso tipo="error">Ruta no disponible: no se pudo obtener ningún recorrido por calles. Se muestra la distancia directa.</Aviso>}
+              {conRutas && datos.rutasDisponibles > 0 && datos.rutasDisponibles < Math.min(items.length, datos.rutasMaximas) && (
+                <Aviso>Algunos recursos no tienen ruta disponible; conservan su distancia directa.</Aviso>
+              )}
+              {conRutas && (
+                <p className="ayuda">
+                  {criterio === "mas_corta" ? (
+                    <>Los recorridos son la <strong>ruta más corta</strong> por calles permitidas (OSRM propio, minimiza la distancia). Su tiempo puede ser mayor que el de la ruta más rápida.</>
+                  ) : (
+                    <>Los recorridos son la <strong>ruta más rápida</strong> por calles (OSRM, minimiza la duración), no necesariamente la de menor distancia.</>
+                  )}{" "}
+                  Tiempo estimado sin tráfico en tiempo real.
+                </p>
+              )}
+              <LeyendaRutas conRutas={conRutas && datos.rutasDisponibles > 0} />
             </>
           )}
-          <button type="button" className="btn btn--secundario" onClick={() => setIncidente(null)}>
+          <button type="button" className="btn btn--secundario" onClick={() => elegirIncidente(null)}>
             Elegir otro incidente
           </button>
         </section>
       )}
-      {!incidente && <ListaElegible carga={carga} tipo="incidente" objetos={incidentes} elegido={incidente} onElegir={setIncidente} />}
     </>
   );
 }
+
 
 // ------------------------------------- elegir el punto por intersección de dos calles
 
@@ -918,9 +1012,8 @@ export const CONSULTAS = [
     id: "recursos-cercanos",
     fondo: "incidente", // lo que GeoServer dibuja de fondo
     titulo: "3. Recursos cercanos a un incidente",
-    descripcion:
-      "Se ven los incidentes de esta parte del mapa. Elegí uno y se muestran los recursos operativos (Disponible) más cercanos dentro de un radio: el buffer del incidente, la distancia en línea recta y, a pedido, el camino por calles.",
-    postgis: "ST_Buffer y ST_DWithin (radio), operador <-> (vecino más cercano) y ST_Distance; el camino por calles, con el servicio de rutas",
+    descripcion: "Se ven los incidentes de esta parte del mapa. Elegí uno, definí el radio del buffer y se muestran los recursos que están dentro, con la distancia directa. Con \"Calcular rutas por calles\" se agrega el recorrido transitable de los más cercanos.",
+    postgis: "ST_Buffer y ST_DWithin (recursos dentro del radio), ST_Distance y ST_ShortestLine (distancia directa); recorrido por calles con OSRM",
     objetos: "/incidentes",
     Panel: PanelRecursosCercanos,
   },
