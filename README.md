@@ -184,7 +184,8 @@ Hay dos vistas, separadas por un login básico:
 - **Cómo funciona:** `POST /auth/login` devuelve un token (vale 8 horas, vive en la memoria del backend: si se
   reinicia hay que ingresar de nuevo) que el frontend manda en `Authorization: Bearer ...`. Un filtro del backend
   (`auth/AuthFilter.java`) **protege toda la API por defecto**: solo son públicos `/health`, `/auth/login`,
-  `/auth/logout`, `GET /consultas/tipos-incidente` y `GET /fotos/...`. El mapa público dibuja con GeoServer.
+  `/auth/logout`, `GET /fotos/...` y la lectura de las Consultas del invitado (`GET /consultas/...` salvo el reporte,
+  el listado `GET /zonas|/incidentes|/recursos` y `GET /eta/criterios`). Escribir siempre exige sesión. El mapa público dibuja con GeoServer.
 - **En el frontend:** `frontend/src/auth/` (sesión, pantalla de ingreso y `RutaAdmin`, que manda al ingreso si no
   hay sesión). En Postman, correr primero la carpeta 0, que guarda el token.
 

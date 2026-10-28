@@ -15,8 +15,8 @@ const NAV = [
   { to: "/zonas", label: "Zonas operativas", module: "P3", admin: true },
   { to: "/recursos", label: "Recursos", module: "P3", admin: true },
   { to: "/incidentes", label: "Incidentes", module: "P4", admin: true },
+  { to: "/consultas", label: "Consultas", module: "P5" },
   { to: "/eta", label: "Tiempo de llegada", module: "P2", admin: true },
-  { to: "/consultas", label: "Consultas", module: "P5", admin: true },
 ];
 
 const RUTAS_CON_MAPA = ["/invitado", "/zonas", "/recursos", "/incidentes", "/consultas", "/eta"];
@@ -87,11 +87,11 @@ function Aplicacion() {
           <Route path="/" element={<Navigate to="/invitado" replace />} />
           <Route path="/invitado" element={<InvitadoPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/consultas" element={<ConsultasPage />} />
           <Route element={<RutaAdmin />}>
             <Route path="/zonas" element={<ZonasPage />} />
             <Route path="/recursos" element={<RecursosPage />} />
             <Route path="/incidentes" element={<IncidentesPage />} />
-            <Route path="/consultas" element={<ConsultasPage />} />
             <Route path="/eta" element={<EtaPage />} />
           </Route>
         </Routes>

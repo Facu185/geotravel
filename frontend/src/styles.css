@@ -532,6 +532,10 @@ body {
   list-style: none;
 }
 
+.leyenda--suelta {
+  padding: 0;
+}
+
 .leyenda__item {
   display: flex;
   align-items: center;
@@ -1744,4 +1748,27 @@ body {
   border: 1px solid var(--borde, #d6dbd2);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(19, 32, 44, 0.18);
+}
+
+/* "¿Qué significa cada ícono?" al pie del panel de las Consultas. */
+.leyenda-plegable {
+  font-size: 0.9rem;
+}
+
+.leyenda-plegable summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+.leyenda-plegable__capa {
+  margin-top: 10px;
+}
+
+.leyenda-plegable__titulo {
+  margin: 0 0 2px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tinta-tenue);
 }

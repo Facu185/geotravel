@@ -16,7 +16,8 @@ servers:
   - url: http://localhost:8080/geotravel/api
 
 # Seguridad: toda la API exige una sesión de administrador (encabezado Authorization: Bearer <token>) salvo
-# /health, /auth/login, /auth/logout, GET /consultas/tipos-incidente y GET /fotos/... Sin token responde 401.
+# /health, /auth/login, /auth/logout, GET /fotos/... y la lectura que usan las Consultas del invitado:
+# GET /consultas/... (menos /consultas/reportes), GET /zonas, /incidentes y /recursos (listado, sin id), GET /eta/criterios. Sin token, el resto responde 401.
 # El mapa público no pasa por esta API: lo dibuja GeoServer.
 security:
   - bearerAuth: []

@@ -1079,6 +1079,7 @@ function PanelReporte({ setResultado }) {
  *   objetos      ruta de los objetos que se eligen (se cargan los de la vista, ver CargaPorZona): "/zonas", "/incidentes" o "/recursos".
  *   sobreVista   la consulta pide al backend solo lo de la vista (bbox), como el ranking de zonas.
  *   fondo        el único tipo de objeto que GeoServer dibuja de fondo: "zona", "incidente" o "recurso".
+ *   soloAdmin    el invitado no la ve.
  *   postgis      qué función espacial la resuelve.
  */
 export const CONSULTAS = [
@@ -1147,6 +1148,7 @@ export const CONSULTAS = [
   },
   {
     id: "reporte",
+    soloAdmin: true, // el invitado no lo ve ni puede pedirlo (la API lo exige, ver AuthFilter)
     fondo: "zona", // lo que GeoServer dibuja de fondo
     titulo: "Reporte de incidentes por zona",
     descripcion: "Listado filtrable por zona, tipo, prioridad, estado y fechas, agrupado por zona.",

@@ -5,6 +5,8 @@ import PaginaMapa from "../../components/PaginaMapa.jsx";
 import CargaPorZona, { SIN_CARGAR } from "../../components/CargaPorZona.jsx";
 import { ZOOM_MINIMO_ELEGIR } from "../../components/region.js";
 import CapaElegibles from "../../components/CapaElegibles.jsx";
+import LeyendaIconos from "../../components/LeyendaCapa.jsx";
+import { useAuth } from "../../auth/AuthContext.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_PRIORIDAD } from "../../components/colores.js";
 import { iconoIncidente, iconoRecurso } from "../../components/iconos.jsx";
 import { CONSULTAS, RESULTADO_VACIO } from "./paneles.jsx";
@@ -212,6 +214,9 @@ function CapaResultado({ resultado, punto }) {
 }
 
 export default function ConsultasPage() {
+  const { esAdmin } = useAuth();
+  // El invitado ve las consultas geográficas; el reporte (listado completo para gestionar) es del administrador.
+  const disponibles = CONSULTAS.filter((c) => esAdmin || !c.soloAdmin);
   const [consultaId, setConsultaId] = useState(CONSULTAS[0].id);
   const [resultado, setResultado] = useState(RESULTADO_VACIO);
   const [elegibles, setElegibles] = useState(null); // objetos de la vista para elegir con un clic (ver CapaElegibles)
@@ -219,7 +224,7 @@ export default function ConsultasPage() {
   const [vista, setVista] = useState(null); // parte visible del mapa: { bbox, zoom }
   const [punto, setPunto] = useState(null);
 
-  const consulta = CONSULTAS.find((c) => c.id === consultaId);
+  const consulta = disponibles.find((c) => c.id === consultaId) ?? disponibles[0];
   const { Panel } = consulta;
 
   const elegir = (id) => {
@@ -259,7 +264,7 @@ export default function ConsultasPage() {
         <label className="campo">
           <span className="campo__etiqueta">Consulta</span>
           <select value={consultaId} onChange={(e) => elegir(e.target.value)}>
-            {CONSULTAS.map((c) => (
+            {disponibles.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.titulo}
               </option>
@@ -270,6 +275,9 @@ export default function ConsultasPage() {
         <p className="ayuda">
           <strong>PostGIS:</strong> {consulta.postgis}
         </p>
+      </div>
+      <div className="panel__seccion">
+        <LeyendaIconos />
       </div>
       <div className="panel__seccion">
         <Panel

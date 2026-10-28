@@ -60,10 +60,20 @@ public class AuthTest {
         assertTrue(AuthFilter.esPublica("GET", "consultas/tipos-incidente"));
         assertTrue(AuthFilter.esPublica("GET", "fotos/12"));
 
-        assertFalse(AuthFilter.esPublica("GET", "zonas"));
+        // Las Consultas del invitado: solo lectura.
+        assertTrue(AuthFilter.esPublica("GET", "consultas/buscar"));
+        assertTrue(AuthFilter.esPublica("GET", "/consultas/recursos-cercanos/4/analisis-vial"));
+        assertTrue(AuthFilter.esPublica("GET", "zonas"));
+        assertTrue(AuthFilter.esPublica("GET", "incidentes/"));
+        assertTrue(AuthFilter.esPublica("GET", "recursos"));
+        assertTrue(AuthFilter.esPublica("GET", "eta/criterios"));
+
+        assertFalse(AuthFilter.esPublica("GET", "consultas/reportes/incidentes-por-zona"));
+        assertFalse(AuthFilter.esPublica("GET", "zonas/3"));
+        assertFalse(AuthFilter.esPublica("GET", "eta/recursos/1/incidentes/2"));
         assertFalse(AuthFilter.esPublica("POST", "zonas"));
+        assertFalse(AuthFilter.esPublica("POST", "incidentes"));
         assertFalse(AuthFilter.esPublica("DELETE", "incidentes/3"));
-        assertFalse(AuthFilter.esPublica("GET", "consultas/buscar"));
         assertFalse(AuthFilter.esPublica("POST", "consultas/tipos-incidente"));
         assertFalse(AuthFilter.esPublica("POST", "fotos/12"));
         assertFalse(AuthFilter.esPublica("GET", "auth/yo"));
