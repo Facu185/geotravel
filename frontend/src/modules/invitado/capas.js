@@ -26,15 +26,6 @@ export const CAPAS = [
     ],
   },
   {
-    id: "puertas",
-    capa: "geotravel:acceso",
-    nombre: "Números de puerta",
-    descripcion: "Se dibujan al acercar mucho el mapa",
-    forma: "circulo",
-    activaPorDefecto: false,
-    leyenda: [{ color: "#5f6f7e", etiqueta: "Puerta con su número" }],
-  },
-  {
     id: "zonas",
     capa: "geotravel:zona_operativa",
     nombre: "Zonas operativas",

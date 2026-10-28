@@ -15,7 +15,7 @@ import { GEOSERVER_WMS_URL } from "../../components/MapView.jsx";
 const aLatLng = ([x, y]) => L.CRS.EPSG3857.unproject(L.point(x, y));
 
 const WFS_URL = GEOSERVER_WMS_URL.replace(/\/wms$/, "/ows");
-const ORDEN = { incidente: 0, recurso: 1, acceso: 2, zona_operativa: 3, via: 4 };
+const ORDEN = { incidente: 0, recurso: 1, zona_operativa: 2, via: 3 };
 const capaDe = (objeto) => objeto.id.split(".")[0];
 
 async function consultarObjetos(map, latlng, capas, cql) {
@@ -192,22 +192,6 @@ function Objeto({ objeto }) {
           <Dato nombre="Nombre">{p.nombre}</Dato>
           <Dato nombre="Ubicación">{textoUbicacion(objeto.geometry)}</Dato>
         </dl>
-      </article>
-    );
-  }
-
-  if (capa === "acceso") {
-    return (
-      <article className="seleccion">
-        <header className="detalle__cabecera">
-          <div>
-            <p className="seleccion__tipo">Número de puerta</p>
-            <h3 className="bloque__titulo">
-              {p.nom_calle} {p.num_puerta}
-              {p.letra ?? ""}
-            </h3>
-          </div>
-        </header>
       </article>
     );
   }
