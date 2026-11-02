@@ -146,8 +146,16 @@ public class RutaService {
         }
     }
 
-    private static final RutaService PREDETERMINADO = new RutaService(
-            new MotorOsrm(Criterio.MAS_RAPIDA), new MotorOsrm(Criterio.MAS_CORTA));
+    private static final RutaService PREDETERMINADO = crearPredeterminado();
+
+    private static RutaService crearPredeterminado() {
+        if ("pgrouting".equalsIgnoreCase(System.getenv("RUTAS_MOTOR"))) {
+            return new RutaService(new MotorPgRouting(Criterio.MAS_RAPIDA),
+                                   new MotorPgRouting(Criterio.MAS_CORTA));
+        }
+        return new RutaService(new MotorOsrm(Criterio.MAS_RAPIDA),
+                               new MotorOsrm(Criterio.MAS_CORTA));
+    }
 
     private final MotorRutas motor;
     private final MotorRutas motorCorta;
@@ -169,8 +177,13 @@ public class RutaService {
 
     /** Si el criterio se puede calcular con la configuracion actual. */
     public boolean disponible(Criterio criterio) {
+        MotorRutas elegido = criterio == Criterio.MAS_CORTA ? motorCorta : motor;
+        if (elegido == null) return false;
+        if (elegido instanceof MotorPgRouting) {
+            return ((MotorPgRouting) elegido).saludable();
+        }
         if (criterio == Criterio.MAS_CORTA) {
-            return motorCorta != null && (motorCorta != PREDETERMINADO.motorCorta || OsrmClient.cortaConfigurada());
+            return elegido != PREDETERMINADO.motorCorta || OsrmClient.cortaConfigurada();
         }
         return true;
     }
@@ -182,6 +195,12 @@ public class RutaService {
         }
         MotorRutas m = criterio == Criterio.MAS_CORTA ? motorCorta : motor;
         return m instanceof MotorOsrm ? OsrmClient.saludable(criterio) : true;
+    }
+
+    /** Nombre del motor efectivamente utilizado para reportar en ETA. */
+    public String nombreMotor(Criterio criterio) {
+        MotorRutas m = criterio == Criterio.MAS_CORTA ? motorCorta : motor;
+        return m instanceof MotorPgRouting ? "pgRouting (PostgreSQL)" : criterio.motor;
     }
 
     /** Extremos de la ruta (en lon/lat) y distancia directa; null si el recurso o el incidente no existen. */

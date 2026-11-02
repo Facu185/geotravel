@@ -104,6 +104,7 @@ services:
       DB_NAME: ${POSTGRES_DB:-geotravel}
       DB_USER: ${POSTGRES_USER:-geotravel}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      RUTAS_MOTOR: ${RUTAS_MOTOR:-osrm}
       OSRM_URL: ${OSRM_URL:-https://router.project-osrm.org}
       # Sin valor: el criterio "mas corta" queda desactivado (responde 503). Ver docs/RECURSOS_CERCANOS_RUTAS.md
       OSRM_FAST_URL: ${OSRM_FAST_URL:-}
