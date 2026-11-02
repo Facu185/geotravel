@@ -45,7 +45,7 @@ public class EtaResource {
             boolean ok = rutas.saludable(c);
             cuerpo.put(c.codigo, ok);
             if (!ok) {
-                motivos.put(c.codigo, configurado ? "El servicio OSRM no responde" : "El servicio OSRM no esta configurado");
+                motivos.put(c.codigo, configurado ? "El motor de rutas no responde" : "El motor no esta configurado o el grafo no esta disponible");
             }
         }
         cuerpo.put("motivos", motivos);
@@ -66,7 +66,7 @@ public class EtaResource {
         }
         if (!rutas.disponible(criterio)) {
             return error(503, "El criterio " + criterio.codigo
-                    + " no esta disponible: falta configurar el OSRM propio (OSRM_SHORTEST_URL)");
+                    + " no esta disponible: compruebe el motor y el grafo vial configurados");
         }
 
         // Validar que ambos identificadores sean positivos
@@ -97,7 +97,7 @@ public class EtaResource {
             respuesta.put("duracionSegundos", Math.round(ruta.duracionSegundos));
             respuesta.put("tiempoEstimadoMinutos", ruta.minutosRedondeados());
             respuesta.put("geometriaRuta", ruta.geometriaRuta);
-            respuesta.put("motor", criterio.motor);
+            respuesta.put("motor", rutas.nombreMotor(criterio));
             respuesta.put("aclaracion", "Estimacion sin trafico en tiempo real");
             respuesta.put("criterioRuta", criterio.codigo);
             respuesta.put("criterioRutaTexto", criterio.texto);
@@ -116,7 +116,7 @@ public class EtaResource {
             return error(503, "Consulta OSRM interrumpida");
 
         } catch (IOException e) {
-            return error(503, "No se pudo consultar OSRM");
+            return error(503, "No se pudo consultar el motor de rutas");
         }
     }
 
