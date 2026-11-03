@@ -2,7 +2,9 @@ name: geotravel
 
 services:
   db:
-    image: postgis/postgis:16-3.4
+    build:
+      context: ../
+      dockerfile: infra/Dockerfile.db
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-geotravel}
       POSTGRES_USER: ${POSTGRES_USER:-geotravel}
@@ -51,6 +53,7 @@ services:
       - ./init/seed.sh:/init/seed.sh:ro
       - ../db/seed:/seed:ro
       - ../db/data:/data:ro
+      - ../db/sql:/sql:ro
     entrypoint: ["/bin/sh", "/init/seed.sh"]
 
   # Configura GeoServer por REST: workspace, store PostGIS, capas y estilos SLD
