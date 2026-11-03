@@ -77,6 +77,21 @@ RUTAS_MOTOR=pgrouting
 
 Sin cambiar esa variable, OSRM continúa funcionando como hasta ahora. En modo pgRouting **no se cambia a OSRM silenciosamente** si el motor SQL falla. `GET /eta/criterios` informa la falta de función o grafo; la UI ya sabe deshabilitar criterios que no estén disponibles. El frontend existente no requiere reescritura porque los contratos no cambian.
 
+## Verificación con el grafo de P1 (3/11)
+
+Con el grafo corregido (calles cortadas en cada cruce, ver `docs/P1_GRAFO_SALTO.md`) y `RUTAS_MOTOR=pgrouting`, sobre una
+base nueva levantada desde cero:
+
+- `GET /eta/criterios` informa `mas_rapida` y `mas_corta` disponibles.
+- Con 300 pares recurso–incidente de Salto, la función `p2_calcular_ruta` encuentra ruta en 288; los otros 12 tienen un
+  extremo a más de 250 m de una esquina (el límite de ajuste) o fuera de la red.
+- El ETA entre la Policía Caminera (extremo este) y un accidente del otro extremo de la ciudad da 11,1 km y 17 minutos,
+  con `motor: "pgRouting (PostgreSQL)"`; la consulta 3 con `conRutas=true` devuelve el camino de los 5 recursos más cercanos.
+- Con el grafo anterior (un arco por calle entera) solo 12 de 300 pares tenían ruta, y todas las calles tenían la misma
+  velocidad, por lo que "más rápida" daba siempre lo mismo que "más corta".
+- En viajes largos (más de 2,5 km) las dos rutas difieren en 11 de 66 casos; en distancias cortas casi siempre coinciden.
+- El motor por defecto sigue siendo OSRM: para usar pgRouting hay que definir `RUTAS_MOTOR=pgrouting` en `infra/.env`.
+
 ## Pendiente antes del cierre de esta tarea
 
 1. P1: publicar migración nueva e importar un grafo válido de Salto con sentidos y velocidades.

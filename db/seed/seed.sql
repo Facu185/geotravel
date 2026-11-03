@@ -178,8 +178,6 @@ BEGIN
     END LOOP;
 END $$;
 
-DROP TABLE _calles_salto;
-
 -- Incidentes puntuales: 120. La mitad cae en el centro (Centro Salto), la otra mitad en toda la ciudad.
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
@@ -202,6 +200,12 @@ WITH nuevos AS (
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
 
+-- Los incidentes puntuales ocurren en la calle: cada punto sorteado se lleva al punto más cercano de la red de calles
+-- de Salto. Así no caen en el río ni del otro lado (Concordia), y se puede calcular un camino hasta ellos.
+UPDATE incidente i
+SET geom = (SELECT ST_ClosestPoint(c.geom, i.geom) FROM _calles_salto c ORDER BY c.geom <-> i.geom LIMIT 1)
+WHERE i.id IN (SELECT id FROM _gen_incidente);
+
 -- Calles cortadas: 20 incidentes de LÍNEA sobre calles reales de Salto (tramos de 80 a 300 m).
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
@@ -217,6 +221,7 @@ WITH nuevos AS (
         SELECT nom_calle, geom
         FROM via
         WHERE tipo = 'CALLE'
+          AND gid IN (SELECT gid FROM _calles_salto)
           AND ST_Length(geom) BETWEEN 80 AND 300
           AND geom && ST_Transform(ST_MakeEnvelope(-57.995, -31.405, -57.925, -31.365, 4326), 32721)
         ORDER BY random()
@@ -225,6 +230,7 @@ WITH nuevos AS (
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
+DROP TABLE _calles_salto;
 
 -- Inundaciones: 12 incidentes de POLÍGONO (áreas de 60 a 140 m de radio).
 WITH nuevos AS (

@@ -129,7 +129,8 @@ sedes reales (hospital y centros de salud, estación de bomberos, jefatura y sec
 Policía Caminera; ubicaciones de OpenStreetMap, ODbL) y 48 móviles se reparten por toda la ciudad sobre sus calles, a
 350 m o más entre sí. Todos quedan sobre una calle de la tabla `via` y solo del lado de Salto (la tabla también trae
 Concordia, Argentina, del otro lado del río). La carga masiva (`db/pruebas/carga-masiva.sql`) reparte sus 3.000 recursos
-de la misma forma.
+de la misma forma. Los incidentes puntuales de prueba también caen sobre una calle, así que se puede calcular un camino
+hasta ellos.
 
 **Cambiar las calles en una base que ya existe** (por ejemplo, la que tenía las de Montevideo), sin perder
 zonas, recursos ni incidentes. Desde `infra/`:
