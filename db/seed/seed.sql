@@ -95,22 +95,88 @@ INSERT INTO zona_operativa (nombre, descripcion, nivel_prioridad, responsable, g
 ('Corredor Av. Uruguay', 'Franja a lo largo de la avenida, superpuesta con el centro', 1, 'Equipo Tránsito',
  ST_Transform(ST_MakeEnvelope(-57.975, -31.389, -57.950, -31.384, 4326), 32721));
 
--- Recursos: 60 puntos al azar sobre Salto, de todos los tipos y estados.
-WITH nuevos AS (
+-- Recursos: 60 en Salto, repartidos como en la realidad y no al azar dentro de un rectángulo:
+--   * 12 en sedes reales (OpenStreetMap): hospital y centros de salud, la estación de bomberos, la jefatura y la
+--     seccional de policía, la base de ambulancias y la Policía Caminera.
+--   * 48 móviles (ambulancias, patrullas, bomberos y equipos de apoyo) repartidos por toda la ciudad a lo largo de
+--     sus calles —hay más donde hay más calles— y a 350 m o más entre sí.
+-- Todos van sobre una calle de la tabla via, y solo de la red de Salto: la tabla también trae Concordia (Argentina),
+-- que está del otro lado del río, y por eso se toma solo la red de calles conectada con el centro de Salto.
+CREATE TEMP TABLE _calles_salto AS
+WITH c AS (
+    SELECT gid, geom, tipo, ST_ClusterDBSCAN(geom, 0, 1) OVER () AS red FROM via
+)
+SELECT gid, geom, ST_Length(geom) AS largo, sum(ST_Length(geom)) OVER (ORDER BY gid) AS acum
+FROM c
+WHERE red = (SELECT red FROM c ORDER BY geom <-> ST_Transform(ST_SetSRID(ST_MakePoint(-57.9606, -31.3857), 4326), 32721) LIMIT 1)
+  AND tipo IN ('CALLE', 'AVENIDA');
+CREATE INDEX ON _calles_salto USING gist (geom);
+ANALYZE _calles_salto;
+
+-- Sedes reales, cada una en el punto de calle más cercano a su ubicación en OpenStreetMap.
+WITH sedes (identificacion, nombre, tipo, estado, descripcion, lon, lat) AS (VALUES
+    ('CEN-001', 'Hospital Departamental de Salto',  'centro_atencion', 'Disponible',  'Hospital (sede real)',                 -57.96117, -31.39228),
+    ('CEN-002', 'Centro de Asistencia Médica',      'centro_atencion', 'Disponible',  'Centro de salud (sede real)',          -57.96359, -31.38893),
+    ('CEN-003', 'Centro Médico Pediátrico',         'centro_atencion', 'En servicio', 'Centro de salud (sede real)',          -57.95339, -31.38884),
+    ('CEN-004', 'Centro Médico de Salto',           'centro_atencion', 'Disponible',  'Centro de salud (sede real)',          -57.94953, -31.40363),
+    ('BOM-001', 'Bomberos Salto 1',                 'bomberos',        'Disponible',  'Estación de Bomberos (sede real)',     -57.97012, -31.38923),
+    ('BOM-002', 'Bomberos Salto 2',                 'bomberos',        'En servicio', 'Estación de Bomberos (sede real)',     -57.96940, -31.38890),
+    ('PAT-001', 'Patrulla Jefatura 1',              'patrulla',        'Disponible',  'Jefatura Departamental (sede real)',   -57.97044, -31.38834),
+    ('PAT-002', 'Patrulla Seccional Primera',       'patrulla',        'Disponible',  'Seccional Primera (sede real)',        -57.97087, -31.38915),
+    ('PAT-003', 'Patrulla Jefatura 2',              'patrulla',        'En servicio', 'Jefatura Departamental (sede real)',   -57.96980, -31.38800),
+    ('PAT-004', 'Patrulla Caminera',                'patrulla',        'Disponible',  'Policía Caminera (sede real)',         -57.88446, -31.38356),
+    ('AMB-001', 'Ambulancia UCMS',                  'ambulancia',      'Disponible',  'Base de ambulancias UCMS (sede real)', -57.94448, -31.38464),
+    ('AMB-002', 'Ambulancia Hospital Departamental','ambulancia',      'Fuera de servicio', 'Base en el hospital (sede real)', -57.96050, -31.39300)
+), nuevos AS (
     INSERT INTO recurso (identificacion, nombre, tipo, estado_operativo, descripcion, geom)
-    SELECT upper(left(tipo, 3)) || '-' || lpad(g::text, 3, '0'),
-           initcap(replace(tipo, '_', ' ')) || ' ' || g,
-           tipo,
-           (ARRAY['Disponible', 'Disponible', 'En servicio', 'Fuera de servicio'])[1 + g % 4],
-           'Recurso de emergencia en Salto',
-           ST_Transform(ST_SetSRID(ST_MakePoint(-57.995 + random() * 0.07, -31.405 + random() * 0.04), 4326), 32721)
-    FROM (
-        SELECT g, (ARRAY['ambulancia', 'bomberos', 'patrulla', 'centro_atencion', 'otro'])[1 + g % 5] AS tipo
-        FROM generate_series(1, 60) g
-    ) r
+    SELECT s.identificacion, s.nombre, s.tipo, s.estado, s.descripcion,
+           (SELECT ST_ClosestPoint(c.geom, p.g) FROM _calles_salto c ORDER BY c.geom <-> p.g LIMIT 1)
+    FROM sedes s
+    CROSS JOIN LATERAL (SELECT ST_Transform(ST_SetSRID(ST_MakePoint(s.lon, s.lat), 4326), 32721) AS g) p
     RETURNING id
 )
 INSERT INTO _gen_recurso SELECT id FROM nuevos;
+
+-- Móviles: se sortea una calle (más probable cuanto más larga) y un punto sobre ella; si hay otro recurso a menos de
+-- 350 m se vuelve a sortear (hasta 200 veces). Estados: 55 % disponible, 30 % en servicio, 15 % fuera de servicio.
+DO $$
+DECLARE
+    unidad record;
+    punto geometry;
+    total double precision := (SELECT max(acum) FROM _calles_salto);
+    sorteo double precision;
+    intentos integer;
+    nuevo_id integer;
+BEGIN
+    FOR unidad IN
+        SELECT t.tipo, t.base + row_number() OVER (PARTITION BY t.tipo) AS n
+        FROM (
+            SELECT tipo, base, generate_series(1, cantidad) AS g
+            FROM (VALUES ('ambulancia', 10, 2), ('patrulla', 20, 4), ('bomberos', 6, 2), ('otro', 12, 0)) AS v(tipo, cantidad, base)
+        ) t
+        ORDER BY random()
+    LOOP
+        intentos := 0;
+        LOOP
+            intentos := intentos + 1;
+            sorteo := random() * total;
+            SELECT ST_LineInterpolatePoint(c.geom, random()) INTO punto
+            FROM _calles_salto c WHERE c.acum >= sorteo ORDER BY c.acum LIMIT 1;
+            EXIT WHEN intentos >= 200 OR NOT EXISTS (
+                SELECT 1 FROM recurso r JOIN _gen_recurso g ON g.id = r.id WHERE ST_DWithin(r.geom, punto, 350));
+        END LOOP;
+        sorteo := random();
+        INSERT INTO recurso (identificacion, nombre, tipo, estado_operativo, descripcion, geom)
+        VALUES (upper(left(unidad.tipo, 3)) || '-' || lpad(unidad.n::text, 3, '0'),
+                initcap(replace(unidad.tipo, '_', ' ')) || ' ' || unidad.n,
+                unidad.tipo,
+                CASE WHEN sorteo < 0.55 THEN 'Disponible' WHEN sorteo < 0.85 THEN 'En servicio' ELSE 'Fuera de servicio' END,
+                CASE unidad.tipo WHEN 'otro' THEN 'Equipo de apoyo móvil en Salto' ELSE 'Móvil en recorrida por Salto' END,
+                punto)
+        RETURNING id INTO nuevo_id;
+        INSERT INTO _gen_recurso VALUES (nuevo_id);
+    END LOOP;
+END $$;
 
 -- Incidentes puntuales: 120. La mitad cae en el centro (Centro Salto), la otra mitad en toda la ciudad.
 WITH nuevos AS (
@@ -134,6 +200,12 @@ WITH nuevos AS (
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
 
+-- Los incidentes puntuales ocurren en la calle: cada punto sorteado se lleva al punto más cercano de la red de calles
+-- de Salto. Así no caen en el río ni del otro lado (Concordia), y se puede calcular un camino hasta ellos.
+UPDATE incidente i
+SET geom = (SELECT ST_ClosestPoint(c.geom, i.geom) FROM _calles_salto c ORDER BY c.geom <-> i.geom LIMIT 1)
+WHERE i.id IN (SELECT id FROM _gen_incidente);
+
 -- Calles cortadas: 20 incidentes de LÍNEA sobre calles reales de Salto (tramos de 80 a 300 m).
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
@@ -149,6 +221,7 @@ WITH nuevos AS (
         SELECT nom_calle, geom
         FROM via
         WHERE tipo = 'CALLE'
+          AND gid IN (SELECT gid FROM _calles_salto)
           AND ST_Length(geom) BETWEEN 80 AND 300
           AND geom && ST_Transform(ST_MakeEnvelope(-57.995, -31.405, -57.925, -31.365, 4326), 32721)
         ORDER BY random()
@@ -157,6 +230,7 @@ WITH nuevos AS (
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
+DROP TABLE _calles_salto;
 
 -- Inundaciones: 12 incidentes de POLÍGONO (áreas de 60 a 140 m de radio).
 WITH nuevos AS (
@@ -182,6 +256,7 @@ FROM incidente i
 JOIN _gen_incidente g ON g.id = i.id
 CROSS JOIN LATERAL (
     SELECT rec.id FROM recurso rec JOIN _gen_recurso gr ON gr.id = rec.id
+    WHERE rec.estado_operativo <> 'Fuera de servicio'
     ORDER BY rec.geom <-> i.geom LIMIT 1 + (i.id % 3)
 ) r
 WHERE i.estado IN ('En atención', 'Derivado', 'Resuelto');

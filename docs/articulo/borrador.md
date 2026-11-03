@@ -80,6 +80,12 @@ de 3000"). Se probó con una carga masiva de 700 zonas y 3000 recursos en Salto 
 se acepta, que se rechazan los polígonos inválidos, la prioridad fuera de rango y los tipos de recurso no permitidos, y que lo
 creado aparece en el listado de su rectángulo y no en uno lejano.
 
+**Datos de prueba realistas.** Los recursos de prueba no se sortean en un rectángulo: 12 están en sedes reales
+(OpenStreetMap) y 48 móviles se reparten por la ciudad a lo largo de sus calles, más donde hay más calles y a 350 m o más
+entre sí, siempre del lado de Salto (la tabla de calles también trae Concordia, del otro lado del río). Los incidentes
+puntuales también caen sobre una calle. Esto no es solo estético: un recurso o un incidente en el río no tiene camino, y
+el cálculo de rutas (distancia y tiempo de llegada) necesita que ambos extremos estén en la red vial.
+
 **Limitaciones.** Al eliminar un recurso se quita de las asignaciones de incidentes (borrado en cascada); la pantalla avisa
 cuántas son antes de confirmar, pero no se conserva ese historial. Las listas no se pueden filtrar por tipo, estado o
 prioridad, y los polígonos no se simplifican según el zoom.
