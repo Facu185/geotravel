@@ -27,6 +27,19 @@ export const REGIONES = {
       [-31.365, -57.925],
     ],
   },
+  // Todo el departamento de Salto, para ver los datos del interior (Belén, Constitución, Termas del Arapey, Daymán...).
+  // Solo sirve para el botón "Ir a": las direcciones y las calles propias son las de la ciudad.
+  departamento: {
+    nombre: "Depto. de Salto",
+    ide: { departamento: "salto", localidad: "salto" },
+    callesPropias: false,
+    ejemploDireccion: "Uruguay 1000",
+    centro: [-31.2, -57.1],
+    encuadre: [
+      [-31.7, -58.05],
+      [-30.7, -56.15],
+    ],
+  },
   montevideo: {
     nombre: "Montevideo",
     ide: { departamento: "montevideo", localidad: "montevideo" },

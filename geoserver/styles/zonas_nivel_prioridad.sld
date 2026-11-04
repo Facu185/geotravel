@@ -16,7 +16,7 @@
         <Rule>
           <Name>Prioridad 1</Name>
           <Title>Prioridad 1 (Máxima)</Title>
-          <MaxScaleDenominator>750000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>nivel_prioridad</ogc:PropertyName>
@@ -37,7 +37,7 @@
         <Rule>
           <Name>Prioridad 2</Name>
           <Title>Prioridad 2</Title>
-          <MaxScaleDenominator>750000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>nivel_prioridad</ogc:PropertyName>
@@ -58,7 +58,7 @@
         <Rule>
           <Name>Prioridad 3</Name>
           <Title>Prioridad 3</Title>
-          <MaxScaleDenominator>750000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>nivel_prioridad</ogc:PropertyName>
@@ -79,7 +79,7 @@
         <Rule>
           <Name>Prioridad 4</Name>
           <Title>Prioridad 4</Title>
-          <MaxScaleDenominator>750000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>nivel_prioridad</ogc:PropertyName>
@@ -100,7 +100,7 @@
         <Rule>
           <Name>Prioridad 5</Name>
           <Title>Prioridad 5 (Mínima)</Title>
-          <MaxScaleDenominator>750000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:PropertyIsEqualTo>
               <ogc:PropertyName>nivel_prioridad</ogc:PropertyName>

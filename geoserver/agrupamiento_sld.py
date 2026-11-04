@@ -19,7 +19,7 @@ import os
 import re
 
 ESCALA_ICONOS = 20000   # con el mapa más cerca que esto (zoom 15 o más) se dibujan los íconos
-ESCALA_MAXIMA = 200000  # y con el mapa más lejos que esto no se dibuja nada
+ESCALA_MAXIMA = 1200000  # y con el mapa más lejos que esto (más que el departamento de Salto entero, zoom 9) no se dibuja nada
 CELDA = 64              # píxeles; tiene que dividir a 256
 COLOR_INCIDENTES = "#13202c"
 COLOR_RECURSOS = "#0f766e"

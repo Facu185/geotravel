@@ -72,6 +72,7 @@ Resuelto `#1f7a5c` · Cancelado `#a8392b`.
 
 Con el mapa alejado (zoom 14 o menos) los incidentes y recursos que quedan juntos se agrupan en un **círculo con la
 cantidad**, como en Airbnb: oscuro para incidentes, verde azulado para recursos. Del zoom 15 en adelante se ven los íconos.
+GeoServer dibuja las capas hasta 1:1.200.000 (zoom 9, el departamento de Salto entero); más lejos no se dibuja nada.
 Las líneas y los polígonos de incidentes cuentan en el grupo por su centro (y su forma se dibuja igual).
 
 - **Lo que dibuja GeoServer** (mapa público, y el fondo de las demás pantallas cuando está lejos): una transformación de
