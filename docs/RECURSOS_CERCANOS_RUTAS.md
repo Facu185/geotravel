@@ -33,6 +33,10 @@ Son dos criterios distintos y la API/UI los distinguen (`criterio=mas_rapida|mas
 |---|---|---|---|
 | `mas_rapida` (defecto) | duración estimada | OSRM `driving` (público o propio) | ninguno |
 | `mas_corta` | distancia vial por calles permitidas | OSRM propio, perfil `infra/osrm/profiles/car_distancia.lua` | `OSRM_SHORTEST_URL` + datos preparados |
+| ambos | duración o distancia según el criterio | pgRouting dentro de PostgreSQL (mismo grafo, costos de tiempo y de longitud) | `RUTAS_MOTOR=pgrouting` + grafo de P1 (ver [P2_PGROUTING.md](P2_PGROUTING.md)) |
+
+Con `RUTAS_MOTOR=pgrouting` los dos criterios se calculan en PostgreSQL sobre el grafo de Salto y no se consulta
+ningún OSRM; si el motor SQL falla no se cambia a OSRM silenciosamente.
 
 OSRM aplica el perfil al **procesar** el mapa, por eso hay dos datasets y dos servicios (`osrm-fast`, `osrm-shortest`).
 El perfil de distancia es el `car.lua` oficial con `weight_name = 'distance'`: respeta sentidos únicos, giros
@@ -84,8 +88,9 @@ El criterio de la ruta rápida es la duración estimada con las velocidades del 
 ### Pruebas
 
 Unitarias (sin servicios): `mvn -f backend/pom.xml test`. Opt-in con servicios levantados:
-`URBANSAFE_INTEGRATION_TESTS=true` (PostGIS; usar una base de pruebas) y `URBANSAFE_OSRM_TESTS=true` con `OSRM_FAST_URL`
-y `OSRM_SHORTEST_URL` (pesos del perfil, "más corta pero más lenta", GeoJSON).
+`URBANSAFE_INTEGRATION_TESTS=true` (PostGIS; usar una base de pruebas), `URBANSAFE_OSRM_TESTS=true` con `OSRM_FAST_URL`
+y `OSRM_SHORTEST_URL` (pesos del perfil, "más corta pero más lenta", GeoJSON) y `URBANSAFE_PGROUTING_TESTS=true`
+(pgRouting contra el grafo real de Salto; apuntar `DB_PORT` a la base de pruebas).
 
 ### Resultados verificados (OSRM propio, datos de prueba de Montevideo y Salto)
 
@@ -98,7 +103,9 @@ directa contra OSRM, ahorrar 146 m (3932 → 3786 m) costó 185 s más (408 → 
 - El peso de distancia no penaliza giros ni cruces; la duración mostrada sigue estimándose con velocidades del perfil car.
 - Sin tráfico en tiempo real. La calidad depende de OpenStreetMap (sentidos, cierres, cobertura).
 - Los extremos se ajustan a la calle más cercana (ver `advertencia`).
-- La tabla `via` del proyecto no sirve como grafo (solo Montevideo, sin sentidos ni topología), por eso se usa OSM.
+- La tabla `via` del proyecto cubre **Salto** (3.239 tramos) pero tal cual viene no sirve como grafo: cada fila es una
+  calle entera (no está cortada en las esquinas) y no trae sentidos de circulación. El grafo de P1
+  (`db/sql/p1_generar_grafo_via.sql`) resuelve el corte en esquinas; los sentidos únicos siguen sin modelarse.
 
 ## Configuración
 

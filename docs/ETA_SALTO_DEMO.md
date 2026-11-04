@@ -1,6 +1,6 @@
 # UrbanSafe P2: reproducir ETA en Salto en otra computadora
 
-Este escenario esta versionado **solo en `feat/backend-p2`**, no en `main`.
+Este escenario ya esta integrado en `main` (PR #24).
 El repositorio incluye codigo backend y frontend, Docker Compose, migraciones,
 configuracion y datos de prueba reproducibles. **No** se versionan los volumenes
 Docker ni los IDs internos de la base local.
@@ -17,7 +17,7 @@ Docker ni los IDs internos de la base local.
 Desde una carpeta vacia en la que quieras instalar el proyecto:
 
 ```powershell
-git clone --branch feat/backend-p2 --single-branch https://github.com/Facu185/geotravel.git
+git clone https://github.com/Facu185/geotravel.git
 Set-Location geotravel/infra
 Copy-Item .env.example .env
 docker compose up -d --build
@@ -84,15 +84,18 @@ Invoke-RestMethod "$api/eta/recursos/$($r.id)/incidentes/$($i.id)" | ConvertTo-J
 La respuesta debe contener `distanciaMetros`, `duracionSegundos`,
 `tiempoEstimadoMinutos` y `geometriaRuta` con `type: LineString`, coordenadas
 **longitud, latitud**, EPSG:4326. En `/eta`, elegir esas referencias para ver
-el recorrido vial verde. La demo anterior obtuvo ~1.051 m, 170 segundos y
-3 minutos; OSRM puede modificar las cifras al actualizar las rutas.
+el recorrido vial verde. La demo con OSRM obtuvo ~1.051 m, 170 segundos y
+3 minutos; con pgRouting (`RUTAS_MOTOR=pgrouting`) el mismo par da 1.052 m,
+95 segundos y 2 minutos (la distancia coincide; la duracion difiere porque cada
+motor estima las velocidades a su manera). OSRM puede modificar las cifras al
+actualizar las rutas.
 
 ## Actualizar una instalacion que ya tenia una base Docker
 
-Desde la raiz de tu clon en la **rama `feat/backend-p2`**:
+Desde la raiz de tu clon:
 
 ```powershell
-git pull --ff-only origin feat/backend-p2
+git pull --ff-only origin main
 Set-Location infra
 docker compose up -d --build
 docker compose logs seed --tail=30
@@ -111,9 +114,12 @@ elimina los volumenes de la base y GeoServer.
 ## Limites
 
 - OSRM publico y los mapas base requieren **internet**; la app no incluye un
-  servidor OSRM local ni un paquete offline del mapa de Salto.
+  servidor OSRM local ni un paquete offline del mapa de Salto. Con
+  `RUTAS_MOTOR=pgrouting` la ruta se calcula dentro de PostgreSQL (grafo de
+  Salto de P1) y no se necesita internet ni OSRM para el calculo.
 - Las calles y puertas de `db/data/` son de **Salto**. La ruta ETA se calcula
-  con OSRM, a partir de las coordenadas del recurso y el incidente.
+  con OSRM (motor por defecto) o con pgRouting, a partir de las coordenadas
+  del recurso y el incidente.
 - Para acceder desde un telefono u otra PC a una instancia alojada en un
   equipo distinto, configurar `VITE_API_URL`, `VITE_GEOSERVER_WMS_URL` y
   la direccion de escucha de Vite segun la red. `localhost` corresponde
