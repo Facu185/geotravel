@@ -361,7 +361,7 @@
         <Rule>
           <Name>Registrado_Line</Name>
           <Title>Registrado - Línea</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -386,7 +386,7 @@
         <Rule>
           <Name>Registrado_Polygon</Name>
           <Title>Registrado - Polígono</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -761,7 +761,7 @@
         <Rule>
           <Name>En_atención_Line</Name>
           <Title>En atención - Línea</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -786,7 +786,7 @@
         <Rule>
           <Name>En_atención_Polygon</Name>
           <Title>En atención - Polígono</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1161,7 +1161,7 @@
         <Rule>
           <Name>Derivado_Line</Name>
           <Title>Derivado - Línea</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1186,7 +1186,7 @@
         <Rule>
           <Name>Derivado_Polygon</Name>
           <Title>Derivado - Polígono</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1561,7 +1561,7 @@
         <Rule>
           <Name>Resuelto_Line</Name>
           <Title>Resuelto - Línea</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1586,7 +1586,7 @@
         <Rule>
           <Name>Resuelto_Polygon</Name>
           <Title>Resuelto - Polígono</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1961,7 +1961,7 @@
         <Rule>
           <Name>Cancelado_Line</Name>
           <Title>Cancelado - Línea</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -1986,7 +1986,7 @@
         <Rule>
           <Name>Cancelado_Polygon</Name>
           <Title>Cancelado - Polígono</Title>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -2029,7 +2029,7 @@
           <Name>agrupado_uno</Name>
           <Title>Uno solo</Title>
           <MinScaleDenominator>20000</MinScaleDenominator>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter><ogc:PropertyIsEqualTo><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>1</ogc:Literal></ogc:PropertyIsEqualTo></ogc:Filter>
           <PointSymbolizer>
             <Graphic>
@@ -2050,7 +2050,7 @@
           <Name>agrupado_2_a_9</Name>
           <Title>De 2 a 9</Title>
           <MinScaleDenominator>20000</MinScaleDenominator>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter><ogc:And><ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>2</ogc:Literal></ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyIsLessThan><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>10</ogc:Literal></ogc:PropertyIsLessThan></ogc:And></ogc:Filter>
           <PointSymbolizer>
             <Graphic>
@@ -2087,7 +2087,7 @@
           <Name>agrupado_10_a_99</Name>
           <Title>De 10 a 99</Title>
           <MinScaleDenominator>20000</MinScaleDenominator>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter><ogc:And><ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>10</ogc:Literal></ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyIsLessThan><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>100</ogc:Literal></ogc:PropertyIsLessThan></ogc:And></ogc:Filter>
           <PointSymbolizer>
             <Graphic>
@@ -2124,7 +2124,7 @@
           <Name>agrupado_100_o_mas</Name>
           <Title>100 o más</Title>
           <MinScaleDenominator>20000</MinScaleDenominator>
-          <MaxScaleDenominator>200000</MaxScaleDenominator>
+          <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter><ogc:And><ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>100</ogc:Literal></ogc:PropertyIsGreaterThanOrEqualTo></ogc:And></ogc:Filter>
           <PointSymbolizer>
             <Graphic>

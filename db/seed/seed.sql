@@ -1,5 +1,6 @@
--- seed.sql — datos de prueba para Salto: unos pocos hechos a mano y, al final, un conjunto más grande
--- (zonas —algunas superpuestas—, recursos e incidentes de todos los tipos y formas) para recorrer las consultas, en Salto y en Montevideo.
+-- seed.sql — datos de prueba para Salto: unos pocos hechos a mano y, después, un conjunto moderado repartido por la
+-- ciudad y por el departamento (zonas —algunas superpuestas—, recursos e incidentes de todos los tipos y formas) y otro
+-- más chico en Montevideo, para recorrer las consultas.
 -- Las geometrías se definen en lon/lat (EPSG:4326, coordenadas reales de Salto) y se
 -- transforman a EPSG:32721, el SRID que usa la base.
 -- Ejecutar después de la migración V1. 
@@ -62,9 +63,12 @@ INSERT INTO historial_estado (incidente_id, estado, fecha_hora, usuario) VALUES
 (4, 'Resuelto',    now() + interval '2 minutes', 'carla.nunez');
 
 -- =====================================================================================================
--- Conjunto grande para recorrer las consultas: 23 zonas, 60 recursos y 152 incidentes de Salto, con
--- puntos, líneas (calles cortadas, sobre las calles reales de la tabla via) y polígonos (áreas
--- inundadas), de todos los estados, tipos y prioridades, con recursos asignados e historial de estados.
+-- Datos de prueba para recorrer el sistema, en cantidad moderada y repartidos como en la realidad:
+--   * Departamento de Salto: 10 zonas operativas (5 en la ciudad, dos de ellas superpuestas con otras, y 5 en el
+--     interior), 36 recursos y 43 incidentes. La ciudad tiene la mayoría, a lo largo de sus calles reales; el resto
+--     está en las localidades del departamento (Daymán, Belén, Constitución, Termas del Arapey, Pueblo Lavalleja...).
+--   * Montevideo: 7 zonas, 12 recursos y 25 incidentes (el sistema atiende todo el país).
+-- Las localidades y las sedes del interior (policlínicas y seccionales policiales) son de OpenStreetMap (ODbL).
 -- Es determinista (semilla fija). Va después de la carga de la red vial (seed.sh la carga antes).
 -- =====================================================================================================
 SELECT setseed(0.2027);
@@ -72,36 +76,34 @@ SELECT setseed(0.2027);
 CREATE TEMP TABLE _gen_incidente (id integer PRIMARY KEY);
 CREATE TEMP TABLE _gen_recurso (id integer PRIMARY KEY);
 
--- Zonas: grilla de 7 x 5 celdas de ~950 x 890 m sobre Salto, salvo las que tocan una zona de arriba.
-INSERT INTO zona_operativa (nombre, descripcion, nivel_prioridad, responsable, geom)
-SELECT 'Zona ' || chr(65 + j) || (i + 1),
-       'Zona operativa de Salto',
-       1 + (i * 3 + j * 2) % 5,
-       'Equipo ' || (1 + (i + j) % 4),
-       celda
-FROM (
-    SELECT i, j,
-           ST_Transform(ST_MakeEnvelope(-57.995 + i * 0.01, -31.405 + j * 0.008,
-                                        -57.995 + i * 0.01 + 0.0094, -31.405 + j * 0.008 + 0.0076, 4326), 32721) AS celda
-    FROM generate_series(0, 6) i, generate_series(0, 4) j
-) celdas
-WHERE NOT EXISTS (SELECT 1 FROM zona_operativa z WHERE z.geom && celda AND ST_Intersects(z.geom, celda));
-
--- Zonas que SÍ se superponen con otras (las zonas operativas pueden superponerse): un punto, un recurso o un
--- incidente puede estar en más de una. Van después de la grilla, que saltea las celdas que tocan una zona previa.
+-- Zonas de la ciudad: además de las tres de arriba, dos que SÍ se superponen con otras (las zonas operativas
+-- pueden superponerse): un punto, un recurso o un incidente puede estar en más de una.
 INSERT INTO zona_operativa (nombre, descripcion, nivel_prioridad, responsable, geom) VALUES
 ('Casco urbano Salto', 'Zona amplia que incluye el centro y varias zonas vecinas', 2, 'Coordinación Salto',
  ST_Transform(ST_MakeEnvelope(-57.985, -31.395, -57.945, -31.375, 4326), 32721)),
 ('Corredor Av. Uruguay', 'Franja a lo largo de la avenida, superpuesta con el centro', 1, 'Equipo Tránsito',
  ST_Transform(ST_MakeEnvelope(-57.975, -31.389, -57.950, -31.384, 4326), 32721));
 
--- Recursos: 60 en Salto, repartidos como en la realidad y no al azar dentro de un rectángulo:
---   * 12 en sedes reales (OpenStreetMap): hospital y centros de salud, la estación de bomberos, la jefatura y la
---     seccional de policía, la base de ambulancias y la Policía Caminera.
---   * 48 móviles (ambulancias, patrullas, bomberos y equipos de apoyo) repartidos por toda la ciudad a lo largo de
---     sus calles —hay más donde hay más calles— y a 350 m o más entre sí.
--- Todos van sobre una calle de la tabla via, y solo de la red de Salto: la tabla también trae Concordia (Argentina),
--- que está del otro lado del río, y por eso se toma solo la red de calles conectada con el centro de Salto.
+-- Zonas del interior del departamento: una alrededor de cada localidad importante (círculo del radio indicado, en metros)
+-- y una más grande en el este.
+INSERT INTO zona_operativa (nombre, descripcion, nivel_prioridad, responsable, geom)
+SELECT z.nombre, z.descripcion, z.prioridad, z.responsable,
+       ST_Buffer(ST_Transform(ST_SetSRID(ST_MakePoint(z.lon, z.lat), 4326), 32721), z.radio, 16)
+FROM (VALUES
+    ('Daymán y Termas del Daymán', 'Zona sur: Daymán y sus termas', 3, 'Equipo Sur', -57.9084, -31.4525, 3500),
+    ('Constitución', 'Villa Constitución y su entorno rural', 3, 'Equipo Norte', -57.8494, -31.0672, 4000),
+    ('Belén', 'Belén y Chacras de Belén', 4, 'Equipo Norte', -57.7791, -30.7894, 4000),
+    ('Termas del Arapey', 'Complejo termal del Arapey', 4, 'Equipo Norte', -57.5232, -30.9474, 5000)
+) z(nombre, descripcion, prioridad, responsable, lon, lat, radio);
+
+INSERT INTO zona_operativa (nombre, descripcion, nivel_prioridad, responsable, geom) VALUES
+('Interior este (Pueblo Lavalleja y Biassini)', 'Zona rural del este del departamento', 5, 'Equipo Interior',
+ ST_Transform(ST_MakeEnvelope(-57.20, -31.30, -56.95, -31.05, 4326), 32721));
+
+-- Calles de Salto por las que anda un auto, solo de la red de la ciudad: la tabla via también trae Concordia (Argentina),
+-- del otro lado del río, y por eso se toma solo la red de calles conectada con el centro de Salto. Sirve para ubicar
+-- recursos e incidentes sobre una calle (acum = largo acumulado: un punto al azar sobre toda la red, más probable
+-- cuanto más larga es la calle).
 CREATE TEMP TABLE _calles_salto AS
 WITH c AS (
     SELECT gid, geom, tipo, ST_ClusterDBSCAN(geom, 0, 1) OVER () AS red FROM via
@@ -113,7 +115,8 @@ WHERE red = (SELECT red FROM c ORDER BY geom <-> ST_Transform(ST_SetSRID(ST_Make
 CREATE INDEX ON _calles_salto USING gist (geom);
 ANALYZE _calles_salto;
 
--- Sedes reales, cada una en el punto de calle más cercano a su ubicación en OpenStreetMap.
+-- Recursos de la ciudad: 12 en sedes reales (OpenStreetMap: hospital y centros de salud, estación de bomberos, jefatura y
+-- seccional de policía, base de ambulancias y Policía Caminera), cada una en el punto de calle más cercano.
 WITH sedes (identificacion, nombre, tipo, estado, descripcion, lon, lat) AS (VALUES
     ('CEN-001', 'Hospital Departamental de Salto',  'centro_atencion', 'Disponible',  'Hospital (sede real)',                 -57.96117, -31.39228),
     ('CEN-002', 'Centro de Asistencia Médica',      'centro_atencion', 'Disponible',  'Centro de salud (sede real)',          -57.96359, -31.38893),
@@ -137,8 +140,9 @@ WITH sedes (identificacion, nombre, tipo, estado, descripcion, lon, lat) AS (VAL
 )
 INSERT INTO _gen_recurso SELECT id FROM nuevos;
 
--- Móviles: se sortea una calle (más probable cuanto más larga) y un punto sobre ella; si hay otro recurso a menos de
--- 350 m se vuelve a sortear (hasta 200 veces). Estados: 55 % disponible, 30 % en servicio, 15 % fuera de servicio.
+-- Móviles de la ciudad: 6 (ambulancias, patrullas y un camión de bomberos) en recorrida por toda la ciudad. Se sortea una
+-- calle (más probable cuanto más larga) y un punto sobre ella; si hay otro recurso a menos de 500 m se vuelve a sortear.
+-- Estados: 55 % disponible, 30 % en servicio, 15 % fuera de servicio.
 DO $$
 DECLARE
     unidad record;
@@ -152,7 +156,7 @@ BEGIN
         SELECT t.tipo, t.base + row_number() OVER (PARTITION BY t.tipo) AS n
         FROM (
             SELECT tipo, base, generate_series(1, cantidad) AS g
-            FROM (VALUES ('ambulancia', 10, 2), ('patrulla', 20, 4), ('bomberos', 6, 2), ('otro', 12, 0)) AS v(tipo, cantidad, base)
+            FROM (VALUES ('ambulancia', 2, 2), ('patrulla', 3, 4), ('bomberos', 1, 2)) AS v(tipo, cantidad, base)
         ) t
         ORDER BY random()
     LOOP
@@ -163,7 +167,7 @@ BEGIN
             SELECT ST_LineInterpolatePoint(c.geom, random()) INTO punto
             FROM _calles_salto c WHERE c.acum >= sorteo ORDER BY c.acum LIMIT 1;
             EXIT WHEN intentos >= 200 OR NOT EXISTS (
-                SELECT 1 FROM recurso r JOIN _gen_recurso g ON g.id = r.id WHERE ST_DWithin(r.geom, punto, 350));
+                SELECT 1 FROM recurso r JOIN _gen_recurso g ON g.id = r.id WHERE ST_DWithin(r.geom, punto, 500));
         END LOOP;
         sorteo := random();
         INSERT INTO recurso (identificacion, nombre, tipo, estado_operativo, descripcion, geom)
@@ -171,42 +175,64 @@ BEGIN
                 initcap(replace(unidad.tipo, '_', ' ')) || ' ' || unidad.n,
                 unidad.tipo,
                 CASE WHEN sorteo < 0.55 THEN 'Disponible' WHEN sorteo < 0.85 THEN 'En servicio' ELSE 'Fuera de servicio' END,
-                CASE unidad.tipo WHEN 'otro' THEN 'Equipo de apoyo móvil en Salto' ELSE 'Móvil en recorrida por Salto' END,
+                'Móvil en recorrida por Salto',
                 punto)
         RETURNING id INTO nuevo_id;
         INSERT INTO _gen_recurso VALUES (nuevo_id);
     END LOOP;
 END $$;
 
--- Incidentes puntuales: 120. La mitad cae en el centro (Centro Salto), la otra mitad en toda la ciudad.
+-- Recursos del interior del departamento: 9 sedes reales de OpenStreetMap (policlínicas y seccionales policiales de
+-- las localidades) y 4 unidades en las localidades más grandes, que no tienen sede registrada. No hay calles del interior
+-- en la base, así que van en las coordenadas exactas.
+WITH interior (identificacion, nombre, tipo, estado, descripcion, lon, lat) AS (VALUES
+    ('CEN-D01', 'Policlínica Rural Barrio Albisu',         'centro_atencion', 'Disponible',        'Policlínica (sede real)',           -57.8142, -31.3833),
+    ('CEN-D02', 'Policlínica de Garibaldi',                'centro_atencion', 'Disponible',        'Policlínica (sede real)',           -57.8285, -31.3385),
+    ('CEN-D03', 'Policlínica MSP de Pueblo Lavalleja',     'centro_atencion', 'En servicio',       'Policlínica (sede real)',           -57.0240, -31.0963),
+    ('CEN-D04', 'Policlínica Cuchilla de Guaviyú',         'centro_atencion', 'Disponible',        'Policlínica (sede real)',           -56.6346, -31.0358),
+    ('PAT-D01', 'Seccional 10ª Pueblo Lavalleja',          'patrulla',        'Disponible',        'Seccional policial (sede real)',    -57.0245, -31.0957),
+    ('PAT-D02', 'Seccional 11ª Sarandí del Arapey',        'patrulla',        'Disponible',        'Seccional policial (sede real)',    -56.2149, -30.9884),
+    ('PAT-D03', 'Seccional 16ª Laureles',                  'patrulla',        'Fuera de servicio', 'Seccional policial (sede real)',    -57.5227, -31.5004),
+    ('PAT-D04', 'Seccional 12ª Quintana',                  'patrulla',        'Disponible',        'Seccional policial (sede real)',    -56.3940, -31.3503),
+    ('PAT-D05', 'Puesto policial de ruta',                 'patrulla',        'En servicio',       'Puesto policial (sede real)',       -57.7045, -31.2863),
+    ('AMB-D01', 'Ambulancia Belén',                        'ambulancia',      'Disponible',        'Unidad móvil en Belén',             -57.7791, -30.7894),
+    ('AMB-D02', 'Ambulancia Constitución',                 'ambulancia',      'Disponible',        'Unidad móvil en Constitución',      -57.8494, -31.0672),
+    ('AMB-D03', 'Ambulancia Termas del Daymán',            'ambulancia',      'En servicio',       'Unidad móvil en Termas del Daymán', -57.9084, -31.4525),
+    ('OTR-D01', 'Equipo de apoyo Termas del Arapey',       'otro',            'Disponible',        'Equipo de apoyo en las termas',     -57.5232, -30.9474)
+), nuevos AS (
+    INSERT INTO recurso (identificacion, nombre, tipo, estado_operativo, descripcion, geom)
+    SELECT identificacion, nombre, tipo, estado, descripcion,
+           ST_Transform(ST_SetSRID(ST_MakePoint(lon, lat), 4326), 32721)
+    FROM interior
+    RETURNING id
+)
+INSERT INTO _gen_recurso SELECT id FROM nuevos;
+
+-- Incidentes puntuales de la ciudad: 18, sobre calles reales y repartidos por toda la red (no solo en el centro).
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
-    SELECT initcap(replace(tipo, '_', ' ')) || ' ' || g,
+    SELECT initcap(replace(s.tipo, '_', ' ')) || ' ' || s.g,
            'Incidente en Salto',
-           tipo,
+           s.tipo,
            1 + floor(random() * random() * 5)::int,
            (ARRAY['Registrado', 'Registrado', 'Registrado', 'En atención', 'En atención', 'En atención',
                   'Derivado', 'Resuelto', 'Resuelto', 'Cancelado'])[1 + floor(random() * 10)::int],
            now() - random() * interval '90 days',
-           'Equipo ' || (1 + g % 4),
-           ST_Transform(ST_SetSRID(ST_MakePoint(
-               CASE WHEN g % 2 = 0 THEN -57.970 + random() * 0.015 ELSE -57.995 + random() * 0.07 END,
-               CASE WHEN g % 2 = 0 THEN -31.390 + random() * 0.010 ELSE -31.405 + random() * 0.04 END), 4326), 32721)
+           'Equipo ' || (1 + s.g % 4),
+           ST_LineInterpolatePoint(c.geom, s.f)
     FROM (
-        SELECT g, (ARRAY['accidente_transito', 'incendio', 'corte_servicio', 'inundacion', 'otro'])[1 + floor(random() * 5)::int] AS tipo
-        FROM generate_series(1, 120) g
-    ) i
+        SELECT g,
+               (ARRAY['accidente_transito', 'accidente_transito', 'incendio', 'corte_servicio', 'inundacion', 'otro'])[1 + floor(random() * 6)::int] AS tipo,
+               random() * (SELECT max(acum) FROM _calles_salto) AS r,
+               random() AS f
+        FROM generate_series(1, 18) g
+    ) s
+    CROSS JOIN LATERAL (SELECT geom FROM _calles_salto WHERE acum >= s.r ORDER BY acum LIMIT 1) c
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
 
--- Los incidentes puntuales ocurren en la calle: cada punto sorteado se lleva al punto más cercano de la red de calles
--- de Salto. Así no caen en el río ni del otro lado (Concordia), y se puede calcular un camino hasta ellos.
-UPDATE incidente i
-SET geom = (SELECT ST_ClosestPoint(c.geom, i.geom) FROM _calles_salto c ORDER BY c.geom <-> i.geom LIMIT 1)
-WHERE i.id IN (SELECT id FROM _gen_incidente);
-
--- Calles cortadas: 20 incidentes de LÍNEA sobre calles reales de Salto (tramos de 80 a 300 m).
+-- Calles cortadas de la ciudad: 4 incidentes de LÍNEA sobre calles reales (tramos de 80 a 300 m).
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
     SELECT 'Calle cortada: ' || nom_calle,
@@ -223,40 +249,88 @@ WITH nuevos AS (
         WHERE tipo = 'CALLE'
           AND gid IN (SELECT gid FROM _calles_salto)
           AND ST_Length(geom) BETWEEN 80 AND 300
-          AND geom && ST_Transform(ST_MakeEnvelope(-57.995, -31.405, -57.925, -31.365, 4326), 32721)
         ORDER BY random()
-        LIMIT 20
+        LIMIT 4
     ) calles
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
-DROP TABLE _calles_salto;
 
--- Inundaciones: 12 incidentes de POLÍGONO (áreas de 60 a 140 m de radio).
+-- Inundaciones de la ciudad: 3 incidentes de POLÍGONO (áreas de 60 a 140 m de radio) en la parte baja, cerca del río.
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
-    SELECT 'Área inundada ' || g,
+    SELECT 'Área inundada ' || z.g,
            'Área afectada por la lluvia',
            'inundacion',
            1 + floor(random() * 3)::int,
            (ARRAY['Registrado', 'En atención', 'Resuelto', 'Cancelado'])[1 + floor(random() * 4)::int],
            now() - random() * interval '45 days',
-           'Equipo ' || (1 + g % 4),
-           ST_Buffer(ST_Transform(ST_SetSRID(ST_MakePoint(-57.990 + random() * 0.06, -31.400 + random() * 0.03), 4326), 32721),
-                     60 + random() * 80, 8)
-    FROM generate_series(1, 12) g
+           'Equipo ' || (1 + z.g % 4),
+           ST_Buffer(ST_LineInterpolatePoint(z.geom, 0.5), 60 + random() * 80, 8)
+    FROM (
+        SELECT row_number() OVER () AS g, geom
+        FROM (SELECT geom FROM _calles_salto
+              WHERE ST_X(ST_Transform(ST_Centroid(geom), 4326)) < -57.965 ORDER BY random() LIMIT 3) bajas
+    ) z
+    RETURNING id
+)
+INSERT INTO _gen_incidente SELECT id FROM nuevos;
+DROP TABLE _calles_salto;
+
+-- Incidentes del interior del departamento: uno en cada una de 12 localidades (a menos de 1,5 km del centro del pueblo),
+-- con el tipo de incidente que es más común en cada lugar, y dos áreas inundadas junto al río.
+WITH nuevos AS (
+    INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
+    SELECT initcap(replace(l.tipo, '_', ' ')) || ' en ' || l.nombre,
+           'Incidente en el interior del departamento de Salto',
+           l.tipo,
+           1 + floor(random() * random() * 5)::int,
+           (ARRAY['Registrado', 'Registrado', 'En atención', 'En atención', 'Derivado', 'Resuelto', 'Resuelto', 'Cancelado'])[1 + floor(random() * 8)::int],
+           now() - random() * interval '90 days',
+           'Equipo Interior',
+           ST_Transform(ST_SetSRID(ST_MakePoint(l.lon + (random() - 0.5) * 0.03, l.lat + (random() - 0.5) * 0.03), 4326), 32721)
+    FROM (VALUES
+        ('Termas del Daymán', 'incendio',           -57.9084, -31.4525),
+        ('Belén',             'accidente_transito', -57.7791, -30.7894),
+        ('Constitución',      'corte_servicio',     -57.8494, -31.0672),
+        ('Termas del Arapey', 'accidente_transito', -57.5232, -30.9474),
+        ('Colonia 18 de Julio', 'incendio',         -57.8740, -31.3563),
+        ('Garibaldi',         'otro',               -57.8289, -31.3394),
+        ('San Antonio',       'accidente_transito', -57.7669, -31.3574),
+        ('Pueblo Lavalleja',  'incendio',           -57.0250, -31.0958),
+        ('Biassini',          'corte_servicio',     -57.1263, -31.2776),
+        ('Rincón de Valentín', 'accidente_transito', -57.1992, -31.2822),
+        ('Campo de Todos',    'otro',               -57.6146, -31.5593),
+        ('Laureles',          'incendio',           -57.5260, -31.4988)
+    ) l(nombre, tipo, lon, lat)
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
 
--- Recursos asignados: los incidentes que no están "Registrado" ni "Cancelado" tienen de 1 a 3 recursos, los más cercanos.
+WITH nuevos AS (
+    INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
+    SELECT 'Área inundada en ' || a.nombre,
+           'Área afectada por la crecida del río Uruguay',
+           'inundacion',
+           1 + floor(random() * 3)::int,
+           (ARRAY['Registrado', 'En atención', 'Resuelto'])[1 + floor(random() * 3)::int],
+           now() - random() * interval '45 days',
+           'Equipo Interior',
+           ST_Buffer(ST_Transform(ST_SetSRID(ST_MakePoint(a.lon, a.lat), 4326), 32721), 150 + random() * 100, 8)
+    FROM (VALUES ('Belén', -57.8050, -30.7900), ('Constitución', -57.8900, -31.0700)) a(nombre, lon, lat)
+    RETURNING id
+)
+INSERT INTO _gen_incidente SELECT id FROM nuevos;
+
+-- Recursos asignados: los incidentes que no están "Registrado" ni "Cancelado" tienen de 1 a 3 recursos disponibles o en
+-- servicio, los más cercanos y a menos de 30 km (un incidente lejos de todo no tiene recurso asignado).
 INSERT INTO incidente_recurso (incidente_id, recurso_id, fecha_asignacion)
 SELECT i.id, r.id, i.fecha_hora_registro + interval '6 minutes'
 FROM incidente i
 JOIN _gen_incidente g ON g.id = i.id
 CROSS JOIN LATERAL (
     SELECT rec.id FROM recurso rec JOIN _gen_recurso gr ON gr.id = rec.id
-    WHERE rec.estado_operativo <> 'Fuera de servicio'
+    WHERE rec.estado_operativo <> 'Fuera de servicio' AND ST_DWithin(rec.geom, i.geom, 30000)
     ORDER BY rec.geom <-> i.geom LIMIT 1 + (i.id % 3)
 ) r
 WHERE i.estado IN ('En atención', 'Derivado', 'Resuelto');
@@ -289,31 +363,31 @@ ANALYZE incidente;
 
 -- =====================================================================================================
 -- Montevideo: el sistema atiende todo el país, y la defensa es en Salto, pero también tiene que haber datos en
--- otro lugar. 30 zonas, 40 recursos y 114 incidentes (puntos, líneas y polígonos) en el centro de Montevideo.
--- No hay calles ni puertas propias de Montevideo (las direcciones de ahí las resuelve la IDE), así que las
--- líneas son tramos rectos de ~200 m, no están sobre calles reales.
+-- otro lugar. 7 zonas, 12 recursos y 25 incidentes (puntos, líneas y polígonos) repartidos entre Ciudad Vieja y
+-- Pocitos / Cordón / Tres Cruces. No hay calles ni puertas propias de Montevideo (las direcciones de ahí las resuelve
+-- la IDE), así que las líneas son tramos rectos de ~200 m, no están sobre calles reales.
 -- =====================================================================================================
 SELECT setseed(0.2028);
 
 CREATE TEMP TABLE _gen_incidente (id integer PRIMARY KEY);
 CREATE TEMP TABLE _gen_recurso (id integer PRIMARY KEY);
 
--- Zonas: grilla de 6 x 5 celdas de ~1,2 x 1,1 km entre Ciudad Vieja y Pocitos / Cordón / Tres Cruces.
+-- Zonas: grilla de 3 x 2 celdas de ~2,3 x 2,1 km.
 INSERT INTO zona_operativa (nombre, descripcion, nivel_prioridad, responsable, geom)
 SELECT 'Montevideo Zona ' || chr(65 + j) || (i + 1),
        'Zona operativa de Montevideo',
        1 + (i * 2 + j * 3) % 5,
        'Equipo MVD ' || (1 + (i + j) % 4),
-       ST_Transform(ST_MakeEnvelope(-56.195 + i * 0.0125, -34.900 + j * 0.010,
-                                    -56.195 + i * 0.0125 + 0.0118, -34.900 + j * 0.010 + 0.0094, 4326), 32721)
-FROM generate_series(0, 5) i, generate_series(0, 4) j;
+       ST_Transform(ST_MakeEnvelope(-56.195 + i * 0.0250, -34.900 + j * 0.0200,
+                                    -56.195 + i * 0.0250 + 0.0240, -34.900 + j * 0.0200 + 0.0190, 4326), 32721)
+FROM generate_series(0, 2) i, generate_series(0, 1) j;
 
 -- Una zona que se superpone con varias de la grilla.
 INSERT INTO zona_operativa (nombre, descripcion, nivel_prioridad, responsable, geom) VALUES
 ('Montevideo Ciudad Vieja y Centro', 'Zona amplia superpuesta con varias zonas vecinas', 2, 'Coordinación MVD',
  ST_Transform(ST_MakeEnvelope(-56.200, -34.900, -56.165, -34.885, 4326), 32721));
 
--- Recursos: 40 puntos al azar sobre la misma área, de todos los tipos y estados.
+-- Recursos: 12 puntos al azar sobre la misma área, de todos los tipos y estados.
 WITH nuevos AS (
     INSERT INTO recurso (identificacion, nombre, tipo, estado_operativo, descripcion, geom)
     SELECT upper(left(tipo, 3)) || '-M' || lpad(g::text, 3, '0'),
@@ -321,16 +395,16 @@ WITH nuevos AS (
            tipo,
            (ARRAY['Disponible', 'Disponible', 'En servicio', 'Fuera de servicio'])[1 + g % 4],
            'Recurso de emergencia en Montevideo',
-           ST_Transform(ST_SetSRID(ST_MakePoint(-56.195 + random() * 0.075, -34.900 + random() * 0.05), 4326), 32721)
+           ST_Transform(ST_SetSRID(ST_MakePoint(-56.195 + random() * 0.075, -34.900 + random() * 0.04), 4326), 32721)
     FROM (
         SELECT g, (ARRAY['ambulancia', 'bomberos', 'patrulla', 'centro_atencion', 'otro'])[1 + g % 5] AS tipo
-        FROM generate_series(1, 40) g
+        FROM generate_series(1, 12) g
     ) r
     RETURNING id
 )
 INSERT INTO _gen_recurso SELECT id FROM nuevos;
 
--- Incidentes puntuales: 100. La mitad cae en el centro, la otra mitad en toda el área.
+-- Incidentes puntuales: 20, repartidos por toda el área.
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
     SELECT initcap(replace(tipo, '_', ' ')) || ' ' || g || ' (Montevideo)',
@@ -341,18 +415,16 @@ WITH nuevos AS (
                   'Derivado', 'Resuelto', 'Resuelto', 'Cancelado'])[1 + floor(random() * 10)::int],
            now() - random() * interval '90 days',
            'Equipo MVD ' || (1 + g % 4),
-           ST_Transform(ST_SetSRID(ST_MakePoint(
-               CASE WHEN g % 2 = 0 THEN -56.160 + random() * 0.020 ELSE -56.195 + random() * 0.075 END,
-               CASE WHEN g % 2 = 0 THEN -34.885 + random() * 0.015 ELSE -34.900 + random() * 0.05 END), 4326), 32721)
+           ST_Transform(ST_SetSRID(ST_MakePoint(-56.195 + random() * 0.075, -34.900 + random() * 0.040), 4326), 32721)
     FROM (
         SELECT g, (ARRAY['accidente_transito', 'incendio', 'corte_servicio', 'inundacion', 'otro'])[1 + floor(random() * 5)::int] AS tipo
-        FROM generate_series(1, 100) g
+        FROM generate_series(1, 20) g
     ) i
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
 
--- Calles cortadas: 8 incidentes de LÍNEA (tramos rectos de ~200 m).
+-- Calles cortadas: 3 incidentes de LÍNEA (tramos rectos de ~200 m).
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
     SELECT 'Calle cortada: tramo ' || g || ' (Montevideo)',
@@ -365,13 +437,13 @@ WITH nuevos AS (
            ST_MakeLine(inicio, ST_Translate(inicio, 150 + random() * 100, (random() - 0.5) * 200))
     FROM (
         SELECT g, ST_Transform(ST_SetSRID(ST_MakePoint(-56.190 + random() * 0.060, -34.895 + random() * 0.040), 4326), 32721) AS inicio
-        FROM generate_series(1, 8) g
+        FROM generate_series(1, 3) g
     ) tramos
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
 
--- Inundaciones: 6 incidentes de POLÍGONO (áreas de 60 a 140 m de radio).
+-- Inundaciones: 2 incidentes de POLÍGONO (áreas de 60 a 140 m de radio).
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
     SELECT 'Área inundada ' || g || ' (Montevideo)',
@@ -383,7 +455,7 @@ WITH nuevos AS (
            'Equipo MVD ' || (1 + g % 4),
            ST_Buffer(ST_Transform(ST_SetSRID(ST_MakePoint(-56.190 + random() * 0.060, -34.895 + random() * 0.040), 4326), 32721),
                      60 + random() * 80, 8)
-    FROM generate_series(1, 6) g
+    FROM generate_series(1, 2) g
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
@@ -395,6 +467,7 @@ FROM incidente i
 JOIN _gen_incidente g ON g.id = i.id
 CROSS JOIN LATERAL (
     SELECT rec.id FROM recurso rec JOIN _gen_recurso gr ON gr.id = rec.id
+    WHERE rec.estado_operativo <> 'Fuera de servicio'
     ORDER BY rec.geom <-> i.geom LIMIT 1 + (i.id % 3)
 ) r
 WHERE i.estado IN ('En atención', 'Derivado', 'Resuelto');
