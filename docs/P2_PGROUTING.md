@@ -1,6 +1,6 @@
 # P2: preparación de rutas con pgRouting
 
-**Estado:** adaptador Java y función SQL preparados, **aún sin integrar ni validar contra el grafo de P1**. El motor predeterminado continúa siendo OSRM. Esta contribución no modifica `main` y no elimina las dos rutas OSRM existentes.
+**Estado:** adaptador Java y función SQL **integrados y validados contra el grafo de P1** (ver "Verificación con el grafo de P1" más abajo, medida el 4/11 en un entorno Docker aislado). El motor predeterminado continúa siendo OSRM; pgRouting se activa con `RUTAS_MOTOR=pgrouting`. Esta contribución no elimina las dos rutas OSRM existentes.
 
 ## Comparación para el artículo (P2 + P1)
 
@@ -77,27 +77,38 @@ RUTAS_MOTOR=pgrouting
 
 Sin cambiar esa variable, OSRM continúa funcionando como hasta ahora. En modo pgRouting **no se cambia a OSRM silenciosamente** si el motor SQL falla. `GET /eta/criterios` informa la falta de función o grafo; la UI ya sabe deshabilitar criterios que no estén disponibles. El frontend existente no requiere reescritura porque los contratos no cambian.
 
-## Verificación con el grafo de P1 (3/11)
+## Verificación con el grafo de P1 (medida el 4/11, rama feat/p2-validacion-final-pgrouting)
 
-Con el grafo corregido (calles cortadas en cada cruce, ver `docs/P1_GRAFO_SALTO.md`) y `RUTAS_MOTOR=pgrouting`, sobre una
-base nueva levantada desde cero:
+Con el grafo de P1 (calles cortadas en cada cruce, ver `docs/P1_GRAFO_SALTO.md`) y `RUTAS_MOTOR=pgrouting`, sobre una
+base nueva levantada desde cero en un entorno Docker aislado (proyecto compose `p2valida`, `OSRM_URL` apuntando a un
+host inexistente para descartar llamadas a OSRM):
 
+- pgRouting 4.0.2 y PostGIS 3.6.4 instalados; grafo con 2.316 vértices y 3.627 arcos, una sola componente conexa,
+  sin costos nulos/negativos ni arcos huérfanos; velocidades de 30, 40, 50 y 60 km/h según el tipo de vía.
 - `GET /eta/criterios` informa `mas_rapida` y `mas_corta` disponibles.
-- Con 300 pares recurso–incidente de Salto, la función `p2_calcular_ruta` encuentra ruta en 288; los otros 12 tienen un
-  extremo a más de 250 m de una esquina (el límite de ajuste) o fuera de la red.
-- El ETA entre la Policía Caminera (extremo este) y un accidente del otro extremo de la ciudad da 11,1 km y 17 minutos,
-  con `motor: "pgRouting (PostgreSQL)"`; la consulta 3 con `conRutas=true` devuelve el camino de los 5 recursos más cercanos.
-- Con el grafo anterior (un arco por calle entera) solo 12 de 300 pares tenían ruta, y todas las calles tenían la misma
-  velocidad, por lo que "más rápida" daba siempre lo mismo que "más corta".
-- En viajes largos (más de 2,5 km) las dos rutas difieren en 11 de 66 casos; en distancias cortas casi siempre coinciden.
+- Con 300 pares recurso–incidente aleatorios **de Salto** (`setseed(0.42)`), la función `p2_calcular_ruta` encuentra
+  ruta en 274; los otros 26 tienen un extremo a más de 250 m de una esquina (el límite de ajuste). **Todos** los pares
+  con ambos extremos dentro del límite tienen ruta (0 fallos inexplicables). Los pares con puntos fuera de Salto
+  (el seed también carga Montevideo) quedan fuera de cobertura, como corresponde.
+- El ETA entre la Patrulla Caminera (extremo este) y el incidente puntual más lejano de Salto (10,0 km en línea
+  recta) da 11,7 km y 15 minutos con `mas_rapida`, con `motor: "pgRouting (PostgreSQL)"`; la consulta 3 con
+  `conRutas=true` devuelve el camino de los 5 recursos más cercanos.
+- En 66 viajes largos al azar (más de 2,5 km en línea recta, misma semilla) las dos rutas difieren en 4 casos; en
+  distancias cortas casi siempre coinciden. En todos los casos la más corta no supera en distancia a la más rápida y
+  la más rápida no supera en duración a la más corta. El desvío mediano de la ruta contra la línea recta es 1,25.
 - El motor por defecto sigue siendo OSRM: para usar pgRouting hay que definir `RUTAS_MOTOR=pgrouting` en `infra/.env`.
+- Pruebas automatizadas: `PgRoutingIntegrationTest` (9 pruebas, se activan con `URBANSAFE_PGROUTING_TESTS=true`)
+  más el resto de la suite: 112 pruebas, 0 fallos (las 5 de OSRM propio se omiten por no aplicar).
 
 ## Pendiente antes del cierre de esta tarea
 
-1. P1: publicar migración nueva e importar un grafo válido de Salto con sentidos y velocidades.
-2. P2: acordar nombres y tipos reales de tablas; instalar SQL P2; ejecutar pruebas de Dijkstra y contraste con OSRM en base aislada.
-3. P2: probar ETA y consulta 3 por HTTP con ambos criterios e incidentes Point, LineString y Polygon.
+1. ~~P1: publicar migración nueva e importar un grafo válido de Salto con sentidos y velocidades.~~ **Hecho** (PR #25:
+   migración V5, grafo generado desde `via`; queda la limitación de que `via` no trae sentidos únicos).
+2. ~~P2: acordar nombres y tipos reales de tablas; instalar SQL P2; ejecutar pruebas de Dijkstra y contraste con OSRM en base aislada.~~ **Hecho** (4/11): las tablas de P1 cumplen el contrato; Dijkstra verificado en base aislada.
+3. ~~P2: probar ETA y consulta 3 por HTTP con ambos criterios e incidentes Point, LineString y Polygon.~~ **Hecho** (4/11):
+   ver "Verificación con el grafo de P1".
 4. P5: comprobar frontend y GeoServer (solo visualización de calles, no cálculo de rutas).
 5. Equipo: decidir si OSRM queda como respaldo configurable o se retira una vez verificado pgRouting. **No eliminar todavía OSRM.**
 
-**No se ejecutaron pruebas reales de pgRouting en esta preparación.** La red y la extensión aún no están instaladas en la rama revisada. No usar `docker compose down -v` ni `flyway repair` sobre datos existentes.
+Las pruebas reales de pgRouting ya se ejecutaron (4/11) en un entorno Docker aislado, sin tocar las bases ni los
+volúmenes existentes. No usar `docker compose down -v` ni `flyway repair` sobre datos existentes.

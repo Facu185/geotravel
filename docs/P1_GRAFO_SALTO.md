@@ -61,10 +61,11 @@ docker compose exec -T db psql -U geotravel -d geotravel -v ON_ERROR_STOP=1 < ..
 - **2.316 vértices** (esquinas) y **3.627 arcos** (tramos de esquina a esquina; mediana 114 m, máximo 4,2 km).
 - **Una sola componente conexa**: desde cualquier esquina se llega a cualquier otra.
 - Cuatro velocidades distintas (30, 40, 50 y 60 km/h).
-- Con los recursos y los incidentes de prueba de Salto (300 pares recurso–incidente): todos los pares con ambos extremos a
-  menos de 250 m de una esquina (255) tienen ruta; el desvío mediano de la ruta contra la línea recta es de 1,27.
-  Los otros 45 tienen un incidente a más de 250 m de cualquier calle (ver `docs/P2_PGROUTING.md`).
-- En viajes largos (más de 2,5 km) la ruta más rápida es distinta de la más corta en 11 de 66 casos.
+- Con los recursos y los incidentes puntuales de prueba de Salto (300 pares recurso–incidente al azar con
+  `setseed(0.42)`, medido el 4/11): todos los pares con ambos extremos a menos de 250 m de una esquina (274) tienen
+  ruta; el desvío mediano de la ruta contra la línea recta es de 1,25.
+  Los otros 26 tienen un extremo a más de 250 m de cualquier esquina (ver `docs/P2_PGROUTING.md`).
+- En viajes largos (más de 2,5 km) la ruta más rápida es distinta de la más corta en 4 de 66 casos (misma muestra).
 - Costos coherentes: todos positivos, sin NULL, bidireccionales.
 
 ## Instalación

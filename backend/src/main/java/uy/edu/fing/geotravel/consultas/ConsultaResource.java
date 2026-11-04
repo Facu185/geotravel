@@ -179,10 +179,13 @@ public class ConsultaResource {
         }
         RutaService servicio = RutaService.predeterminado();
         if (conRutas && !servicio.disponible(criterio)) {
+            String motivo = servicio.nombreMotor(criterio).startsWith("pgRouting")
+                    ? "falta la extension pgRouting, el grafo vial o la funcion de rutas en la base"
+                    : "falta configurar el OSRM propio (OSRM_SHORTEST_URL)";
             throw new WebApplicationException(Response.status(Response.Status.SERVICE_UNAVAILABLE)
                     .type(MediaType.APPLICATION_JSON)
                     .entity(Map.of("error", "El criterio " + criterio.codigo
-                            + " no esta disponible: falta configurar el OSRM propio (OSRM_SHORTEST_URL)"))
+                            + " no esta disponible: " + motivo))
                     .build());
         }
         AnalisisVial.Parametros parametros;
