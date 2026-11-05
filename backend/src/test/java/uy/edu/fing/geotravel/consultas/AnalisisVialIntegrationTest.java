@@ -6,7 +6,7 @@ import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import uy.edu.fing.geotravel.db.DataSourceProvider;
-import uy.edu.fing.geotravel.eta.OsrmClient;
+import uy.edu.fing.geotravel.eta.Ruta;
 import uy.edu.fing.geotravel.eta.RutaService;
 
 import java.sql.Connection;
@@ -39,7 +39,7 @@ public class AnalisisVialIntegrationTest {
         Assume.assumeTrue("Definir URBANSAFE_INTEGRATION_TESTS=true para usar PostGIS local",
                 "true".equalsIgnoreCase(System.getenv("URBANSAFE_INTEGRATION_TESTS")));
         prefijo = "IT-AV-" + UUID.randomUUID();
-        analisis = new AnalisisVial(new RutaService((a, b, c, d) -> new OsrmClient.Ruta(1200, 150)));
+        analisis = new AnalisisVial(new RutaService((a, b, c, d) -> new Ruta(1200, 150)));
     }
 
     @After
@@ -194,7 +194,7 @@ public class AnalisisVialIntegrationTest {
         assertEquals("disponible", item.get("estadoRuta"));
         assertEquals(1200L, item.get("distanciaViaM"));
         assertEquals(150L, item.get("duracionS"));
-        assertEquals("mas_rapida", r.get("criterioRuta"));
+        assertNotNull(r.get("recursoMasRapidoId"));
         assertTrue(((Number) item.get("distanciaViaM")).doubleValue()
                 >= ((Number) item.get("distanciaDirectaM")).doubleValue());
     }

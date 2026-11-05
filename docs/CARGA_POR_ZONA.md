@@ -124,7 +124,7 @@ Se sacaron los dos extras (incidentes por km² y dibujar una línea o un polígo
 
 Las consultas 1 a 7 las ve también el **invitado** (sin ingresar); el reporte sigue siendo solo del administrador. Por eso
 `AuthFilter` deja públicas, únicamente de lectura, `GET /consultas/...` (menos `reportes`), el listado de `GET /zonas`,
-`/incidentes` y `/recursos` y `GET /eta/criterios`. Al pie del panel, "¿Qué significa cada ícono?" muestra la misma
+`/incidentes` y `/recursos` y `GET /eta/disponible`. Al pie del panel, "¿Qué significa cada ícono?" muestra la misma
 leyenda del mapa público (`LeyendaCapa.jsx`).
 
 ## Tiempo de llegada (P2)
@@ -166,7 +166,21 @@ Las consultas 4 y 5 aceptan una dirección y una esquina. Según la región (`RE
 | | Salto (`callesPropias: true`) | Resto del país (por ejemplo Montevideo) |
 |---|---|---|
 | Calle y número | Tabla propia `acceso` (números de puerta de Salto) | Servicio de direcciones de la IDE (`?departamento=montevideo&localidad=montevideo`) |
-| Esquina | Cruce calculado con PostGIS sobre `via` (con autocompletado de calles) | IDE, con el parámetro `esquina` (sin autocompletado: no hay calles propias) |
+| Esquina | Cruce calculado con PostGIS sobre la red vial de OpenStreetMap **de todo el país** (con autocompletado de calles, sin internet): ver "Cruces de calles en todo el país" | Igual: la red es la misma en todo el país (la IDE queda de respaldo si las calles no se cruzan en la red) |
+
+**Dirección en todo el país.** El campo "Dónde buscar" del buscador de direcciones arranca en **Todo el país**
+(`departamento=todo`): primero se busca en las puertas propias de Salto y, si la calle no está, en la IDE **sin fijar
+departamento**. La IDE devuelve las calles con ese nombre de todo Uruguay; se ubica la mejor (la de portal exacto, y en
+Salto si empata) y las demás se ofrecen como alternativas ("Hay otras coincidencias en el país"). Se puede limitar la búsqueda
+a uno de los 19 departamentos. Ejemplo: `Minas 2091` no está en Salto; existe con portal exacto en Montevideo y es lo que se
+ubica, y la lista muestra las otras "Minas" (Young, Belén, Toledo, Mariscala, Villa Sara). Los cruces de calles siguen
+usando la región configurada.
+
+**Cruces de calles en todo el país.** `/consultas/interseccion` busca, en la red vial de OpenStreetMap (`red_vial_arco`, la misma
+de las rutas), las esquinas a las que llegan un tramo de cada calle; no usa internet. Los nombres se comparan sin tildes, mayúsculas
+ni abreviaturas (`normalizar_calle`, migración V7). Como una calle se repite en muchas localidades ("Colonia" son 60 vías en el país),
+devuelve hasta 10 cruces, del más cercano a la región, cada uno con el lugar más próximo (`lugar_osm`: ciudades, pueblos y barrios del
+mismo extracto de OpenStreetMap). Ejemplo: "Colonia" y "Convención" dan un cruce en Montevideo y otro en Pinares de Solymar.
 
 Para sumar otro departamento alcanza con agregar una entrada en `region.js`. En Salto, la dirección y el cruce
 funcionan sin internet; la IDE queda de respaldo si la calle no está en la base. Probado con "Uruguay 1000" y la

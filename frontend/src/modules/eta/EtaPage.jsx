@@ -8,9 +8,9 @@ import CargaPorZona, { AvisoCarga, SIN_CARGAR } from "../../components/CargaPorZ
 import { IconoIncidente, IconoRecurso } from "../../components/iconos.jsx";
 import { nombreTipoIncidente, nombreTipoRecurso } from "../../components/colores.js";
 import { ZOOM_MINIMO_ELEGIR } from "../../components/region.js";
-import { Aviso, Segmentado } from "../../components/ui.jsx";
+import { Aviso } from "../../components/ui.jsx";
 import { api } from "../../api/client.js";
-import useCriteriosRuta from "../../api/useCriteriosRuta.js";
+import useRutasDisponibles from "../../api/useRutasDisponibles.js";
 import { SelectorBuscable, useObjetosDeLaVista } from "../consultas/paneles.jsx";
 
 /**
@@ -54,10 +54,8 @@ export default function EtaPage() {
   const [calculando, setCalculando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState(null);
-  const [criterio, setCriterio] = useState("mas_rapida");
   const [foco, setFoco] = useState(null); // lo último que se eligió buscando: el mapa va hasta ahí
-  const { opciones: criteriosRuta, mensajeDe } = useCriteriosRuta();
-  const avisoCriterio = mensajeDe(criterio);
+  const { aviso: avisoRutas } = useRutasDisponibles();
   const solicitudActual = useRef(0);
 
   const incidentesDeLaVista = useObjetosDeLaVista(cargaIncidentes);
@@ -95,7 +93,7 @@ export default function EtaPage() {
   };
 
   async function calcular() {
-    if (!incidente || !recurso || avisoCriterio) return;
+    if (!incidente || !recurso || avisoRutas) return;
 
     const numeroSolicitud = ++solicitudActual.current;
     setCalculando(true);
@@ -103,7 +101,7 @@ export default function EtaPage() {
     setError(null);
 
     try {
-      const datos = await api.get(`/eta/recursos/${recurso.id}/incidentes/${incidente.id}?criterio=${criterio}`);
+      const datos = await api.get(`/eta/recursos/${recurso.id}/incidentes/${incidente.id}`);
       if (numeroSolicitud === solicitudActual.current) setResultado(datos);
     } catch (e) {
       if (numeroSolicitud === solicitudActual.current) setError(e.message);
@@ -145,7 +143,7 @@ export default function EtaPage() {
       <CapaElegibles elegibles={elegidos.incidente} />
       <CapaElegibles elegibles={elegidos.recurso} />
       {resultado?.geometriaRuta && (
-        <GeoJSON key={`ruta-${recurso?.id}-${incidente?.id}-${criterio}`} data={resultado.geometriaRuta} interactive={false} style={{ color: "#0f766e", weight: 6, opacity: 0.9 }} />
+        <GeoJSON key={`ruta-${recurso?.id}-${incidente?.id}`} data={resultado.geometriaRuta} interactive={false} style={{ color: "#0f766e", weight: 6, opacity: 0.9 }} />
       )}
       {objetivoMapa ? <Enfocar objetivo={objetivoMapa} /> : foco && <Enfocar objetivo={foco} />}
     </>
@@ -169,7 +167,7 @@ export default function EtaPage() {
       <div className="panel__seccion">
         <p className="ayuda">
           Elegí un incidente y un recurso de emergencia con un clic en el mapa o en el desplegable (se puede buscar escribiendo). Se calcula el recorrido por calles
-          transitables (OSRM) hasta el incidente.
+          hasta el incidente, respetando los sentidos de circulación.
         </p>
 
         <section className="bloque">
@@ -211,23 +209,12 @@ export default function EtaPage() {
           )}
         </section>
 
-        <Segmentado
-          leyenda="Criterio de la ruta"
-          nombre="criterioEta"
-          opciones={criteriosRuta}
-          valor={criterio}
-          onChange={(valor) => {
-            limpiarResultado();
-            setCriterio(valor);
-          }}
-        />
-
-        <button type="button" className="btn btn--primario btn--ancho" onClick={calcular} disabled={!incidente || !recurso || calculando || Boolean(avisoCriterio)}>
+        <button type="button" className="btn btn--primario btn--ancho" onClick={calcular} disabled={!incidente || !recurso || calculando || Boolean(avisoRutas)}>
           {calculando ? "Calculando..." : "Calcular llegada"}
         </button>
 
         {error && <Aviso tipo="error">{error}</Aviso>}
-        {avisoCriterio && <Aviso tipo="error">{avisoCriterio}</Aviso>}
+        {avisoRutas && <Aviso tipo="error">{avisoRutas}</Aviso>}
 
         {resultado && (
           <section className="bloque">
@@ -250,20 +237,26 @@ export default function EtaPage() {
                 <dd>{resultado.duracionSegundos} s</dd>
               </div>
               <div>
-                <dt>Criterio</dt>
-                <dd>{resultado.criterioRutaTexto}</dd>
-              </div>
-              <div>
                 <dt>Motor</dt>
                 <dd>{resultado.motor}</dd>
               </div>
             </dl>
             {resultado.advertencia && <Aviso>{resultado.advertencia}</Aviso>}
-            <p className="ayuda">Tiempo estimado sin tráfico en tiempo real.</p>
+            {resultado.calles?.length > 0 && (
+              <>
+                <h4 className="bloque__titulo">Calles del recorrido</h4>
+                <ol className="calles-ruta">
+                  {resultado.calles.map((c, n) => (
+                    <li key={`${n}-${c.calle}`}>
+                      <span>{c.calle}</span>
+                      <span className="calles-ruta__metros">{formatearMetros(c.metros)}</span>
+                    </li>
+                  ))}
+                </ol>
+              </>
+            )}
             <p className="ayuda">
-              {resultado.criterioRuta === "mas_corta"
-                ? "El recorrido minimiza la distancia por calles permitidas; su duración puede ser mayor que la de la ruta más rápida."
-                : "El recorrido optimiza la duración, no la distancia: puede no ser el camino de menor distancia vial."}
+              Es el camino de menor tiempo por calles, respetando los sentidos de circulación. Tiempo estimado sin tráfico en tiempo real.
             </p>
           </section>
         )}

@@ -62,13 +62,8 @@ else
   echo "seed ETA Salto: ya aplicado; no se repite"
 fi
 
-# --- 4. Grafo pgRouting de Salto: se aplica UNA vez, aun sobre una base existente.
-$PSQL -c "CREATE TABLE IF NOT EXISTS _pgrouting_grafo_aplicado (fecha timestamptz NOT NULL DEFAULT now())" > /dev/null
-if [ "$($PSQL -c 'SELECT count(*) FROM _pgrouting_grafo_aplicado')" = "0" ]; then
-  psql -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q -f /sql/p1_generar_grafo_via.sql
-  psql -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q -f /sql/p2_rutas_pgrouting.sql
-  $PSQL -c "INSERT INTO _pgrouting_grafo_aplicado DEFAULT VALUES" > /dev/null
-  echo "pgrouting: grafo de Salto generado y función P2 instalada"
-else
-  echo "pgrouting: grafo ya generado; no se repite"
-fi
+# --- 4. La función de rutas (pgRouting). Se reinstala en cada arranque (CREATE OR REPLACE): así un cambio en
+#        db/sql/p2_rutas_pgrouting.sql llega también a las bases que ya existían. La red vial sobre la que calcula
+#        (de todo Uruguay) la arma el servicio red-vial, ver infra/red-vial/cargar.sh.
+psql -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q -f /sql/p2_rutas_pgrouting.sql
+echo "pgrouting: función de rutas instalada"

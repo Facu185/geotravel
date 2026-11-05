@@ -944,7 +944,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}/analisis-vial?radioMetros=2000&limite=5&soloDisponibles=true&conRutas=false&criterio=mas_rapida"
+            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}/analisis-vial?radioMetros=2000&limite=5&soloDisponibles=true&conRutas=false"
           }
         },
         {

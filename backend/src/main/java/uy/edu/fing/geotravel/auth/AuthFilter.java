@@ -20,7 +20,7 @@ import java.util.Map;
  *   - GET /consultas/tipos-incidente (lo usa el filtro del mapa público),
  *   - las Consultas geográficas que ve el invitado, todas de solo lectura: GET /consultas/... (menos el reporte,
  *     que es del administrador), el listado de zonas, incidentes y recursos de la vista (GET /zonas, /incidentes
- *     y /recursos, sin id) con el que se elige qué consultar, y GET /eta/criterios (qué criterios de ruta hay),
+ *     y /recursos, sin id) con el que se elige qué consultar, y GET /eta/disponible (si se pueden calcular rutas),
  *   - GET /fotos/... (las imágenes no pueden mandar encabezados).
  * El mapa público dibuja con GeoServer, que no pasa por esta API.
  *
@@ -56,7 +56,7 @@ public class AuthFilter implements ContainerRequestFilter {
             return r.equals("fotos") || r.startsWith("fotos/")
                     || (r.startsWith("consultas/") && !r.startsWith("consultas/reportes"))
                     || r.equals("zonas") || r.equals("incidentes") || r.equals("recursos")
-                    || r.equals("eta/criterios");
+                    || r.equals("eta/disponible");
         }
         return false;
     }

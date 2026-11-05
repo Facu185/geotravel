@@ -56,6 +56,18 @@ public final class ConfiguracionIde {
                 + "&localidad=" + codificar(localidad);
     }
 
+    /**
+     * Pedido al servicio de direcciones. El departamento y la localidad son opcionales: sin ellos el servicio busca la
+     * calle en todo el país; solo con el departamento, en todo el departamento.
+     */
+    public static String urlBusqueda(String endpoint, String calle, String esquina, String departamento, String localidad) {
+        StringBuilder url = new StringBuilder(endpoint).append("?calle=").append(codificar(calle.trim()));
+        if (esquina != null && !esquina.isBlank()) url.append("&esquina=").append(codificar(esquina));
+        if (departamento != null && !departamento.isBlank()) url.append("&departamento=").append(codificar(departamento));
+        if (localidad != null && !localidad.isBlank()) url.append("&localidad=").append(codificar(localidad));
+        return url.toString();
+    }
+
     private static String valorOReemplazo(String valor, String reemplazo) {
         return valor == null || valor.trim().isEmpty() ? reemplazo : valor.trim();
     }

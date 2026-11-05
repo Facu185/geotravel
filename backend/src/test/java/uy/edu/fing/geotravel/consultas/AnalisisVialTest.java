@@ -1,7 +1,9 @@
 package uy.edu.fing.geotravel.consultas;
 
 import org.junit.Test;
-import uy.edu.fing.geotravel.eta.OsrmClient;
+import uy.edu.fing.geotravel.eta.PlazoAgotadoException;
+import uy.edu.fing.geotravel.eta.Ruta;
+import uy.edu.fing.geotravel.eta.SinRutaException;
 import uy.edu.fing.geotravel.eta.RutaService;
 
 import java.io.IOException;
@@ -94,8 +96,8 @@ public class AnalisisVialTest {
         AtomicInteger n = new AtomicInteger();
         AnalisisVial analisis = new AnalisisVial(new RutaService((a, b, c, d) -> {
             int llamada = n.incrementAndGet();
-            if (llamada == 2) throw new OsrmClient.SinRutaException("No se encontro ruta vial");
-            return new OsrmClient.Ruta(1000 + llamada, 100 * llamada);
+            if (llamada == 2) throw new SinRutaException("No se encontro ruta vial");
+            return new Ruta(1000 + llamada, 100 * llamada);
         }));
         List<AnalisisVial.Candidato> lista = candidatos(3);
 
@@ -132,7 +134,7 @@ public class AnalisisVialTest {
         AtomicInteger llamadas = new AtomicInteger();
         AnalisisVial analisis = new AnalisisVial(new RutaService((a, b, c, d) -> {
             llamadas.incrementAndGet();
-            return new OsrmClient.Ruta(1000, 100);
+            return new Ruta(1000, 100);
         }));
         List<AnalisisVial.Candidato> lista = candidatos(AnalisisVial.RUTAS_MAXIMAS + 3);
 
@@ -149,7 +151,7 @@ public class AnalisisVialTest {
         AtomicInteger llamadas = new AtomicInteger();
         AnalisisVial analisis = new AnalisisVial(new RutaService((a, b, c, d) -> {
             llamadas.incrementAndGet();
-            return new OsrmClient.Ruta(1000, 100);
+            return new Ruta(1000, 100);
         }));
         List<AnalisisVial.Candidato> lista = candidatos(2);
 
@@ -163,13 +165,13 @@ public class AnalisisVialTest {
     public void unPedidoQueExcedeElPlazoNoRetienePasaLosDemas() {
         AtomicInteger llamadas = new AtomicInteger();
         AnalisisVial analisis = new AnalisisVial(new RutaService(new RutaService.MotorRutas() {
-            public OsrmClient.Ruta calcular(double a, double b, double c, double d) {
-                return new OsrmClient.Ruta(1000, 100);
+            public Ruta calcular(double a, double b, double c, double d) {
+                return new Ruta(1000, 100);
             }
-            public OsrmClient.Ruta calcular(double a, double b, double c, double d, long t)
+            public Ruta calcular(double a, double b, double c, double d, long t)
                     throws java.io.IOException {
                 llamadas.incrementAndGet();
-                throw new OsrmClient.PlazoAgotadoException("lento");
+                throw new PlazoAgotadoException("lento");
             }
         }));
         List<AnalisisVial.Candidato> lista = candidatos(3);
@@ -185,7 +187,7 @@ public class AnalisisVialTest {
     @Test
     public void elRecursoMasRapidoEsElDeMenorDuracion() {
         AnalisisVial analisis = new AnalisisVial(new RutaService((a, b, c, d) ->
-                new OsrmClient.Ruta(1000, a < -57.9625 ? 50 : 300)));
+                new Ruta(1000, a < -57.9625 ? 50 : 300)));
         List<AnalisisVial.Candidato> lista = candidatos(3);
 
         analisis.calcularRutas(lista, SIN_PLAZO);
@@ -196,30 +198,5 @@ public class AnalisisVialTest {
     @Test
     public void sinRutasNoHayRecursoMasRapido() {
         assertNull(AnalisisVial.recursoMasRapido(candidatos(2)));
-        assertNull(AnalisisVial.recursoMasCorto(candidatos(2)));
-    }
-
-    @Test
-    public void elRecursoMasCortoEsElDeMenorDistanciaAunqueTardeMas() {
-        AnalisisVial analisis = new AnalisisVial(new RutaService(
-                (a, b, c, d) -> new OsrmClient.Ruta(1000, 50),
-                (a, b, c, d) -> new OsrmClient.Ruta(a < -57.9625 ? 700 : 1200, 400)));
-        List<AnalisisVial.Candidato> lista = candidatos(3);
-
-        analisis.calcularRutas(lista, SIN_PLAZO, uy.edu.fing.geotravel.eta.Criterio.MAS_CORTA);
-
-        assertEquals(Integer.valueOf(3), AnalisisVial.recursoMasCorto(lista));
-        assertEquals(Long.valueOf(700), lista.get(2).item.get("distanciaViaM"));
-    }
-
-    @Test
-    public void conCortaNoConfiguradaLosRecursosQuedanEnError() {
-        AnalisisVial analisis = new AnalisisVial(new RutaService((a, b, c, d) -> new OsrmClient.Ruta(1, 1)));
-        List<AnalisisVial.Candidato> lista = candidatos(2);
-
-        int obtenidas = analisis.calcularRutas(lista, SIN_PLAZO, uy.edu.fing.geotravel.eta.Criterio.MAS_CORTA);
-
-        assertEquals(0, obtenidas);
-        assertEquals("error", lista.get(0).item.get("estadoRuta"));
     }
 }

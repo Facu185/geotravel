@@ -43,10 +43,10 @@ cp .env.example .env          # solo la primera vez; ajustar si hace falta
 docker compose up -d --build
 ```
 
-Un solo comando levanta y deja configurado todo: la base (con sus migraciones, la red vial de
-Salto de `db/data/vias.csv.gz`, los números de puerta de `db/data/accesos.csv.gz` y los datos de prueba, una sola vez), GeoServer (workspace,
+Un solo comando levanta y deja configurado todo: la base (con sus migraciones, las calles de
+Salto de `db/data/vias.csv.gz`, los números de puerta de `db/data/accesos.csv.gz` y los datos de prueba, una sola vez), la red vial de rutas de todo Uruguay (servicio `red-vial`, baja unos 56 MB de OpenStreetMap la primera vez), GeoServer (workspace,
 store, capas y estilos) y el backend en Tomcat con el `.war` ya adentro. La primera vez tarda unos minutos (compila el backend y GeoServer arranca
-lento); cuando termina quedan en `Exited (0)` `flyway`, `seed` y `geoserver-init`, es lo esperado.
+lento); cuando termina quedan en `Exited (0)` `flyway`, `seed`, `red-vial` y `geoserver-init`, es lo esperado.
 Después, solo el frontend: `cd frontend && npm install && npm run dev`.
 
 - **Día a día:** `docker compose up -d` (los datos quedan en volúmenes de Docker).
@@ -59,18 +59,15 @@ Después, solo el frontend: `cd frontend && npm install && npm run dev`.
 Todo es repetible: el seed no duplica datos y la configuración de GeoServer deja como está lo que
 ya existe. Los pasos de abajo son el mismo proceso, a mano, por si hace falta hacer uno solo.
 
-### Demostracion P2: ETA en Salto
+### Tiempo de llegada y rutas por calles
 
-En `feat/backend-p2`, Docker prepara automaticamente un recurso y un incidente
-para **Salto, Uruguay** (`db/seed/seed_salto_eta.sql`). Funciona tanto en una
-instalacion nueva como en una base Docker que ya tenga datos; nunca se asignan
-IDs fijos. La pantalla `/eta` muestra distancia, duracion y la ruta vial
-GeoJSON sobre Leaflet. El calculo de rutas utiliza un servicio OSRM con acceso
-a internet.
+Docker prepara automaticamente un recurso y un incidente para **Salto, Uruguay** (`db/seed/seed_salto_eta.sql`). La pantalla
+`/eta` muestra distancia, duracion, la ruta sobre las calles y **las calles por las que pasa**.
 
-**Ruta más corta (opcional):** el criterio `mas_corta` (minimiza distancia) usa un OSRM propio. Preparar los datos
-con `infra/osrm/preparar.ps1` (o `.sh`), definir `OSRM_URL`/`OSRM_SHORTEST_URL` en `infra/.env` y levantar con
-`docker compose --profile osrm up -d --build`. Detalles en [docs/RECURSOS_CERCANOS_RUTAS.md](docs/RECURSOS_CERCANOS_RUTAS.md).
+Las rutas las calcula **pgRouting dentro de PostgreSQL** sobre una **red vial de OpenStreetMap de todo Uruguay**, con
+sentidos de circulacion y velocidades: no hay un servicio de rutas externo. El servicio `red-vial` de Docker la arma la
+primera vez (baja el extracto de Geofabrik, unos 56 MB, y tarda un par de minutos). Hay un solo camino: el de menor
+tiempo. Detalle, fuentes de datos evaluadas y limites en [docs/RED_VIAL.md](docs/RED_VIAL.md).
 
 **Guia de instalacion en otra computadora y verificaciones:**
 [docs/ETA_SALTO_DEMO.md](docs/ETA_SALTO_DEMO.md).
@@ -80,10 +77,10 @@ con `infra/osrm/preparar.ps1` (o `.sh`), definir `OSRM_URL`/`OSRM_SHORTEST_URL` 
 `VITE_REGION` solo controla el encuadre del mapa en React. El backend configura por separado
 el servicio de direcciones IDE mediante `IDE_DEPARTAMENTO` e `IDE_LOCALIDAD` en `infra/.env`;
 ambos usan `salto` por defecto y pueden fijarse en otro lugar (por ejemplo `montevideo`).
-La tabla local `acceso` (números de puerta) y la red vial `via` disponibles en `db/data/` son de Salto.
+La tabla local `acceso` (números de puerta) disponible en `db/data/` es de Salto. La capa `via` (calles) arranca con las de Salto y el servicio `red-vial` la reemplaza por las de todo el país.
 Por eso con Salto `/consultas/geocodificar` busca primero en `acceso` y recién después en la IDE (que se usa
 siempre para las esquinas pedidas con `esquina` y para cualquier otro departamento o localidad), y
-`/consultas/calles` y `/consultas/interseccion` trabajan sobre las calles de Salto.
+`/consultas/calles` y `/consultas/interseccion` trabajan sobre la red vial de OpenStreetMap de todo el país (ver `docs/RED_VIAL.md`).
 
 ### 1. Datos: PostGIS + GeoServer (a mano)
 
@@ -105,16 +102,17 @@ que hayas puesto en `.env`). `geoserver-init` hace por la API REST lo que se har
 
 1. Workspace `geotravel` (nombre heredado del repo; es solo un identificador).
 2. Store PostGIS `geotravel` apuntando a la base (host `db`, puerto `5432`).
-3. Capas: `zona_operativa`, `recurso`, `incidente`, `via` (calles) y `acceso` (números de puerta).
+3. Capas: `zona_operativa`, `recurso`, `incidente`, `via` (calles), `acceso` (números de puerta) y `red_vial_arco` (la red de rutas, con las manos únicas).
 4. Estilos de `geoserver/styles/`, uno por capa: `zonas_nivel_prioridad`, `recursos_tipo`,
-   `incidentes_estado`, `vias_tipo` y `accesos_puerta`.
+   `incidentes_estado`, `vias_tipo`, `accesos_puerta` y `red_vial`.
 
 #### Datos de referencia (calles y puertas)
 
 Son capas de consulta, no se editan desde la aplicación:
 
-- **Calles** (`via`, 3.239 tramos de Salto): ejes de calle de OpenStreetMap (© colaboradores de OpenStreetMap,
-  licencia ODbL), bajados con Overpass API (`way["highway"]["name"]` en el rectángulo de Salto, recortados a él).
+- **Calles** (`via`, 60.261 vías con nombre de todo el país): ejes de calle de OpenStreetMap (© colaboradores de OpenStreetMap,
+  licencia ODbL). El servicio `red-vial` las saca del mismo extracto de Geofabrik que la red de rutas (una fila por vía entera) y
+  reemplaza a las 3.239 de Salto que trae el seed (`db/data/vias.csv.gz`, bajadas con Overpass API en el rectángulo de Salto).
   El tipo de vía (`tipo`) se deriva de la etiqueta `highway` para que lo reconozca el estilo `vias_tipo.sld`.
   Archivo `db/data/vias.csv.gz` (nombre, tipo y geometría en WKT lon/lat; `seed.sh` la pasa a EPSG:32721).
   Si la base ya tenía calles de otra ciudad, `seed.sh` no las pisa: ver "Cambiar las calles" más abajo.
@@ -134,21 +132,23 @@ Termas del Arapey, Pueblo Lavalleja...). El botón "Depto. de Salto" del mapa mu
   interior hay 9 sedes reales (policlínicas y seccionales policiales) y 4 unidades en las localidades más grandes. Las
   ubicaciones y los nombres de las localidades son de OpenStreetMap (ODbL).
 - **Incidentes:** los de la ciudad (18 puntuales, 4 calles cortadas y 3 áreas inundadas) van sobre calles reales; los del
-  interior (uno en cada una de 12 localidades y dos áreas inundadas junto al río) están a menos de 1,5 km del centro de cada pueblo.
+  interior (uno en cada una de 12 localidades y dos áreas inundadas) van sobre la calle de OpenStreetMap más cercana al centro de cada pueblo.
 - **Sobre una calle y del lado de Salto:** en la ciudad, recursos e incidentes quedan sobre una calle de la tabla `via`, y solo
   de la red de Salto (la tabla también trae Concordia, Argentina, del otro lado del río), así que se puede calcular un camino
-  hasta ellos. El interior no tiene calles en la base.
+  hasta ellos. Los del interior también van sobre una calle (a menos de 100 m): un punto a más de 500 m de una calle no tiene ruta.
+  Con esto, las rutas entre cada incidente del seed y sus recursos más cercanos dan camino en todos los casos probados (138 de 138).
 - **Montevideo:** 7 zonas, 12 recursos y 25 incidentes, para comprobar que el sistema atiende todo el país.
 
 La carga masiva (`db/pruebas/carga-masiva.sql`) reparte sus 3.000 recursos sobre las calles de la ciudad.
 
-**Cambiar las calles en una base que ya existe** (por ejemplo, la que tenía las de Montevideo), sin perder
-zonas, recursos ni incidentes. Desde `infra/`:
+**Volver a cargar las calles en una base que ya existe**, sin perder zonas, recursos ni incidentes (el seed carga las de Salto y
+`red-vial` las pasa a todo el país). Desde `infra/`:
 
 ```bash
 docker compose exec db psql -U geotravel -d geotravel -c "TRUNCATE via RESTART IDENTITY"
 docker compose run --rm seed
-# GeoServer guarda la extensión de cada capa al publicarla: se recalcula para que dibuje Salto
+docker compose run --rm -e RED_VIAL_REGENERAR=1 red-vial   # vuelve a dejar las calles de todo el país
+# GeoServer guarda la extensión de cada capa al publicarla: se recalcula (geoserver-init también lo hace)
 curl -u admin:geoserver -X PUT -H "Content-Type: application/json" \
   -d '{"featureType":{"name":"via","enabled":true}}' \
   "http://localhost:8082/geoserver/rest/workspaces/geotravel/datastores/geotravel/featuretypes/via?recalculate=nativebbox,latlonbbox"
@@ -203,7 +203,7 @@ Hay dos vistas, separadas por un login básico:
   reinicia hay que ingresar de nuevo) que el frontend manda en `Authorization: Bearer ...`. Un filtro del backend
   (`auth/AuthFilter.java`) **protege toda la API por defecto**: solo son públicos `/health`, `/auth/login`,
   `/auth/logout`, `GET /fotos/...` y la lectura de las Consultas del invitado (`GET /consultas/...` salvo el reporte,
-  el listado `GET /zonas|/incidentes|/recursos` y `GET /eta/criterios`). Escribir siempre exige sesión. El mapa público dibuja con GeoServer.
+  el listado `GET /zonas|/incidentes|/recursos` y `GET /eta/disponible`). Escribir siempre exige sesión. El mapa público dibuja con GeoServer.
 - **En el frontend:** `frontend/src/auth/` (sesión, pantalla de ingreso y `RutaAdmin`, que manda al ingreso si no
   hay sesión). En Postman, correr primero la carpeta 0, que guarda el token.
 

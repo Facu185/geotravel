@@ -13,7 +13,7 @@ WHERE NOT EXISTS (
 );
 
 INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, equipo_responsable, geom)
-SELECT 'TEST ETA Salto', 'Incidente simulado para recorrer calles con OSRM',
+SELECT 'TEST ETA Salto', 'Incidente simulado para recorrer calles con pgRouting',
        'accidente_transito', 3, 'Prueba P2',
        ST_Transform(ST_SetSRID(ST_MakePoint(-57.95340, -31.38927), 4326), 32721)
 WHERE NOT EXISTS (

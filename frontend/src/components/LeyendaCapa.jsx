@@ -17,6 +17,10 @@ export function LeyendaCapa({ capa, suelta = false }) {
             <IconoIncidente tipo={item.tipoIncidente} chico />
           ) : item.recurso ? (
             <IconoRecurso tipo={item.recurso} estado="" chico />
+          ) : item.flecha ? (
+            <svg className="leyenda__flecha" viewBox="0 0 24 8" width="22" height="8" aria-hidden="true" focusable="false">
+              <path d="M1 4h20M16 1l5 3-5 3" fill="none" stroke={item.flecha} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           ) : item.grupo ? (
             <span className="grupo__numero grupo__numero--chico" style={{ "--color": item.grupo }} aria-hidden="true">
               3
