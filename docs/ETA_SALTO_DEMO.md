@@ -8,8 +8,9 @@ Docker ni los IDs internos de la base local.
 ## Requisitos
 
 - Git, Docker Desktop/Engine con Compose, Node.js y npm.
-- Conexion a internet para instalar dependencias, descargar teselas de mapa y
-  consultar el OSRM publico (o configurar un OSRM propio que cubra Salto).
+- Conexion a internet para instalar dependencias, descargar teselas de mapa y,
+  la primera vez, bajar el extracto de OpenStreetMap de Uruguay (~56 MB) con el que
+  el servicio `red-vial` arma las rutas. Despues las rutas se calculan sin internet.
 - Puertos por defecto libres: 5432, 8080, 8082 y 5173.
 
 ## Primera instalacion en Windows (PowerShell)
@@ -84,11 +85,9 @@ Invoke-RestMethod "$api/eta/recursos/$($r.id)/incidentes/$($i.id)" | ConvertTo-J
 La respuesta debe contener `distanciaMetros`, `duracionSegundos`,
 `tiempoEstimadoMinutos` y `geometriaRuta` con `type: LineString`, coordenadas
 **longitud, latitud**, EPSG:4326. En `/eta`, elegir esas referencias para ver
-el recorrido vial verde. La demo con OSRM obtuvo ~1.051 m, 170 segundos y
-3 minutos; con pgRouting (`RUTAS_MOTOR=pgrouting`) el mismo par da 1.052 m,
-95 segundos y 2 minutos (la distancia coincide; la duracion difiere porque cada
-motor estima las velocidades a su manera). OSRM puede modificar las cifras al
-actualizar las rutas.
+el recorrido vial verde y la lista de calles por las que pasa. Las cifras
+dependen de la red vial de OpenStreetMap cargada (ver [RED_VIAL.md](RED_VIAL.md)):
+la duracion es una estimacion sin transito, con la velocidad maxima de cada calle.
 
 ## Actualizar una instalacion que ya tenia una base Docker
 
@@ -113,17 +112,14 @@ elimina los volumenes de la base y GeoServer.
 
 ## Limites
 
-- OSRM publico y los mapas base requieren **internet**; la app no incluye un
-  servidor OSRM local ni un paquete offline del mapa de Salto. Con
-  `RUTAS_MOTOR=pgrouting` la ruta se calcula dentro de PostgreSQL (grafo de
-  Salto de P1) y no se necesita internet ni OSRM para el calculo.
-- Las calles y puertas de `db/data/` son de **Salto**. La ruta ETA se calcula
-  con OSRM (motor por defecto) o con pgRouting, a partir de las coordenadas
-  del recurso y el incidente.
+- Los mapas base requieren **internet**. La ruta se calcula dentro de
+  PostgreSQL (pgRouting) sobre la red vial de OpenStreetMap de todo Uruguay
+  y no necesita internet ni un servicio de rutas aparte.
+- Las calles (`via`) y puertas de `db/data/` son de **Salto** y sirven para el mapa
+  y las direcciones; la red de rutas es de todo el pais y sale de OpenStreetMap.
 - Para acceder desde un telefono u otra PC a una instancia alojada en un
   equipo distinto, configurar `VITE_API_URL`, `VITE_GEOSERVER_WMS_URL` y
   la direccion de escucha de Vite segun la red. `localhost` corresponde
   a la computadora donde se abre el navegador.
-- La ruta ETA puede calcularse como **más rápida** (defecto, minimiza duración) o **más corta** (minimiza
-  distancia; requiere el OSRM propio). Ver [RECURSOS_CERCANOS_RUTAS.md](RECURSOS_CERCANOS_RUTAS.md).
+- La ruta ETA es un solo camino: el de menor tiempo por calles. Ver [RECURSOS_CERCANOS_RUTAS.md](RECURSOS_CERCANOS_RUTAS.md).
 - Los cambios aqui descritos **no modifican `main`** ni crean un Pull Request.

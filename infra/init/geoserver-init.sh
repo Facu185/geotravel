@@ -45,7 +45,7 @@ else
   echo "store $WS: creado"
 fi
 
-for tabla in zona_operativa recurso incidente via acceso; do
+for tabla in zona_operativa recurso incidente via acceso red_vial_arco; do
   if existe "$G/workspaces/$WS/datastores/$WS/featuretypes/$tabla.json"; then
     echo "capa $tabla: ya existe"
   else
@@ -55,8 +55,14 @@ for tabla in zona_operativa recurso incidente via acceso; do
   fi
 done
 
+# La extension de via y de red_vial_arco cambia cuando el servicio red-vial las carga (de Salto a todo el pais): se recalcula siempre.
+for tabla in via red_vial_arco; do
+  curl -sf $A -X PUT -H "$JSON" "$G/workspaces/$WS/datastores/$WS/featuretypes/$tabla?recalculate=nativebbox,latlonbbox" \
+    -d "{\"featureType\":{\"name\":\"$tabla\"}}" > /dev/null && echo "capa $tabla: extension recalculada"
+done
+
 # estilo:capa -- cada capa usa por defecto el estilo que la colorea por su dato.
-for par in incidentes_estado:incidente recursos_tipo:recurso zonas_nivel_prioridad:zona_operativa vias_tipo:via accesos_puerta:acceso; do
+for par in incidentes_estado:incidente recursos_tipo:recurso zonas_nivel_prioridad:zona_operativa vias_tipo:via accesos_puerta:acceso red_vial:red_vial_arco; do
   estilo="${par%%:*}"
   capa="${par##*:}"
   existe "$G/workspaces/$WS/styles/$estilo.json" || \

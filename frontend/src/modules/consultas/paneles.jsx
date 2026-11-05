@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Aviso, Insignia, Segmentado, Selector } from "../../components/ui.jsx";
+import { Aviso, Insignia, Selector } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, COLOR_PRIORIDAD, nombreTipoIncidente, nombreTipoRecurso } from "../../components/colores.js";
 import { IconoIncidente, IconoRecurso } from "../../components/iconos.jsx";
 import { api } from "../../api/client.js";
-import useCriteriosRuta from "../../api/useCriteriosRuta.js";
-import { REGION } from "../../components/region.js";
+import useRutasDisponibles from "../../api/useRutasDisponibles.js";
+import { DEPARTAMENTOS, REGION, nombreLugar } from "../../components/region.js";
 import { conGeometria } from "./geometria.js";
 
 /**
@@ -403,7 +403,7 @@ function LeyendaRutas({ conRutas }) {
 }
 
 /** Una tarjeta por recurso: distancia directa, distancia por calles, tiempo y disponibilidad de la ruta. */
-function FilaRecursoCercano({ it, elegido, mejor, criterio, onElegir }) {
+function FilaRecursoCercano({ it, elegido, mejor, onElegir }) {
   const hayRuta = it.estadoRuta === "disponible";
   const sinRuta = it.estadoRuta === "sin_ruta" || it.estadoRuta === "error";
   return (
@@ -424,7 +424,7 @@ function FilaRecursoCercano({ it, elegido, mejor, criterio, onElegir }) {
           {sinRuta && <span className="item__detalle">Ruta no disponible</span>}
           {hayRuta && it.advertencia && <span className="item__detalle">⚠ {it.advertencia}</span>}
         </span>
-        {mejor && <Insignia color="#16a34a">{criterio === "mas_corta" ? "Más corto" : "Más rápido"}</Insignia>}
+        {mejor && <Insignia color="#16a34a">Más rápido</Insignia>}
       </button>
     </li>
   );
@@ -435,9 +435,7 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   const [radio, setRadio] = useState(RADIO_INICIAL_M);
   const [limite, setLimite] = useState(5);
   const [soloDisponibles, setSoloDisponibles] = useState(true);
-  const [criterio, setCriterio] = useState("mas_rapida");
-  const { opciones: CRITERIOS, mensajeDe } = useCriteriosRuta();
-  const avisoCriterio = mensajeDe(criterio);
+  const { aviso: avisoRutas } = useRutasDisponibles();
   const [elegidoId, setElegidoId] = useState(null);
   const [calculo, setCalculo] = useState(null); // rutas pedidas: { base, fase, datos, error }
 
@@ -448,8 +446,8 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   }, []);
   useElegibles(setElegibles, "incidente", incidentes, incidente, elegirIncidente);
 
-  // Buscar recursos en el buffer solo usa PostGIS; las rutas (OSRM) se piden recién con el botón.
-  const base = incidente ? `/consultas/recursos-cercanos/${incidente.id}/analisis-vial${query({ radioMetros: radio, limite, soloDisponibles, criterio })}` : null;
+  // Buscar recursos en el buffer solo usa PostGIS; las rutas por calles se piden recién con el botón.
+  const base = incidente ? `/consultas/recursos-cercanos/${incidente.id}/analisis-vial${query({ radioMetros: radio, limite, soloDisponibles })}` : null;
   const { fase, datos: previo, error } = useRuta(base);
 
   const calculoVigente = calculo && calculo.base === base ? calculo : null;
@@ -458,7 +456,7 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   const conRutas = Boolean(calculoVigente?.datos);
 
   const calcularRutas = () => {
-    if (!base || avisoCriterio) return;
+    if (!base || avisoRutas) return;
     setCalculo({ base, fase: "cargando", datos: null, error: null });
     api
       .get(`${base}&conRutas=true`)
@@ -507,7 +505,6 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   }, [datos, incidente, elegidoId, radio, limite, soloDisponibles, setResultado]);
 
   const items = datos?.items ?? [];
-  const sinCalcular = items.length > 0 && !conRutas;
 
   return (
     <>
@@ -535,8 +532,18 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
         <input type="checkbox" checked={soloDisponibles} onChange={(e) => setSoloDisponibles(e.target.checked)} />
         Solo recursos disponibles
       </label>
-      <Segmentado leyenda="Criterio de la ruta" nombre="criterioRuta" opciones={CRITERIOS} valor={criterio} onChange={setCriterio} />
-      {avisoCriterio && <Aviso tipo="error">{avisoCriterio}</Aviso>}
+      {avisoRutas && <Aviso tipo="error">{avisoRutas}</Aviso>}
+
+      <button type="button" className="btn btn--primario btn--ancho" onClick={calcularRutas} disabled={!incidente || items.length === 0 || calculando || conRutas || Boolean(avisoRutas)}>
+        {calculando ? "Calculando rutas…" : conRutas ? "Rutas por calles calculadas" : "Calcular rutas por calles"}
+      </button>
+      <p className="ayuda">
+        {!incidente
+          ? "Elegí un incidente y se calcula el recorrido por calles de los recursos más cercanos."
+          : datos && items.length > 0 && !conRutas
+            ? `Se calculan las rutas de los ${Math.min(items.length, datos.rutasMaximas)} recursos más cercanos.`
+            : null}
+      </p>
 
       {!incidente && <ListaElegible carga={carga} tipo="incidente" objetos={incidentes} elegido={incidente} onElegir={elegirIncidente} />}
 
@@ -560,20 +567,11 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
                     key={it.recursoId}
                     it={it}
                     elegido={it.recursoId === elegidoId}
-                    mejor={conRutas && it.recursoId === datos.recursoMejorId}
-                    criterio={criterio}
+                    mejor={conRutas && it.recursoId === datos.recursoMasRapidoId}
                     onElegir={() => setElegidoId(it.recursoId === elegidoId ? null : it.recursoId)}
                   />
                 ))}
               </ul>
-              {sinCalcular && (
-                <>
-                  <button type="button" className="btn btn--primario btn--ancho" onClick={calcularRutas} disabled={calculando || Boolean(avisoCriterio)}>
-                    {calculando ? "Calculando rutas…" : "Calcular rutas por calles"}
-                  </button>
-                  <p className="ayuda">Se calculan las rutas de los {Math.min(items.length, datos.rutasMaximas)} recursos más cercanos.</p>
-                </>
-              )}
               {calculando && <p className="ayuda">Calculando rutas por calles…</p>}
               {calculoVigente?.fase === "error" && <Aviso tipo="error">{calculoVigente.error}</Aviso>}
               {conRutas && datos.rutasDisponibles === 0 && <Aviso tipo="error">Ruta no disponible: no se pudo obtener ningún recorrido por calles. Se muestra la distancia directa.</Aviso>}
@@ -582,12 +580,7 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
               )}
               {conRutas && (
                 <p className="ayuda">
-                  {criterio === "mas_corta" ? (
-                    <>Los recorridos son la <strong>ruta más corta</strong> por calles permitidas (OSRM propio, minimiza la distancia). Su tiempo puede ser mayor que el de la ruta más rápida.</>
-                  ) : (
-                    <>Los recorridos son la <strong>ruta más rápida</strong> por calles (OSRM, minimiza la duración), no necesariamente la de menor distancia.</>
-                  )}{" "}
-                  Tiempo estimado sin tráfico en tiempo real.
+                  Los recorridos son el <strong>camino de menor tiempo</strong> por calles, respetando los sentidos de circulación. Tiempo estimado sin tráfico en tiempo real.
                 </p>
               )}
               <LeyendaRutas conRutas={conRutas && datos.rutasDisponibles > 0} />
@@ -611,8 +604,8 @@ function CampoCalle({ etiqueta, valor, onChange }) {
   const id = useId();
 
   useEffect(() => {
-    // Las calles propias son solo de Salto: en otra región no hay sugerencias, se escribe el nombre.
-    if (!REGION.callesPropias || valor.trim().length < 2) {
+    // Las sugerencias salen de la red vial de todo el país (OpenStreetMap), con o sin tildes.
+    if (valor.trim().length < 2) {
       setSugerencias([]);
       return undefined;
     }
@@ -632,7 +625,7 @@ function CampoCalle({ etiqueta, valor, onChange }) {
   return (
     <label className="campo">
       <span className="campo__etiqueta">{etiqueta}</span>
-      <input list={id} value={valor} onChange={(e) => onChange(e.target.value)} placeholder={REGION.callesPropias ? "Escribí y elegí de la lista" : "Ej.: Uruguay"} autoComplete="off" />
+      <input list={id} value={valor} onChange={(e) => onChange(e.target.value)} placeholder="Escribí y elegí de la lista" autoComplete="off" />
       <datalist id={id}>
         {sugerencias.map((nombre) => (
           <option key={nombre} value={nombre} />
@@ -644,8 +637,9 @@ function CampoCalle({ etiqueta, valor, onChange }) {
 
 /**
  * Alternativa al clic en el mapa: ubica el punto donde se cruzan dos calles y lo deja como punto de búsqueda.
- * En Salto lo calcula PostGIS con los tramos de cada calle (/consultas/interseccion); si esas calles no
- * se cruzan en la base (los tramos pueden estar incompletos) y en el resto del país, lo resuelve el servicio
+ * Se busca en TODO el país con la red vial de OpenStreetMap que está en la base (/consultas/interseccion), sin internet. Si las
+ * dos calles se cruzan en varios lugares (una calle se repite en muchas localidades) se listan, del más cercano a la región
+ * al más lejano, cada uno con la ciudad, el pueblo o el barrio más próximo. Si no se cruzan en la red, se prueba con el servicio
  * de direcciones de la IDE como "esquina" (/consultas/geocodificar).
  */
 function BuscadorIntersecciones({ setPunto }) {
@@ -661,18 +655,16 @@ function BuscadorIntersecciones({ setPunto }) {
     evento.preventDefault();
     setBusqueda({ fase: "cargando", cruces: [], elegido: 0, error: null, ide: false });
     try {
-      let cruces = [];
-      let ide = !REGION.callesPropias;
-      if (REGION.callesPropias) {
-        cruces = await api.get(`/consultas/interseccion${query({ calle1: calle1.trim(), calle2: calle2.trim() })}`);
-      }
+      const [lat, lon] = REGION.centro;
+      let cruces = await api.get(`/consultas/interseccion${query({ calle1: calle1.trim(), calle2: calle2.trim(), cercaLon: lon, cercaLat: lat })}`);
+      let ide = false;
       if (cruces.length === 0) {
-        // Sin cruce en las calles propias (o sin calles propias): se prueba con el servicio de la IDE.
+        // Sin cruce en la red vial: se prueba con el servicio de la IDE.
         try {
           cruces = await esquinaPorIde();
           ide = true;
-        } catch (e) {
-          if (!REGION.callesPropias) throw e;
+        } catch {
+          // sin cruce en la IDE tampoco: se avisa abajo
         }
       }
       setBusqueda({ fase: "ok", cruces, elegido: 0, error: null, ide });
@@ -687,33 +679,47 @@ function BuscadorIntersecciones({ setPunto }) {
     setPunto([busqueda.cruces[n].lat, busqueda.cruces[n].lon]);
   };
 
+  /** El lugar más próximo al cruce (ciudad, pueblo o barrio), por ejemplo "Centro" o "Algorta". */
+  const rotulo = (c) => c.lugar ?? "Cruce";
+
+  const { fase, cruces, elegido, ide } = busqueda;
   return (
     <form className="bloque" onSubmit={buscar}>
       <h4 className="bloque__titulo">O por intersección de calles</h4>
       <CampoCalle etiqueta="Calle" valor={calle1} onChange={setCalle1} />
       <CampoCalle etiqueta="y calle" valor={calle2} onChange={setCalle2} />
-      <button type="submit" className="btn btn--secundario" disabled={!calle1.trim() || !calle2.trim() || busqueda.fase === "cargando"}>
-        {busqueda.fase === "cargando" ? "Buscando…" : "Ubicar el cruce"}
+      <button type="submit" className="btn btn--secundario" disabled={!calle1.trim() || !calle2.trim() || fase === "cargando"}>
+        {fase === "cargando" ? "Buscando…" : "Ubicar el cruce"}
       </button>
-      {busqueda.fase === "error" && <Aviso tipo="error">{busqueda.error}</Aviso>}
-      {busqueda.fase === "ok" && busqueda.cruces.length === 0 && (
+      {fase === "error" && <Aviso tipo="error">{busqueda.error}</Aviso>}
+      {fase === "ok" && cruces.length === 0 && (
         <Aviso tipo="info">Esas calles no se cruzan, o algún nombre no existe. Elegí los nombres de la lista de sugerencias.</Aviso>
       )}
-      {busqueda.fase === "ok" && busqueda.ide && busqueda.cruces.length === 1 && (
+      {fase === "ok" && ide && cruces.length === 1 && (
         <Aviso tipo="ok">
-          Esquina ubicada (servicio de la IDE): <strong>{busqueda.cruces[0].direccion}</strong>
+          Esquina ubicada (servicio de la IDE): <strong>{cruces[0].direccion}</strong>
         </Aviso>
       )}
-      {busqueda.cruces.length > 1 && (
+      {fase === "ok" && !ide && cruces.length === 1 && (
+        <Aviso tipo="ok">
+          Cruce ubicado: <strong>{rotulo(cruces[0])}</strong>
+        </Aviso>
+      )}
+      {cruces.length > 1 && (
         <>
-          <p className="ayuda">Hay {busqueda.cruces.length} cruces con esos nombres. Elegí uno:</p>
-          <div className="acciones">
-            {busqueda.cruces.map((c, n) => (
-              <button key={n} type="button" className={n === busqueda.elegido ? "btn btn--primario" : "btn btn--secundario"} onClick={() => elegir(n)}>
-                Cruce {n + 1}
-              </button>
+          <p className="ayuda">Hay {cruces.length} cruces con esos nombres en el país. Elegí uno:</p>
+          <ul className="items">
+            {cruces.map((c, n) => (
+              <li key={n}>
+                <button type="button" className={n === elegido ? "item item--activo" : "item"} onClick={() => elegir(n)} aria-pressed={n === elegido}>
+                  <span className="item__texto">
+                    <span className="item__titulo">{rotulo(c)}</span>
+                    <span className="item__detalle">Cruce {n + 1}</span>
+                  </span>
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         </>
       )}
     </form>
@@ -724,23 +730,31 @@ function BuscadorIntersecciones({ setPunto }) {
 
 /**
  * Ubica una dirección ("calle número") y la deja como punto de búsqueda (ver /consultas/geocodificar).
- * En Salto la busca en los números de puerta propios; en el resto del país, en la IDE, según el
- * departamento y la localidad de la región configurada (components/region.js).
+ * Se busca en TODO el país: primero en los números de puerta propios de Salto y, si no está, en el servicio de
+ * direcciones de la IDE (los 19 departamentos). Si la calle existe en varios lugares se ubica la mejor coincidencia y se
+ * ofrecen las demás. También se puede limitar la búsqueda a un departamento.
  */
 function BuscadorDireccion({ setPunto }) {
   const [texto, setTexto] = useState("");
+  const [donde, setDonde] = useState("todo"); // "todo" o un departamento
   const [busqueda, setBusqueda] = useState({ fase: "quieto", resultado: null, error: null });
 
   const buscar = async (evento) => {
     evento.preventDefault();
     setBusqueda({ fase: "cargando", resultado: null, error: null });
     try {
-      const r = await api.get(`/consultas/geocodificar${query({ direccion: texto.trim(), ...REGION.ide })}`);
+      const r = await api.get(`/consultas/geocodificar${query({ direccion: texto.trim(), departamento: donde })}`);
       setBusqueda({ fase: "ok", resultado: r, error: null });
       setPunto([r.lat, r.lon]);
     } catch (e) {
       setBusqueda({ fase: "error", resultado: null, error: e.message });
     }
+  };
+
+  // Elegir una de las otras coincidencias: el punto pasa a ser ese lugar.
+  const elegirAlternativa = (a) => {
+    setBusqueda({ fase: "ok", resultado: { ...a, fuente: "IDE", aviso: a.aproximada ? "No se encontró ese número de puerta: se ubicó sobre la calle (aproximado)." : null, alternativas: [] }, error: null });
+    setPunto([a.lat, a.lon]);
   };
 
   const { fase, resultado, error } = busqueda;
@@ -751,6 +765,17 @@ function BuscadorDireccion({ setPunto }) {
         <span className="campo__etiqueta">Calle y número</span>
         <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={`Ej.: ${REGION.ejemploDireccion}`} autoComplete="off" />
       </label>
+      <label className="campo">
+        <span className="campo__etiqueta">Dónde buscar</span>
+        <select value={donde} onChange={(e) => setDonde(e.target.value)}>
+          <option value="todo">Todo el país</option>
+          {DEPARTAMENTOS.map((d) => (
+            <option key={d.valor} value={d.valor}>
+              {d.nombre}
+            </option>
+          ))}
+        </select>
+      </label>
       <button type="submit" className="btn btn--secundario" disabled={!texto.trim() || fase === "cargando"}>
         {fase === "cargando" ? "Buscando…" : "Ubicar la dirección"}
       </button>
@@ -758,8 +783,29 @@ function BuscadorDireccion({ setPunto }) {
       {fase === "ok" && (
         <Aviso tipo={resultado.aproximada ? "info" : "ok"}>
           {resultado.aproximada ? resultado.aviso : "Dirección ubicada"}: <strong>{resultado.direccion}</strong>
-          {resultado.fuente === "IDE" && " (servicio de la IDE)"}
+          {resultado.fuente === "IDE" && resultado.departamento && ` — ${nombreLugar(resultado.localidad)}, ${nombreLugar(resultado.departamento)}`}
+          {resultado.fuente === "IDE" ? " (servicio de la IDE)" : ""}
         </Aviso>
+      )}
+      {fase === "ok" && resultado.alternativas?.length > 0 && (
+        <>
+          <p className="ayuda">Hay otras coincidencias en el país:</p>
+          <ul className="items">
+            {resultado.alternativas.map((a) => (
+              <li key={`${a.direccion}-${a.localidad}-${a.departamento}`}>
+                <button type="button" className="item" onClick={() => elegirAlternativa(a)}>
+                  <span className="item__texto">
+                    <span className="item__titulo">{a.direccion}</span>
+                    <span className="item__detalle">
+                      {nombreLugar(a.localidad)}, {nombreLugar(a.departamento)}
+                      {a.aproximada ? " · aproximada" : ""}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </form>
   );
@@ -772,9 +818,8 @@ function BuscadoresDePunto({ setPunto }) {
       <BuscadorDireccion setPunto={setPunto} />
       <BuscadorIntersecciones setPunto={setPunto} />
       <p className="ayuda">
-        {REGION.callesPropias
-          ? "Las direcciones se buscan en los números de puerta de Salto (capa «acceso» de GeoServer)."
-          : `Las direcciones y esquinas de ${REGION.nombre} las resuelve el servicio de direcciones de la IDE (necesita internet).`}
+        Las direcciones se buscan en todo el país: primero en los números de puerta de Salto (capa «acceso» de GeoServer) y después en el servicio de
+        direcciones de la IDE (necesita internet). Los cruces de calles también se buscan en todo el país, con la red vial de la base (sin internet).
       </p>
     </>
   );
@@ -1106,7 +1151,7 @@ export const CONSULTAS = [
     fondo: "incidente", // lo que GeoServer dibuja de fondo
     titulo: "3. Recursos cercanos a un incidente",
     descripcion: "Se ven los incidentes de esta parte del mapa. Elegí uno, definí el radio del buffer y se muestran los recursos que están dentro, con la distancia directa. Con \"Calcular rutas por calles\" se agrega el recorrido transitable de los más cercanos.",
-    postgis: "ST_Buffer y ST_DWithin (recursos dentro del radio), ST_Distance y ST_ShortestLine (distancia directa); recorrido por calles con OSRM",
+    postgis: "ST_Buffer y ST_DWithin (recursos dentro del radio), ST_Distance y ST_ShortestLine (distancia directa); recorrido por calles con pgRouting",
     objetos: "/incidentes",
     Panel: PanelRecursosCercanos,
   },

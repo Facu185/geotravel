@@ -106,7 +106,10 @@ INSERT INTO zona_operativa (nombre, descripcion, nivel_prioridad, responsable, g
 -- cuanto más larga es la calle).
 CREATE TEMP TABLE _calles_salto AS
 WITH c AS (
-    SELECT gid, geom, tipo, ST_ClusterDBSCAN(geom, 0, 1) OVER () AS red FROM via
+    -- Solo el rectángulo de Salto: la tabla via puede traer las calles de todo el país (la carga el servicio red-vial).
+    SELECT gid, geom, tipo, ST_ClusterDBSCAN(geom, 0, 1) OVER () AS red
+    FROM via
+    WHERE geom && ST_Transform(ST_MakeEnvelope(-58.06, -31.46, -57.86, -31.32, 4326), 32721)
 )
 SELECT gid, geom, ST_Length(geom) AS largo, sum(ST_Length(geom)) OVER (ORDER BY gid) AS acum
 FROM c
@@ -277,8 +280,10 @@ WITH nuevos AS (
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
 DROP TABLE _calles_salto;
 
--- Incidentes del interior del departamento: uno en cada una de 12 localidades (a menos de 1,5 km del centro del pueblo),
--- con el tipo de incidente que es más común en cada lugar, y dos áreas inundadas junto al río.
+-- Incidentes del interior del departamento: uno en cada una de 12 localidades, con el tipo de incidente que es más común en
+-- cada lugar, y dos áreas inundadas. Van SOBRE una calle de OpenStreetMap, la más cercana al centro del pueblo (a menos de
+-- 100 m): son las coordenadas que dio esa búsqueda sobre la red vial (el seed corre antes de que se cargue la red, así que
+-- quedan escritas acá). Un incidente a más de 500 m de una calle no tiene ruta (ver docs/RED_VIAL.md).
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
     SELECT initcap(replace(l.tipo, '_', ' ')) || ' en ' || l.nombre,
@@ -288,20 +293,20 @@ WITH nuevos AS (
            (ARRAY['Registrado', 'Registrado', 'En atención', 'En atención', 'Derivado', 'Resuelto', 'Resuelto', 'Cancelado'])[1 + floor(random() * 8)::int],
            now() - random() * interval '90 days',
            'Equipo Interior',
-           ST_Transform(ST_SetSRID(ST_MakePoint(l.lon + (random() - 0.5) * 0.03, l.lat + (random() - 0.5) * 0.03), 4326), 32721)
+           ST_Transform(ST_SetSRID(ST_MakePoint(l.lon, l.lat), 4326), 32721)
     FROM (VALUES
-        ('Termas del Daymán', 'incendio',           -57.9084, -31.4525),
-        ('Belén',             'accidente_transito', -57.7791, -30.7894),
-        ('Constitución',      'corte_servicio',     -57.8494, -31.0672),
-        ('Termas del Arapey', 'accidente_transito', -57.5232, -30.9474),
-        ('Colonia 18 de Julio', 'incendio',         -57.8740, -31.3563),
-        ('Garibaldi',         'otro',               -57.8289, -31.3394),
-        ('San Antonio',       'accidente_transito', -57.7669, -31.3574),
-        ('Pueblo Lavalleja',  'incendio',           -57.0250, -31.0958),
-        ('Biassini',          'corte_servicio',     -57.1263, -31.2776),
-        ('Rincón de Valentín', 'accidente_transito', -57.1992, -31.2822),
-        ('Campo de Todos',    'otro',               -57.6146, -31.5593),
-        ('Laureles',          'incendio',           -57.5260, -31.4988)
+        ('Termas del Daymán', 'incendio',           -57.90846, -31.45249),
+        ('Belén',             'accidente_transito', -57.77958, -30.78926),
+        ('Constitución',      'corte_servicio',     -57.84949, -31.06747),
+        ('Termas del Arapey', 'accidente_transito', -57.52326, -30.94699),
+        ('Colonia 18 de Julio', 'incendio',         -57.87359, -31.35596),
+        ('Garibaldi',         'otro',               -57.82880, -31.33924),
+        ('San Antonio',       'accidente_transito', -57.76720, -31.35771),
+        ('Pueblo Lavalleja',  'incendio',           -57.02503, -31.09567),
+        ('Biassini',          'corte_servicio',     -57.12620, -31.27740),
+        ('Rincón de Valentín', 'accidente_transito', -57.19929, -31.28202),
+        ('Campo de Todos',    'otro',               -57.61392, -31.55935),
+        ('Laureles',          'incendio',           -57.52638, -31.49875)
     ) l(nombre, tipo, lon, lat)
     RETURNING id
 )
@@ -310,14 +315,14 @@ INSERT INTO _gen_incidente SELECT id FROM nuevos;
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
     SELECT 'Área inundada en ' || a.nombre,
-           'Área afectada por la crecida del río Uruguay',
+           'Área afectada por la crecida',
            'inundacion',
            1 + floor(random() * 3)::int,
            (ARRAY['Registrado', 'En atención', 'Resuelto'])[1 + floor(random() * 3)::int],
            now() - random() * interval '45 days',
            'Equipo Interior',
            ST_Buffer(ST_Transform(ST_SetSRID(ST_MakePoint(a.lon, a.lat), 4326), 32721), 150 + random() * 100, 8)
-    FROM (VALUES ('Belén', -57.8050, -30.7900), ('Constitución', -57.8900, -31.0700)) a(nombre, lon, lat)
+    FROM (VALUES ('Belén', -57.78588, -30.79048), ('Constitución', -57.86212, -31.07368)) a(nombre, lon, lat)
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;

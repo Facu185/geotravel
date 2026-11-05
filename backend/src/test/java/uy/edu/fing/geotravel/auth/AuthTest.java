@@ -66,7 +66,7 @@ public class AuthTest {
         assertTrue(AuthFilter.esPublica("GET", "zonas"));
         assertTrue(AuthFilter.esPublica("GET", "incidentes/"));
         assertTrue(AuthFilter.esPublica("GET", "recursos"));
-        assertTrue(AuthFilter.esPublica("GET", "eta/criterios"));
+        assertTrue(AuthFilter.esPublica("GET", "eta/disponible"));
 
         assertFalse(AuthFilter.esPublica("GET", "consultas/reportes/incidentes-por-zona"));
         assertFalse(AuthFilter.esPublica("GET", "zonas/3"));

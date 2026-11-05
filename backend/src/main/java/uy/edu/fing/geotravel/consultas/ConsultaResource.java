@@ -1,7 +1,6 @@
 package uy.edu.fing.geotravel.consultas;
 
 import uy.edu.fing.geotravel.db.DataSourceProvider;
-import uy.edu.fing.geotravel.eta.Criterio;
 import uy.edu.fing.geotravel.eta.RutaService;
 import uy.edu.fing.geotravel.mapa.Bbox;
 
@@ -170,22 +169,14 @@ public class ConsultaResource {
                                             @QueryParam("radioMetros") String radioMetros,
                                             @QueryParam("limite") String limite,
                                             @QueryParam("soloDisponibles") @DefaultValue("true") boolean soloDisponibles,
-                                            @QueryParam("conRutas") @DefaultValue("false") boolean conRutas,
-                                            @QueryParam("criterio") String criterioParam)
+                                            @QueryParam("conRutas") @DefaultValue("false") boolean conRutas)
             throws SQLException, IOException {
-        Criterio criterio = Criterio.desde(criterioParam);
-        if (criterio == null) {
-            throw peticionInvalida("criterio tiene que ser mas_rapida o mas_corta");
-        }
         RutaService servicio = RutaService.predeterminado();
-        if (conRutas && !servicio.disponible(criterio)) {
-            String motivo = servicio.nombreMotor(criterio).startsWith("pgRouting")
-                    ? "falta la extension pgRouting, el grafo vial o la funcion de rutas en la base"
-                    : "falta configurar el OSRM propio (OSRM_SHORTEST_URL)";
+        if (conRutas && !servicio.disponible()) {
+            String motivo = "falta la extension pgRouting, la red vial o la funcion de rutas en la base";
             throw new WebApplicationException(Response.status(Response.Status.SERVICE_UNAVAILABLE)
                     .type(MediaType.APPLICATION_JSON)
-                    .entity(Map.of("error", "El criterio " + criterio.codigo
-                            + " no esta disponible: " + motivo))
+                    .entity(Map.of("error", "El calculo de rutas no esta disponible: " + motivo))
                     .build());
         }
         AnalisisVial.Parametros parametros;
@@ -197,7 +188,7 @@ public class ConsultaResource {
         }
         try (Connection conn = DataSourceProvider.get().getConnection()) {
             Map<String, Object> respuesta = new AnalisisVial(servicio)
-                    .analizar(conn, incidenteId, parametros, soloDisponibles, conRutas, criterio);
+                    .analizar(conn, incidenteId, parametros, soloDisponibles, conRutas);
             if (respuesta == null) {
                 throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
                         .type(MediaType.APPLICATION_JSON)
@@ -473,6 +464,11 @@ public class ConsultaResource {
      * cercana de esa calle y se marca "aproximada". Esa tabla es solo de Salto. En otro departamento
      * (parámetros departamento y localidad, por ejemplo montevideo y montevideo), y para las esquinas (parámetro
      * esquina: dos calles que se cruzan), se usa el servicio de direcciones de la IDE, que cubre el país.
+     *
+     * Con departamento=todo la dirección se busca en TODO el país: primero en las puertas propias de Salto y, si no está,
+     * en la IDE sin fijar departamento. Si la calle existe en varios lugares se elige el mejor (con el portal exacto, y en
+     * el departamento configurado si empata) y las otras coincidencias se devuelven en "alternativas". Con un departamento
+     * sin localidad la IDE busca en todo el departamento.
      */
     @GET
     @Path("/geocodificar")
@@ -485,16 +481,23 @@ public class ConsultaResource {
             throw peticionInvalida("Falta la dirección (por ejemplo: Buenos Aires 451)");
         }
         boolean hayDepartamento = departamento != null && !departamento.trim().isEmpty();
-        // Sin parámetros se usa el lugar configurado en el backend (IDE_DEPARTAMENTO / IDE_LOCALIDAD).
-        // Con solo el departamento, la localidad es la del mismo nombre.
-        String dep = lugar(departamento, CONFIGURACION_IDE.getDepartamento());
-        String loc = lugar(localidad, hayDepartamento ? dep : CONFIGURACION_IDE.getLocalidad());
+        boolean todoElPais = hayDepartamento && "todo".equalsIgnoreCase(departamento.trim());
         boolean hayEsquina = esquina != null && !esquina.trim().isEmpty();
+        // Sin parámetros se usa el lugar configurado en el backend (IDE_DEPARTAMENTO / IDE_LOCALIDAD).
+        // Solo con el departamento, la IDE busca en todo el departamento (sin localidad).
+        String dep = todoElPais ? CONFIGURACION_IDE.getDepartamento() : lugar(departamento, CONFIGURACION_IDE.getDepartamento());
+        String loc = todoElPais ? CONFIGURACION_IDE.getLocalidad()
+                : hayDepartamento ? (localidad == null || localidad.trim().isEmpty() ? null : lugar(localidad, null))
+                : lugar(localidad, CONFIGURACION_IDE.getLocalidad());
         // La tabla de puertas propia es solo de Salto: en otro lugar, o con esquina, va directo a la IDE.
-        java.util.regex.Matcher m = hayEsquina ? null : coincidenciaPuertaLocal(direccion, new ConfiguracionIde(dep, loc));
+        ConfiguracionIde propia = todoElPais ? CONFIGURACION_IDE : new ConfiguracionIde(dep, loc);
+        java.util.regex.Matcher m = hayEsquina ? null : coincidenciaPuertaLocal(direccion, propia);
         if (m != null) {
-            Map<String, Object> propio = buscarPuerta(m.group(1), Integer.parseInt(m.group(2)), m.group(3));
-            if (propio != null) return propio;
+            Map<String, Object> encontrada = buscarPuerta(m.group(1), Integer.parseInt(m.group(2)), m.group(3));
+            if (encontrada != null) return encontrada;
+        }
+        if (todoElPais) {
+            return geocodificarConIde(direccion, hayEsquina ? esquina.trim() : null, null, null);
         }
         return geocodificarConIde(direccion, hayEsquina ? esquina.trim() : null, dep, loc);
     }
@@ -586,8 +589,8 @@ public class ConsultaResource {
      * calle y se marca "aproximada". Sin internet o con el servicio caído responde 502 con un mensaje.
      */
     private Map<String, Object> geocodificarConIde(String direccion, String esquinaPedida, String departamento, String localidad) {
-        String url = new ConfiguracionIde(departamento, localidad)
-            .urlBusqueda(IDE_BUSQUEDA_DIRECCION, direccion, esquinaPedida);
+        // departamento null: se busca la calle en todo el país.
+        String url = ConfiguracionIde.urlBusqueda(IDE_BUSQUEDA_DIRECCION, direccion, esquinaPedida, departamento, localidad);
         JsonNode lista;
         try {
             HttpResponse<String> respuesta = HTTP.send(
@@ -613,7 +616,7 @@ public class ConsultaResource {
                 .entity(Map.of("error", "No se encontró esa dirección. Probá con el formato \"calle número\" (por ejemplo: Buenos Aires 451) o con otra calle"))
                 .build());
         }
-        JsonNode mejor = lista.get(0);
+        JsonNode mejor = elegirMejor(lista, departamento != null ? departamento : CONFIGURACION_IDE.getDepartamento());
         JsonNode datos = mejor.path("direccion");
         String calle = datos.path("calle").path("nombre_normalizado").asText("");
         String numero = datos.path("numero").path("nro_puerta").asText("");
@@ -626,8 +629,9 @@ public class ConsultaResource {
         Map<String, Object> resultado = new LinkedHashMap<>();
         resultado.put("direccion", texto);
         resultado.put("fuente", "IDE");
-        resultado.put("departamento", departamento);
-        resultado.put("localidad", localidad);
+        // El lugar donde se encontró (la IDE lo informa; importa cuando se busca en todo el país).
+        resultado.put("departamento", nombreDe(datos.path("departamento"), departamento));
+        resultado.put("localidad", nombreDe(datos.path("localidad"), localidad));
         resultado.put("lon", mejor.get("puntoX").asDouble());
         resultado.put("lat", mejor.get("puntoY").asDouble());
         resultado.put("aproximada", !error.isEmpty());
@@ -637,7 +641,64 @@ public class ConsultaResource {
             : !numero.isEmpty() ? "El servicio no tiene el punto exacto de esa puerta: se ubicó por el número sobre la calle (aproximado, puede haber unos metros de diferencia)."
             : "No se encontró ese número de puerta: se ubicó sobre la calle (aproximado).";
         resultado.put("aviso", aviso);
+        if (departamento == null) {
+            resultado.put("alternativas", alternativas(lista, mejor));
+        }
         return resultado;
+    }
+
+    private static boolean valida(JsonNode candidato) {
+        return candidato.hasNonNull("puntoX") && candidato.hasNonNull("puntoY")
+            && !candidato.path("direccion").path("calle").path("nombre_normalizado").asText("").isEmpty();
+    }
+
+    /**
+     * La mejor coincidencia de la lista de la IDE: primero las que tienen el portal exacto (sin error), y entre las
+     * del mismo tipo las del departamento preferido; si no hay empate, la primera que devolvió el servicio.
+     */
+    static JsonNode elegirMejor(JsonNode lista, String departamentoPreferido) {
+        JsonNode mejor = null;
+        int mejorPuntaje = Integer.MAX_VALUE;
+        for (JsonNode c : lista) {
+            if (!valida(c)) continue;
+            int puntaje = (c.path("error").asText("").trim().isEmpty() ? 0 : 2)
+                + (nombreDe(c.path("direccion").path("departamento"), "").equalsIgnoreCase(departamentoPreferido) ? 0 : 1);
+            if (puntaje < mejorPuntaje) {
+                mejor = c;
+                mejorPuntaje = puntaje;
+            }
+        }
+        return mejor != null ? mejor : lista.get(0);
+    }
+
+    /** Hasta 5 coincidencias más, de otros lugares, para mostrar "también hay una calle así en...". */
+    private static List<Map<String, Object>> alternativas(JsonNode lista, JsonNode elegida) {
+        List<Map<String, Object>> otras = new ArrayList<>();
+        java.util.Set<String> vistas = new java.util.HashSet<>();
+        vistas.add(nombreDe(elegida.path("direccion").path("localidad"), "") + "|" + nombreDe(elegida.path("direccion").path("departamento"), ""));
+        for (JsonNode c : lista) {
+            if (c == elegida || !valida(c) || otras.size() >= 5) continue;
+            JsonNode d = c.path("direccion");
+            String lugar = nombreDe(d.path("localidad"), "") + "|" + nombreDe(d.path("departamento"), "");
+            if (!vistas.add(lugar)) continue;
+            String calle = d.path("calle").path("nombre_normalizado").asText("");
+            String numero = d.path("numero").path("nro_puerta").asText("");
+            Map<String, Object> a = new LinkedHashMap<>();
+            a.put("direccion", numero.isEmpty() ? calle : calle + " " + numero);
+            a.put("departamento", nombreDe(d.path("departamento"), ""));
+            a.put("localidad", nombreDe(d.path("localidad"), ""));
+            a.put("lon", c.get("puntoX").asDouble());
+            a.put("lat", c.get("puntoY").asDouble());
+            a.put("aproximada", !c.path("error").asText("").trim().isEmpty());
+            otras.add(a);
+        }
+        return otras;
+    }
+
+    /** Nombre en minúsculas de un departamento o localidad de la respuesta de la IDE (o el valor de reemplazo). */
+    private static String nombreDe(JsonNode lugar, String reemplazo) {
+        String nombre = lugar.path("nombre_normalizado").asText("");
+        return nombre.isEmpty() ? reemplazo : nombre.toLowerCase(Locale.ROOT);
     }
 
     private static WebApplicationException servicioDeDireccionesNoDisponible(String motivo) {
@@ -650,8 +711,9 @@ public class ConsultaResource {
 
     // ---------------------------------------------------------- Calles e intersecciones
     /**
-     * Nombres de calle que contienen el texto dado (mínimo 2 letras), con los que empiezan por
-     * él primero. Alimenta el autocompletado de la búsqueda por intersección.
+     * Nombres de calle de TODO el país (la red vial de OpenStreetMap) que contienen el texto dado (mínimo 2 letras),
+     * sin importar mayúsculas ni tildes, con los que empiezan por él primero y después los más repetidos. Alimenta el
+     * autocompletado de la búsqueda por intersección.
      */
     @GET
     @Path("/calles")
@@ -661,12 +723,14 @@ public class ConsultaResource {
         if (q == null || q.trim().length() < 2) return nombres;
         String texto = q.trim().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
         String sql =
-            "SELECT nom_calle FROM via WHERE nom_calle ILIKE ? " +
-            "GROUP BY nom_calle ORDER BY (nom_calle ILIKE ?) DESC, nom_calle LIMIT 10";
+            "SELECT mode() WITHIN GROUP (ORDER BY nombre) AS nombre, count(DISTINCT osm_way_id) AS vias " +
+            "FROM red_vial_arco WHERE nombre_norm LIKE '%' || normalizar_calle(?) || '%' " +
+            "GROUP BY nombre_norm " +
+            "ORDER BY (nombre_norm LIKE normalizar_calle(?) || '%') DESC, vias DESC, nombre_norm LIMIT 10";
         try (Connection conn = DataSourceProvider.get().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, "%" + texto + "%");
-            ps.setString(2, texto + "%");
+            ps.setString(1, texto);
+            ps.setString(2, texto);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) nombres.add(rs.getString(1));
             }
@@ -675,31 +739,67 @@ public class ConsultaResource {
     }
 
     /**
-     * Puntos donde se cruzan dos calles (lon/lat), para usarlos en "incidente más cercano" y
-     * "zona de un punto". Una calle son varios tramos con el mismo nombre: se unen y se
-     * intersectan en PostGIS (mismo patrón del ejercicio 6 del Práctico 2). Si no se cruzan
-     * devuelve una lista vacía; si hay varios cruces (nombres repetidos en la ciudad), todos.
+     * Los lugares donde se cruzan dos calles, en TODO el país (lon/lat), para usarlos en "incidente más cercano" y
+     * "zona de un punto". Sale de la red vial de OpenStreetMap: un cruce es una esquina (un vértice del grafo) a la que
+     * llegan un tramo de cada calle; dos calles que se superponen sin compartir nodo (un puente) no se cruzan. El nombre se
+     * compara sin tildes ni mayúsculas; si no hay calles con ese nombre exacto, se buscan las que lo contienen.
+     *
+     * Como una calle puede repetirse en muchas localidades, devuelve hasta 10 cruces, del más cercano al punto "cerca"
+     * (cercaLon y cercaLat, por defecto el centro de Salto), cada uno con el lugar más próximo (ciudad, pueblo o barrio) y
+     * la distancia a él, para que se pueda elegir. Las esquinas a menos de 80 m (una avenida de dos manos) cuentan como una.
+     * Si no se cruzan devuelve una lista vacía.
      */
     @GET
     @Path("/interseccion")
     @Produces(MediaType.APPLICATION_JSON)
     public List<Map<String, Object>> interseccion(@QueryParam("calle1") String calle1,
-                                                    @QueryParam("calle2") String calle2) throws SQLException {
+                                                    @QueryParam("calle2") String calle2,
+                                                    @QueryParam("cercaLon") Double cercaLon,
+                                                    @QueryParam("cercaLat") Double cercaLat) throws SQLException {
         if (calle1 == null || calle1.trim().isEmpty() || calle2 == null || calle2.trim().isEmpty()) {
             throw peticionInvalida("Faltan las dos calles: calle1 y calle2");
         }
+        double lon = cercaLon != null && Double.isFinite(cercaLon) ? cercaLon : CENTRO_SALTO_LON;
+        double lat = cercaLat != null && Double.isFinite(cercaLat) ? cercaLat : CENTRO_SALTO_LAT;
+        try (Connection conn = DataSourceProvider.get().getConnection()) {
+            // Lo escrito se normaliza como las puertas: mayúsculas, sin tildes ni puntuación y con las palabras completas (Av. = AVENIDA).
+            String uno = normalizarCalle(calle1);
+            String dos = normalizarCalle(calle2);
+            List<Map<String, Object>> cruces = cruces(conn, uno, dos, lon, lat, false);
+            if (cruces.isEmpty()) {
+                cruces = cruces(conn, uno, dos, lon, lat, true);
+            }
+            return cruces;
+        }
+    }
+
+    private static final double CENTRO_SALTO_LON = -57.9606;
+    private static final double CENTRO_SALTO_LAT = -31.3857;
+
+    private static List<Map<String, Object>> cruces(Connection conn, String calle1, String calle2, double lon, double lat,
+                                                    boolean contiene) throws SQLException {
+        String coincide = contiene ? "nombre_norm LIKE '%' || normalizar_calle(?) || '%'" : "nombre_norm = normalizar_calle(?)";
         String sql =
-            "WITH a AS (SELECT ST_Collect(geom) AS g FROM via WHERE upper(nom_calle) = upper(?)), " +
-            "     b AS (SELECT ST_Collect(geom) AS g FROM via WHERE upper(nom_calle) = upper(?)), " +
-            "     puntos AS (SELECT (ST_Dump(ST_Intersection(a.g, b.g))).geom AS p FROM a, b " +
-            "                WHERE a.g IS NOT NULL AND b.g IS NOT NULL) " +
-            "SELECT ST_X(ST_Transform(p, 4326)) AS lon, ST_Y(ST_Transform(p, 4326)) AS lat " +
-            "FROM puntos WHERE GeometryType(p) = 'POINT' ORDER BY lat, lon";
-        try (Connection conn = DataSourceProvider.get().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, calle1.trim());
-            ps.setString(2, calle2.trim());
-            return rowsToMaps(ps.executeQuery(), "lon", "lat");
+            "WITH a AS (SELECT source AS n, target AS m FROM red_vial_arco WHERE " + coincide + "), " +
+            "     b AS (SELECT source AS n, target AS m FROM red_vial_arco WHERE " + coincide + "), " +
+            "     cruces AS (SELECT v.id, v.geom FROM red_vial_vertice v " +
+            "                WHERE v.id IN (SELECT n FROM a UNION SELECT m FROM a) " +
+            "                  AND v.id IN (SELECT n FROM b UNION SELECT m FROM b)), " +
+            "     grupos AS (SELECT id, geom, ST_ClusterDBSCAN(geom, 80, 1) OVER () AS g FROM cruces), " +
+            "     uno AS (SELECT DISTINCT ON (g) id, geom FROM grupos ORDER BY g, id), " +
+            "     centro AS (SELECT ST_Transform(ST_SetSRID(ST_MakePoint(?, ?), 4326), 32721) AS geom) " +
+            "SELECT ST_X(ST_Transform(u.geom, 4326)) AS lon, ST_Y(ST_Transform(u.geom, 4326)) AS lat, " +
+            "       l.nombre AS lugar, l.tipo AS lugar_tipo, round(ST_Distance(l.geom, u.geom)) AS distancia_lugar_m, " +
+            "       round((u.geom <-> c.geom) / 1000) AS distancia_km " +
+            "FROM uno u CROSS JOIN centro c " +
+            "LEFT JOIN LATERAL (SELECT nombre, tipo, geom FROM lugar_osm ORDER BY geom <-> u.geom LIMIT 1) l ON true " +
+            "ORDER BY u.geom <-> c.geom LIMIT 10";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, calle1);
+            ps.setString(2, calle2);
+            ps.setDouble(3, lon);
+            ps.setDouble(4, lat);
+            return rowsToMaps(ps.executeQuery(), "lon", "lat", "lugar", "lugar_tipo", "distancia_lugar_m", "distancia_km");
         }
     }
 

@@ -32,23 +32,16 @@ public class EtaResource {
     }
 
     /**
-     * Criterios de ruta realmente disponibles: el motor debe estar configurado y responder.
-     * La comprobacion se cachea 5 s (OsrmClient.SALUD_VIGENCIA_MS), asi una caida se refleja en pocos segundos.
+     * Si se pueden calcular rutas: la base debe tener pgRouting, la red vial y la funcion de rutas.
+     * La comprobacion se cachea 5 s, asi un cambio se refleja en pocos segundos.
      */
     @GET
-    @Path("/criterios")
-    public Response criterios() {
+    @Path("/disponible")
+    public Response disponible() {
+        boolean ok = rutas.disponible();
         Map<String, Object> cuerpo = new LinkedHashMap<>();
-        Map<String, Object> motivos = new LinkedHashMap<>();
-        for (Criterio c : Criterio.values()) {
-            boolean configurado = rutas.disponible(c);
-            boolean ok = rutas.saludable(c);
-            cuerpo.put(c.codigo, ok);
-            if (!ok) {
-                motivos.put(c.codigo, configurado ? "El motor de rutas no responde" : "El motor no esta configurado o el grafo no esta disponible");
-            }
-        }
-        cuerpo.put("motivos", motivos);
+        cuerpo.put("disponible", ok);
+        cuerpo.put("motivo", ok ? null : "Falta pgRouting, la red vial o la funcion de rutas en la base (ver docs/RED_VIAL.md)");
         return Response.ok(cuerpo).build();
     }
 
@@ -56,17 +49,11 @@ public class EtaResource {
     @Path("/recursos/{recursoId}/incidentes/{incidenteId}")
     public Response estimar(
             @PathParam("recursoId") int recursoId,
-            @PathParam("incidenteId") int incidenteId,
-            @QueryParam("criterio") String criterioParam)
+            @PathParam("incidenteId") int incidenteId)
             throws SQLException {
 
-        Criterio criterio = Criterio.desde(criterioParam);
-        if (criterio == null) {
-            return error(400, "criterio tiene que ser mas_rapida o mas_corta");
-        }
-        if (!rutas.disponible(criterio)) {
-            return error(503, "El criterio " + criterio.codigo
-                    + " no esta disponible: compruebe el motor y el grafo vial configurados");
+        if (!rutas.disponible()) {
+            return error(503, "El calculo de rutas no esta disponible: falta pgRouting, la red vial o la funcion de rutas");
         }
 
         // Validar que ambos identificadores sean positivos
@@ -84,9 +71,9 @@ public class EtaResource {
             return error(404, "Recurso o incidente no encontrado");
         }
 
-        // 3. Consultar OSRM para calcular la ruta
+        // 3. Calcular la ruta por calles (pgRouting)
         try {
-            OsrmClient.Ruta ruta = rutas.consultar(extremos, criterio);
+            Ruta ruta = rutas.consultar(extremos);
 
             // 4. Construir la respuesta JSON
             Map<String, Object> respuesta = new LinkedHashMap<>();
@@ -97,10 +84,9 @@ public class EtaResource {
             respuesta.put("duracionSegundos", Math.round(ruta.duracionSegundos));
             respuesta.put("tiempoEstimadoMinutos", ruta.minutosRedondeados());
             respuesta.put("geometriaRuta", ruta.geometriaRuta);
-            respuesta.put("motor", rutas.nombreMotor(criterio));
+            respuesta.put("calles", ruta.calles);
+            respuesta.put("motor", rutas.nombreMotor());
             respuesta.put("aclaracion", "Estimacion sin trafico en tiempo real");
-            respuesta.put("criterioRuta", criterio.codigo);
-            respuesta.put("criterioRutaTexto", criterio.texto);
             respuesta.put("distanciaDirectaMetros", Math.round(extremos.distanciaDirectaM));
             respuesta.put("ajusteOrigenMetros", redondeado(ruta.ajusteOrigenMetros));
             respuesta.put("ajusteDestinoMetros", redondeado(ruta.ajusteDestinoMetros));
@@ -108,12 +94,12 @@ public class EtaResource {
 
             return Response.ok(respuesta).build();
 
-        } catch (OsrmClient.SinRutaException e) {
+        } catch (SinRutaException e) {
             return error(422, e.getMessage());
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return error(503, "Consulta OSRM interrumpida");
+            return error(503, "Calculo de ruta interrumpido");
 
         } catch (IOException e) {
             return error(503, "No se pudo consultar el motor de rutas");
