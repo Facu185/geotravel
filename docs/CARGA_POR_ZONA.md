@@ -163,7 +163,7 @@ El mapa público ya dibujaba todo con GeoServer (imágenes), así que escala. Lo
 
 Las consultas 4 y 5 aceptan una dirección y una esquina. Según la región (`REGION.ide` en `region.js`):
 
-| | Salto (`callesPropias: true`) | Resto del país (por ejemplo Montevideo) |
+| | Salto (`callesPropias: true`, con puertas propias) | Resto del país (por ejemplo Montevideo) |
 |---|---|---|
 | Calle y número | Tabla propia `acceso` (números de puerta de Salto) | Servicio de direcciones de la IDE (`?departamento=montevideo&localidad=montevideo`) |
 | Esquina | Cruce calculado con PostGIS sobre la red vial de OpenStreetMap **de todo el país** (con autocompletado de calles, sin internet): ver "Cruces de calles en todo el país" | Igual: la red es la misma en todo el país (la IDE queda de respaldo si las calles no se cruzan en la red) |

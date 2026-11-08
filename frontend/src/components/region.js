@@ -11,8 +11,8 @@
  *
  * Búsqueda de direcciones (consultas 4 y 5):
  *   ide: departamento y localidad que se mandan al servicio de direcciones de la IDE (cubre todo el país).
- *   callesPropias: true solo en Salto, que tiene calles y números de puerta en la base propia
- *     (cruce de calles y autocompletado, sin internet). En el resto la dirección y la esquina las resuelve la IDE.
+ *   callesPropias: true solo en Salto, que tiene números de puerta en la base propia (sin internet). En el resto la dirección
+ *     con número la resuelve la IDE. Los cruces de calles y el autocompletado son de todo el país (red vial de OpenStreetMap).
  *   ejemploDireccion: texto de ayuda del campo.
  */
 export const REGIONES = {

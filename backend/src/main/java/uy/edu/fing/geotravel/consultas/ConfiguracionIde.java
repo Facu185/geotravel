@@ -29,7 +29,7 @@ public final class ConfiguracionIde {
         );
     }
 
-    /** Las tablas propias de calles (via) y puertas (acceso) son de Salto: solo ahí se usan en vez de la IDE. */
+    /** La tabla propia de puertas (acceso) es de Salto: solo ahí se usa en vez de la IDE (las calles y los cruces ya son de todo el país). */
     public boolean usaPuertasLocales() {
         return "salto".equalsIgnoreCase(departamento)
                 && "salto".equalsIgnoreCase(localidad);

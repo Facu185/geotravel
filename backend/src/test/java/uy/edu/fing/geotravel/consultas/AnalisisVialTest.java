@@ -116,7 +116,7 @@ public class AnalisisVialTest {
         AtomicInteger llamadas = new AtomicInteger();
         AnalisisVial analisis = new AnalisisVial(new RutaService((a, b, c, d) -> {
             llamadas.incrementAndGet();
-            throw new IOException("OSRM respondio HTTP 503");
+            throw new IOException("El motor de rutas respondio HTTP 503");
         }));
         List<AnalisisVial.Candidato> lista = candidatos(4);
 

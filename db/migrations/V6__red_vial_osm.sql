@@ -12,6 +12,10 @@ ALTER TABLE public.red_vial_arco
     ADD COLUMN IF NOT EXISTS componente        bigint,
     ADD COLUMN IF NOT EXISTS componente_grande boolean NOT NULL DEFAULT false;
 
+-- V5 los describió como la red de Salto (y no se edita una migración ya aplicada): desde acá son de todo Uruguay.
+COMMENT ON TABLE public.red_vial_vertice IS 'Vértices (esquinas) de la red vial de OpenStreetMap de todo Uruguay para pgRouting (EPSG:32721)';
+COMMENT ON TABLE public.red_vial_arco IS 'Arcos (tramos de calle de esquina a esquina) de la red vial de OpenStreetMap de todo Uruguay, con sentido, velocidad y costo en metros y segundos';
+
 COMMENT ON COLUMN public.red_vial_arco.mano_unica IS 'true: solo se puede circular de source a target (reverse_cost negativo)';
 COMMENT ON COLUMN public.red_vial_arco.componente IS 'Red conectada a la que pertenece el arco (pgr_connectedComponents)';
 COMMENT ON COLUMN public.red_vial_arco.componente_grande IS 'La red conectada tiene 50 arcos o más: solo a ellas se ajustan los extremos de una ruta';
