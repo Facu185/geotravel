@@ -45,7 +45,7 @@ else
   echo "store $WS: creado"
 fi
 
-for tabla in zona_operativa recurso incidente via acceso red_vial_arco; do
+for tabla in zona_operativa recurso incidente via acceso red_vial_arco lugar_osm; do
   if existe "$G/workspaces/$WS/datastores/$WS/featuretypes/$tabla.json"; then
     echo "capa $tabla: ya existe"
   else
@@ -62,7 +62,7 @@ for tabla in via red_vial_arco; do
 done
 
 # estilo:capa -- cada capa usa por defecto el estilo que la colorea por su dato.
-for par in incidentes_estado:incidente recursos_tipo:recurso zonas_nivel_prioridad:zona_operativa vias_tipo:via accesos_puerta:acceso red_vial:red_vial_arco; do
+for par in incidentes_estado:incidente recursos_tipo:recurso zonas_nivel_prioridad:zona_operativa vias_tipo:via accesos_puerta:acceso red_vial:red_vial_arco lugares_referencia:lugar_osm; do
   estilo="${par%%:*}"
   capa="${par##*:}"
   existe "$G/workspaces/$WS/styles/$estilo.json" || \
@@ -71,5 +71,11 @@ for par in incidentes_estado:incidente recursos_tipo:recurso zonas_nivel_priorid
   curl -sf $A -X PUT -H "$JSON" -d "{\"layer\":{\"defaultStyle\":{\"name\":\"$estilo\",\"workspace\":\"$WS\"}}}" "$G/layers/$WS:$capa" > /dev/null
   echo "estilo $estilo: aplicado a $capa"
 done
+
+# Estilo extra de la red de rutas: las calles de referencia en gris, por jerarquía, que el mapa de gestión dibuja debajo de todo
+# (se pide con styles=calles_referencia; el estilo por defecto de red_vial_arco sigue siendo red_vial).
+existe "$G/workspaces/$WS/styles/calles_referencia.json" ||   curl -sf $A -X POST -H "$JSON" -d "{\"style\":{\"name\":\"calles_referencia\",\"filename\":\"calles_referencia.sld\"}}" "$G/workspaces/$WS/styles" > /dev/null
+curl -sf $A -X PUT -H "Content-Type: application/vnd.ogc.sld+xml" --data-binary "@/opt/geoserver/data_dir/styles/calles_referencia.sld" "$G/workspaces/$WS/styles/calles_referencia" > /dev/null
+echo "estilo calles_referencia: disponible para red_vial_arco"
 
 echo "geoserver-init: listo"

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import L from "leaflet";
-import { MapContainer, TileLayer, WMSTileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, Pane, TileLayer, WMSTileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
 import { REGION, REGIONES } from "./region.js";
 
 export const GEOSERVER_WMS_URL =
@@ -27,6 +27,17 @@ const MAPAS_BASE = {
     maxNativeZoom: 16,
     maxZoom: 19,
   },
+};
+
+/**
+ * Fondo de referencia para guiarse: las calles de GeoServer por jerarquía (a lo lejos solo las rutas y avenidas principales; al
+ * acercarse, las secundarias y las de barrio, con sus nombres) y los nombres de ciudades, pueblos y barrios (hasta el zoom 14,
+ * cuando toman la posta los nombres de las calles). Salen de la red de rutas (red_vial_arco, estilo calles_referencia) y de
+ * lugar_osm (estilo lugares_referencia); ver geoserver/styles. Es una sola imagen por tesela, en un panel propio por encima de las zonas y por debajo de los marcadores.
+ */
+const REFERENCIA = {
+  todo: { layers: "geotravel:red_vial_arco,geotravel:lugar_osm", styles: "calles_referencia,lugares_referencia" },
+  barrios: { layers: "geotravel:lugar_osm", styles: "lugares_referencia" },
 };
 
 /**
@@ -88,6 +99,8 @@ function IndicadorZoom({ zoomMinimo }) {
  *   bounds        [[lat, lng], [lat, lng]]: encuadra el mapa a ese rectángulo en vez de center/zoom
  *   boundsOptions opciones de Leaflet para bounds (p. ej. paddingTopLeft)
  *   wmsExtra      parámetros extra para el pedido WMS; cambiarlos fuerza a recargar las capas
+ *   referencia    "todo" (default): calles por jerarquía y nombres de barrios de fondo; "barrios": solo los nombres de
+ *                 barrios (el mapa público tiene sus propias calles, que se prenden y apagan); false: nada
  *   irARegion     true: botones para llevar el mapa a cada región de region.js (Salto, Montevideo...)
  *   mostrarZoom   true: muestra el nivel de zoom actual en una esquina (útil donde algo depende del zoom)
  *   zoomMinimo    con mostrarZoom, el zoom desde el que se ven los objetos, para mostrarlo junto al actual
@@ -102,6 +115,7 @@ export default function MapView({
   bounds,
   boundsOptions,
   wmsExtra,
+  referencia = "todo",
   irARegion = false,
   mostrarZoom = false,
   zoomMinimo,
@@ -124,6 +138,26 @@ export default function MapView({
         maxNativeZoom={mapaBase.maxNativeZoom}
         maxZoom={mapaBase.maxZoom}
       />
+      {/* Un panel propio entre las formas (400) y los marcadores (600): así las calles y los nombres se ven también encima de las
+          zonas pintadas, y los íconos quedan arriba. Las teselas no reciben clics: no estorban. */}
+      {REFERENCIA[referencia] && (
+        <Pane name="referencia" style={{ zIndex: 450 }}>
+          <WMSTileLayer
+            key={`referencia|${referencia}`}
+            url={GEOSERVER_WMS_URL}
+            layers={REFERENCIA[referencia].layers}
+            styles={REFERENCIA[referencia].styles}
+            format="image/png"
+            transparent
+            buffer={32}
+            opacity={0.9}
+            pane="referencia"
+            // Teselas de 512 px (una por cada cuatro de 256): la mitad de pedidos por lado y menos nombres cortados en el borde.
+            tileSize={512}
+            zoomOffset={-1}
+          />
+        </Pane>
+      )}
       {zoomPosition && <ZoomControl position={zoomPosition} />}
       {irARegion && <IrARegion />}
       {mostrarZoom && <IndicadorZoom zoomMinimo={zoomMinimo} />}

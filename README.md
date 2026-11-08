@@ -102,7 +102,9 @@ que hayas puesto en `.env`). `geoserver-init` hace por la API REST lo que se har
 
 1. Workspace `geotravel` (nombre heredado del repo; es solo un identificador).
 2. Store PostGIS `geotravel` apuntando a la base (host `db`, puerto `5432`).
-3. Capas: `zona_operativa`, `recurso`, `incidente`, `via` (calles), `acceso` (números de puerta) y `red_vial_arco` (la red de rutas, con las manos únicas).
+3. Capas: `zona_operativa`, `recurso`, `incidente`, `via` (calles), `acceso` (números de puerta), `red_vial_arco` (la red de rutas, con las manos únicas) y `lugar_osm` (nombres de ciudades, pueblos y barrios).
+
+**Calles y barrios de referencia.** Las pantallas de Zonas, Recursos, Incidentes, Consultas y Tiempo de llegada dibujan de fondo, en gris, las calles de `red_vial_arco` por jerarquía (estilo `calles_referencia`: a lo lejos solo las rutas y avenidas principales; al acercar, las secundarias, las de barrio y las de servicio, con su nombre desde el zoom 14 al 15) y los nombres de ciudades, pueblos y barrios de `lugar_osm` (estilo `lugares_referencia`; los de barrio se ven del zoom 12 al 14, y más cerca toman la posta los de las calles). Es el prop `referencia` de `MapView`; el mapa público solo trae los barrios, porque ahí las calles se prenden y apagan a mano.
 4. Estilos de `geoserver/styles/`, uno por capa: `zonas_nivel_prioridad`, `recursos_tipo`,
    `incidentes_estado`, `vias_tipo`, `accesos_puerta` y `red_vial`.
 
