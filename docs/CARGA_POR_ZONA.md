@@ -154,8 +154,8 @@ El mapa público ya dibujaba todo con GeoServer (imágenes), así que escala. Lo
   `resultType=hits` usando el índice espacial, sin descargar objetos. Los filtros de incidentes y recursos se combinan
   con ese rectángulo.
 - **Detalle al tocar:** `GetFeatureInfo` trae como máximo 10 objetos.
-- **Región:** el mapa abre centrado en Salto (`region.js`). El seed trae datos en el departamento de Salto (10 zonas, 36
-  recursos y 44 incidentes, en la ciudad y en el interior) y también en Montevideo (7 zonas, 12 recursos y 25 incidentes),
+- **Región:** el mapa abre centrado en Salto (`region.js`). El seed trae datos reales en el departamento de Salto (18 zonas, 30
+  recursos y 44 incidentes, en la ciudad y en el interior) y también en Montevideo (33 zonas, 225 recursos y 25 incidentes),
   para comprobar que el sistema atiende todo el país: al mover el mapa a otra región (botones "Ir a") los conteos y las
   capas cambian.
 

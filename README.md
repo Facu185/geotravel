@@ -122,22 +122,32 @@ Son capas de consulta, no se editan desde la aplicación:
   (`Av.` = AVENIDA, `Gral` = GENERAL, `Dr` = DOCTOR). El archivo ya viene en el repo y no hace falta tocarlo;
   para cambiarlo, `docker compose down -v` y volver a levantar.
 
-**Datos de prueba de Salto.** Son pocos y están repartidos como en la realidad (`db/seed/seed.sql`): 10 zonas operativas
-(5 en la ciudad, dos de ellas superpuestas con otras, y 5 en el interior), 36 recursos y 44 incidentes en todo el
-departamento. La ciudad concentra la mayoría y el resto está en las localidades del interior (Daymán, Constitución, Belén,
-Termas del Arapey, Pueblo Lavalleja...). El botón "Depto. de Salto" del mapa muestra todo el departamento.
+**Datos de prueba.** Las zonas y los recursos son **reales** (`db/seed/datos_reales.sql`, que carga `db/seed/seed.sql`); los
+incidentes, en cambio, son inventados y van sobre las calles de cada ciudad (el departamento de Salto tiene 18 zonas, 30
+recursos y 44 incidentes; Montevideo, 33 zonas, 225 recursos y 25 incidentes). El botón "Depto. de Salto" del mapa muestra
+todo el departamento.
 
-- **Recursos:** en la ciudad, 12 están en sedes reales (hospital y centros de salud, estación de bomberos, jefatura y
-  seccional de policía, base de ambulancias y Policía Caminera) y 6 móviles recorren las calles a 500 m o más entre sí; en el
-  interior hay 9 sedes reales (policlínicas y seccionales policiales) y 4 unidades en las localidades más grandes. Las
-  ubicaciones y los nombres de las localidades son de OpenStreetMap (ODbL).
+- **Zonas (ninguna es un rectángulo):** las **seccionales policiales** con sus límites oficiales (Ministerio del Interior /
+  UNASEV: 16 en Salto y 25 en Montevideo), que no se superponen; y encima, superpuestas, los 8 municipios de Montevideo (Intendencia
+  de Montevideo) y las localidades de Salto y Termas del Daymán (OpenStreetMap). La prioridad de cada seccional sale de su
+  densidad de población (1 = la más densa), con los habitantes que informa UNASEV. Los polígonos están simplificados (25 m en
+  Montevideo y 60 m en Salto) para que el archivo sea liviano.
+- **Recursos reales:** en Montevideo, los servicios de salud de la lista de la Intendencia (hospitales, centros de salud y
+  policlínicas) más las mutualistas, sanatorios y clínicas de OpenStreetMap (CASMU, Asociación Española, Médica Uruguaya, SMI,
+  Círculo Católico, COSEM, SEMM, UCM, Universal, Casa de Galicia...), 4 destacamentos de bomberos, 34 seccionales y comisarías
+  y 5 bases de emergencia móvil (SAME y SUAT). En Salto, el Hospital Departamental, el Centro de Asistencia Médica (CAMS) y
+  otros dos centros médicos, 6 policlínicas del interior, la estación de bomberos, la Jefatura, la Policía Caminera, 6
+  seccionales y subcomisarías, y dos ambulancias. Todos en sus coordenadas reales. **OpenStreetMap trae pocos servicios de
+  Salto y de bomberos de Montevideo** (no hay una lista oficial abierta): si falta alguno, se agrega en `datos_reales.sql`.
+- **Móviles simulados:** 6 unidades en recorrida por la ciudad de Salto (a 500 m o más de otro recurso) y 3 ambulancias en
+  Belén, Constitución y Termas del Daymán, para que el interior tenga recursos cerca. Son inventadas y están marcadas como tales.
 - **Incidentes:** los de la ciudad (18 puntuales, 4 calles cortadas y 3 áreas inundadas) van sobre calles reales; los del
   interior (uno en cada una de 12 localidades y dos áreas inundadas) van sobre la calle de OpenStreetMap más cercana al centro de cada pueblo.
-- **Sobre una calle y del lado de Salto:** en la ciudad, recursos e incidentes quedan sobre una calle de la tabla `via`, y solo
+- **Sobre una calle y del lado de Salto:** en la ciudad, los incidentes y las unidades móviles quedan sobre una calle de la tabla `via`, y solo
   de la red de Salto (la tabla también trae Concordia, Argentina, del otro lado del río), así que se puede calcular un camino
   hasta ellos. Los del interior también van sobre una calle (a menos de 100 m): un punto a más de 500 m de una calle no tiene ruta.
   Con esto, las rutas entre cada incidente del seed y sus recursos más cercanos dan camino en todos los casos probados (138 de 138).
-- **Montevideo:** 7 zonas, 12 recursos y 25 incidentes, para comprobar que el sistema atiende todo el país.
+- **Montevideo:** los 25 incidentes (20 puntuales, 3 calles cortadas y 2 áreas inundadas) van sobre calles reales de la red de la ciudad.
 
 La carga masiva (`db/pruebas/carga-masiva.sql`) reparte sus 3.000 recursos sobre las calles de la ciudad.
 

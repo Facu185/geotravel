@@ -165,12 +165,15 @@ de 3000"). Se probó con una carga masiva de 700 zonas y 3000 recursos en Salto 
 se acepta, que se rechazan los polígonos inválidos, la prioridad fuera de rango y los tipos de recurso no permitidos, y que lo
 creado aparece en el listado de su rectángulo y no en uno lejano.
 
-**Datos de prueba realistas.** Los datos de prueba son pocos y están repartidos como en la realidad, no sorteados en un
-rectángulo: en todo el departamento de Salto hay 10 zonas, 36 recursos y 44 incidentes, con la mayoría en la ciudad y el resto
-en las localidades del interior (Daymán, Constitución, Belén, Termas del Arapey, Pueblo Lavalleja...). Las sedes de
-emergencia (hospital y centros de salud, bomberos, policía, policlínicas del interior) están en sus coordenadas reales de
-OpenStreetMap, y los móviles y los incidentes de la ciudad van sobre las calles, más donde hay más calles, siempre del lado
-de Salto (la tabla de calles también trae Concordia, del otro lado del río). Esto no es solo estético: un recurso o un
+**Datos de prueba realistas.** Las zonas y los recursos de los datos de prueba son reales, no figuras sorteadas en un
+rectángulo. Las **zonas** son las seccionales policiales con sus límites oficiales (16 en Salto y 25 en Montevideo; fuente:
+Ministerio del Interior y UNASEV), con la prioridad calculada a partir de la densidad de población de cada una, y encima,
+superpuestos, los 8 municipios de Montevideo (Intendencia de Montevideo) y las localidades de Salto y Termas del Daymán
+(OpenStreetMap). Los **recursos** son 21 en Salto y 225 en Montevideo: hospitales, mutualistas, policlínicas, destacamentos de
+bomberos, comisarías y bases de emergencia móvil, en sus coordenadas reales (lista de servicios de salud de la Intendencia de
+Montevideo y OpenStreetMap). OpenStreetMap trae pocos servicios de Salto, así que el resto de los recursos de ahí (unidades
+móviles en recorrida y ambulancias del interior) son simulados y están marcados como tales. Los incidentes de la ciudad van
+sobre las calles, más donde hay más calles, siempre del lado de Salto (la tabla de calles también trae Concordia, del otro lado del río). Esto no es solo estético: un recurso o un
 incidente en el río no tiene camino, y el cálculo de rutas (distancia y tiempo de llegada) necesita que ambos extremos
 estén en la red vial.
 
@@ -387,3 +390,5 @@ el tiempo de llegada, actualizar la red vial de forma periódica y reemplazar el
 8. Infraestructura de Datos Espaciales de Uruguay (IDE). *Servicio de direcciones*. https://direcciones.ide.uy
 9. Leaflet. *An open-source JavaScript library for interactive maps*. https://leafletjs.com
 10. Flyway. *Database migrations*. https://flywaydb.org
+11. Intendencia de Montevideo. *Servicios web geográficos (WFS)*: servicios de salud, comunales (CCZ) y municipios. https://geoserver.montevideo.gub.uy/geoserver/ows
+12. Presidencia de la República / UNASEV. *Secciones policiales* (capa de la Infraestructura de Datos Espaciales de Uruguay).
