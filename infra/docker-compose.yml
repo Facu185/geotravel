@@ -3,8 +3,8 @@ name: geotravel
 services:
   db:
     build:
-      context: ../
-      dockerfile: infra/Dockerfile.db
+      context: .
+      dockerfile: Dockerfile.db
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-geotravel}
       POSTGRES_USER: ${POSTGRES_USER:-geotravel}
@@ -56,6 +56,23 @@ services:
       - ../db/sql:/sql:ro
     entrypoint: ["/bin/sh", "/init/seed.sh"]
 
+  # Arma la red vial de pgRouting de todo Uruguay desde OpenStreetMap (ver red-vial/cargar.sh): con sentidos,
+  # velocidades y nombres de calle. Baja el extracto de Geofabrik (unos 56 MB) la primera vez y tarda un par de minutos.
+  # Despues de la primera vez no hace nada. Para rehacerla: docker compose run --rm -e RED_VIAL_REGENERAR=1 red-vial
+  red-vial:
+    build: ./red-vial
+    depends_on:
+      flyway:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-geotravel}
+      POSTGRES_USER: ${POSTGRES_USER:-geotravel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      RED_VIAL_REGENERAR: ${RED_VIAL_REGENERAR:-}
+    volumes:
+      - ./red-vial/data:/data
+      - ../db/sql:/sql:ro
+
   # Configura GeoServer por REST: workspace, store PostGIS, capas y estilos SLD
   # (ver init/geoserver-init.sh). Es repetible: lo que ya existe se deja como está.
   geoserver-init:
@@ -66,6 +83,8 @@ services:
         condition: service_started
       seed:
         condition: service_completed_successfully
+      red-vial:
+        condition: service_completed_successfully   # la capa red_vial_arco necesita la red ya cargada para calcular su extension
     environment:
       GEOSERVER_ADMIN_USER: ${GEOSERVER_ADMIN_USER:-admin}
       GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD:-geoserver}
@@ -107,11 +126,7 @@ services:
       DB_NAME: ${POSTGRES_DB:-geotravel}
       DB_USER: ${POSTGRES_USER:-geotravel}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
-      RUTAS_MOTOR: ${RUTAS_MOTOR:-osrm}
-      OSRM_URL: ${OSRM_URL:-https://router.project-osrm.org}
-      # Sin valor: el criterio "mas corta" queda desactivado (responde 503). Ver docs/RECURSOS_CERCANOS_RUTAS.md
-      OSRM_FAST_URL: ${OSRM_FAST_URL:-}
-      OSRM_SHORTEST_URL: ${OSRM_SHORTEST_URL:-}
+      DB_STATEMENT_TIMEOUT_MS: ${DB_STATEMENT_TIMEOUT_MS:-15000}
       IDE_DEPARTAMENTO: ${IDE_DEPARTAMENTO:-salto}
       IDE_LOCALIDAD: ${IDE_LOCALIDAD:-salto}
       FOTOS_DIR: /data/fotos
@@ -122,28 +137,6 @@ services:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
       - fotos_data:/data/fotos   # fotos subidas: sobreviven a los redespliegues del .war
-
-  # OSRM propio (opcional, profile "osrm"): dos servicios con datos procesados con perfiles distintos.
-  # Preparar antes los datos con infra/osrm/preparar.ps1 (o .sh) y definir en .env:
-  #   OSRM_FAST_URL=http://osrm-fast:5000   OSRM_SHORTEST_URL=http://osrm-shortest:5000
-  # Levantar con: docker compose --profile osrm up -d --build
-  osrm-fast:
-    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
-    profiles: ["osrm"]
-    command: osrm-routed --algorithm mld /data/mapa.osrm
-    volumes:
-      - ./osrm/data/fast:/data:ro
-    ports:
-      - "${OSRM_FAST_PORT:-5001}:5000"
-
-  osrm-shortest:
-    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
-    profiles: ["osrm"]
-    command: osrm-routed --algorithm mld /data/mapa.osrm
-    volumes:
-      - ./osrm/data/shortest:/data:ro
-    ports:
-      - "${OSRM_SHORTEST_PORT:-5002}:5000"
 
   geoserver:
     image: kartoza/geoserver:2.25.2

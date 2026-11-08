@@ -1,110 +1,190 @@
--- P2: funciones de rutas en PostgreSQL/pgRouting.
--- NO es migracion Flyway: requiere que P1 haya instalado la extension y construido
--- el grafo vial. Ver docs/P2_PGROUTING.md antes de aplicar.
--- Tablas exigidas: red_vial_arco y red_vial_vertice (EPSG:32721).
+-- p2_calcular_ruta: la ruta por calles entre dos puntos, calculada en PostgreSQL con pgRouting sobre la red vial
+-- de OpenStreetMap de todo Uruguay (tablas red_vial_arco y red_vial_vertice, ver db/sql/red_vial_generar.sql).
+-- NO es una migración de Flyway: la aplica infra/init/seed.sh en cada arranque (es repetible).
+--
+-- Cómo calcula:
+--   1. AJUSTE A LA CALLE. Cada extremo se engancha al punto de la calle más cercana (la proyección sobre el arco, no a
+--      la esquina más próxima): se corta virtualmente ese arco en dos y el punto pasa a ser un vértice. La ruta sale y
+--      llega exactamente a ese punto, y hay un tramo recto corto (el "conector") entre el recurso o el incidente y la
+--      calle, que cuenta en la distancia y el tiempo. Si un extremo queda a más de 500 m de cualquier calle, no hay ruta.
+--   2. SENTIDOS. Los arcos de mano única tienen costo negativo en el sentido prohibido (convención de pgRouting) y
+--      Dijkstra se calcula dirigido.
+--   3. UN SOLO CAMINO: el de menor duración (costo cost_s: largo / velocidad de cada calle + demora por esquina). La
+--      distancia informada es la suma de los largos de ese camino.
+--   4. ESCALA. Para no armar el grafo de todo el país en cada pedido, se usan solo los arcos dentro de una caja alrededor de
+--      los dos puntos (con índice espacial), que se agranda si no aparece camino.
+--   5. LAS CALLES DEL RECORRIDO: se devuelve, en orden, el nombre de cada calle por la que pasa la ruta y cuántos metros.
+-- Limitaciones: no se modelan giros prohibidos ni semáforos (solo una demora fija por esquina) ni el tránsito en vivo.
+
+DROP FUNCTION IF EXISTS public.p2_calcular_ruta(double precision, double precision, double precision, double precision, text);
+DROP FUNCTION IF EXISTS public.p2_calcular_ruta(double precision, double precision, double precision, double precision);
 
 CREATE OR REPLACE FUNCTION public.p2_calcular_ruta(
     p_origen_lon double precision,
     p_origen_lat double precision,
     p_destino_lon double precision,
-    p_destino_lat double precision,
-    p_criterio text DEFAULT 'mas_rapida'
+    p_destino_lat double precision
 )
 RETURNS TABLE (
     distancia_m double precision,
     duracion_s double precision,
     geometria_geojson text,
     ajuste_origen_m double precision,
-    ajuste_destino_m double precision
+    ajuste_destino_m double precision,
+    calles_json text
 )
 LANGUAGE plpgsql STABLE
 AS $$
 DECLARE
-    v_origen geometry(Point,32721);
-    v_destino geometry(Point,32721);
-    v_inicio bigint;
-    v_fin bigint;
-    v_inicio_geom geometry(Point,32721);
-    v_fin_geom geometry(Point,32721);
-    v_ajuste_inicio double precision;
-    v_ajuste_fin double precision;
-    v_cost text;
-    v_reverse text;
-    v_edges_sql text;
+    c_ajuste_max   CONSTANT double precision := 500;        -- metros hasta la calle más cercana
+    c_conector_m_s CONSTANT double precision := 20 / 3.6;   -- velocidad en el conector (m/s)
+    v_o geometry;
+    v_d geometry;
+    a_o record;
+    a_d record;
+    v_f_o double precision;
+    v_f_d double precision;
+    v_q_o geometry;
+    v_q_d geometry;
+    v_aj_o double precision;
+    v_aj_d double precision;
+    v_directa double precision;
+    v_margenes double precision[];
+    v_margen double precision;
+    v_caja text;
+    v_ext text;
+    v_dist double precision;
+    v_dur double precision;
+    v_geoms geometry[];
+    v_calles jsonb;
+    v_partes geometry[];
+    v_linea geometry;
 BEGIN
-    IF p_criterio IS NULL OR p_criterio NOT IN ('mas_rapida', 'mas_corta') THEN
-        RAISE EXCEPTION 'criterio invalido: %', p_criterio USING ERRCODE = '22023';
-    END IF;
-    IF p_origen_lon IS NULL OR p_origen_lat IS NULL
-       OR p_destino_lon IS NULL OR p_destino_lat IS NULL
-       OR NOT (p_origen_lon BETWEEN -180 AND 180)
-       OR NOT (p_destino_lon BETWEEN -180 AND 180)
-       OR NOT (p_origen_lat BETWEEN -90 AND 90)
-       OR NOT (p_destino_lat BETWEEN -90 AND 90) THEN
+    IF p_origen_lon IS NULL OR p_origen_lat IS NULL OR p_destino_lon IS NULL OR p_destino_lat IS NULL
+       OR NOT (p_origen_lon BETWEEN -180 AND 180) OR NOT (p_destino_lon BETWEEN -180 AND 180)
+       OR NOT (p_origen_lat BETWEEN -90 AND 90) OR NOT (p_destino_lat BETWEEN -90 AND 90) THEN
         RAISE EXCEPTION 'coordenadas invalidas' USING ERRCODE = '22023';
     END IF;
 
-    v_origen := ST_Transform(ST_SetSRID(ST_MakePoint(p_origen_lon, p_origen_lat), 4326), 32721);
-    v_destino := ST_Transform(ST_SetSRID(ST_MakePoint(p_destino_lon, p_destino_lat), 4326), 32721);
+    v_o := ST_Transform(ST_SetSRID(ST_MakePoint(p_origen_lon, p_origen_lat), 4326), 32721);
+    v_d := ST_Transform(ST_SetSRID(ST_MakePoint(p_destino_lon, p_destino_lat), 4326), 32721);
 
-    -- Ajuste al nodo mas proximo de la red. No supone que todo punto esta sobre calle.
-    SELECT v.id, v.geom, ST_Distance(v.geom, v_origen)
-      INTO v_inicio, v_inicio_geom, v_ajuste_inicio
-      FROM public.red_vial_vertice v
-      ORDER BY v.geom <-> v_origen, v.id LIMIT 1;
-    SELECT v.id, v.geom, ST_Distance(v.geom, v_destino)
-      INTO v_fin, v_fin_geom, v_ajuste_fin
-      FROM public.red_vial_vertice v
-      ORDER BY v.geom <-> v_destino, v.id LIMIT 1;
+    -- 1. Ajuste de cada extremo a la calle más cercana (solo redes conectadas grandes: no a una calle aislada).
+    SELECT a.id, a.geom INTO a_o FROM public.red_vial_arco a WHERE a.componente_grande ORDER BY a.geom <-> v_o LIMIT 1;
+    IF NOT FOUND THEN RETURN; END IF;
+    SELECT a.id, a.geom INTO a_d FROM public.red_vial_arco a WHERE a.componente_grande ORDER BY a.geom <-> v_d LIMIT 1;
+    IF NOT FOUND THEN RETURN; END IF;
 
-    IF v_inicio IS NULL OR v_fin IS NULL
-       OR v_ajuste_inicio > 250 OR v_ajuste_fin > 250 THEN
-        RETURN; -- Fuera de cobertura de la red, o nodos inexistentes.
+    v_f_o := LEAST(0.9995, GREATEST(0.0005, ST_LineLocatePoint(a_o.geom, v_o)));
+    v_f_d := LEAST(0.9995, GREATEST(0.0005, ST_LineLocatePoint(a_d.geom, v_d)));
+    v_q_o := ST_LineInterpolatePoint(a_o.geom, v_f_o);
+    v_q_d := ST_LineInterpolatePoint(a_d.geom, v_f_d);
+    v_aj_o := ST_Distance(v_q_o, v_o);
+    v_aj_d := ST_Distance(v_q_d, v_d);
+    IF v_aj_o > c_ajuste_max OR v_aj_d > c_ajuste_max THEN
+        RETURN; -- fuera de la red vial
     END IF;
+    v_directa := ST_Distance(v_q_o, v_q_d);
 
-    IF v_inicio = v_fin THEN
-        RETURN QUERY SELECT 0.0::double precision, 0.0::double precision,
-            ST_AsGeoJSON(ST_MakeLine(ST_Transform(v_inicio_geom,4326),
-                                     ST_Transform(v_fin_geom,4326)), 6),
-            v_ajuste_inicio, v_ajuste_fin;
+    -- Los dos extremos en el mismo lugar de la calle: solo los conectores.
+    IF v_directa < 1 THEN
+        v_partes := ARRAY[]::geometry[];
+        IF v_aj_o > 0.5 THEN v_partes := v_partes || ST_MakeLine(v_o, v_q_o); END IF;
+        IF v_aj_d > 0.5 THEN v_partes := v_partes || ST_MakeLine(v_q_d, v_d); END IF;
+        v_linea := CASE WHEN cardinality(v_partes) > 0 THEN ST_MakeLine(v_partes)
+                        ELSE ST_MakeLine(v_o, v_d) END;
+        RETURN QUERY SELECT v_aj_o + v_aj_d + v_directa,
+                            (v_aj_o + v_aj_d + v_directa) / c_conector_m_s,
+                            ST_AsGeoJSON(ST_Transform(ST_SetSRID(v_linea, 32721), 4326), 6),
+                            v_aj_o, v_aj_d, '[]'::text;
         RETURN;
     END IF;
 
-    IF p_criterio = 'mas_corta' THEN
-        v_cost := 'cost_m';
-        v_reverse := 'reverse_cost_m';
-    ELSE
-        v_cost := 'cost_s';
-        v_reverse := 'reverse_cost_s';
+    -- 4. Cajas cada vez más grandes alrededor de los dos puntos; la última, sin límite.
+    v_margenes := ARRAY[3000 + 0.5 * v_directa, 20000 + 3 * v_directa, NULL];
+
+    FOREACH v_margen IN ARRAY v_margenes LOOP
+        v_caja := CASE WHEN v_margen IS NULL THEN 'true'
+                       ELSE format('a.geom && %L::geometry',
+                                   ST_Expand(ST_Envelope(ST_Collect(v_q_o, v_q_d)), v_margen)::text) END;
+
+        -- Los arcos de la caja, más los dos arcos ajustados cortados en el punto (vértices virtuales -1 y -2).
+        v_ext := format($ext$
+            WITH cortes(arco, pid, f) AS (
+                VALUES (%1$s::bigint, -1::bigint, %2$s::float8), (%3$s::bigint, -2::bigint, %4$s::float8)
+            ),
+            usados AS (SELECT DISTINCT arco FROM cortes),
+            nodos AS (
+                SELECT a.id AS arco, a.source AS nodo, 0.0::float8 AS f FROM public.red_vial_arco a JOIN usados u ON u.arco = a.id
+                UNION ALL SELECT arco, pid, f FROM cortes
+                UNION ALL SELECT a.id, a.target, 1.0::float8 FROM public.red_vial_arco a JOIN usados u ON u.arco = a.id
+            ),
+            tramos AS (
+                SELECT arco, nodo AS source, lead(nodo) OVER w AS target, f AS f1, lead(f) OVER w AS f2
+                FROM nodos WINDOW w AS (PARTITION BY arco ORDER BY f, nodo DESC)
+            ),
+            piezas AS (
+                SELECT (-(100 + row_number() OVER (ORDER BY t.arco, t.f1)))::bigint AS id, t.source, t.target,
+                       ST_LineSubstring(a.geom, t.f1, t.f2) AS geom, a.nombre,
+                       CASE WHEN a.cost_s < 0 THEN -1 ELSE a.cost_s * (t.f2 - t.f1) END AS cost,
+                       CASE WHEN a.reverse_cost_s < 0 THEN -1 ELSE a.reverse_cost_s * (t.f2 - t.f1) END AS reverse_cost
+                FROM tramos t JOIN public.red_vial_arco a ON a.id = t.arco
+                WHERE t.target IS NOT NULL AND t.f2 > t.f1
+            )
+            SELECT a.id, a.source, a.target, a.geom, a.nombre, a.cost_s AS cost, a.reverse_cost_s AS reverse_cost
+            FROM public.red_vial_arco a
+            WHERE %5$s AND a.id NOT IN (SELECT arco FROM usados)
+            UNION ALL
+            SELECT id, source, target, geom, nombre, cost, reverse_cost FROM piezas
+        $ext$, a_o.id, v_f_o, a_d.id, v_f_d, v_caja);
+
+        -- 2 y 3. Dijkstra dirigido, de un vértice virtual al otro.
+        EXECUTE format($q$
+            WITH camino AS (
+                SELECT p.path_seq, p.node, p.edge
+                FROM pgr_dijkstra(%L, -1::bigint, -2::bigint, true) p
+                WHERE p.edge <> -1
+            ),
+            ext AS (%s),
+            tramos AS (
+                SELECT c.path_seq, e.nombre,
+                       CASE WHEN c.node = e.source THEN e.geom ELSE ST_Reverse(e.geom) END AS geom,
+                       CASE WHEN c.node = e.source THEN e.cost ELSE e.reverse_cost END AS seg
+                FROM camino c JOIN ext e ON e.id = c.edge
+            ),
+            grupos AS (
+                SELECT path_seq, nombre, ST_Length(geom) AS metros,
+                       sum(CASE WHEN nombre IS DISTINCT FROM previo THEN 1 ELSE 0 END) OVER (ORDER BY path_seq) AS g
+                FROM (SELECT *, lag(nombre) OVER (ORDER BY path_seq) AS previo FROM tramos) t
+            ),
+            calles AS (
+                SELECT g, min(path_seq) AS orden, max(nombre) AS nombre, sum(metros) AS metros FROM grupos GROUP BY g
+            )
+            SELECT (SELECT sum(ST_Length(geom)) FROM tramos),
+                   (SELECT sum(seg) FROM tramos),
+                   (SELECT array_agg(geom ORDER BY path_seq) FROM tramos),
+                   (SELECT jsonb_agg(jsonb_build_object('calle', COALESCE(nombre, '(sin nombre)'), 'metros', round(metros))
+                                     ORDER BY orden) FROM calles)
+        $q$, format('SELECT id, source, target, cost, reverse_cost FROM (%s) q', v_ext), v_ext)
+        INTO v_dist, v_dur, v_geoms, v_calles;
+
+        EXIT WHEN v_geoms IS NOT NULL;
+    END LOOP;
+
+    IF v_geoms IS NULL THEN
+        RETURN; -- no hay camino (por ejemplo, un extremo en una red aislada de la otra)
     END IF;
 
-    -- Columnas de costo escogidas entre identificadores constantes, no entrada SQL libre.
-    v_edges_sql := format(
-        'SELECT id, source, target, %I AS cost, %I AS reverse_cost FROM public.red_vial_arco',
-        v_cost, v_reverse);
+    -- La línea completa: conector de salida + calles + conector de llegada (así toca los dos marcadores).
+    v_partes := ARRAY[]::geometry[];
+    IF v_aj_o > 0.5 THEN v_partes := v_partes || ST_MakeLine(v_o, v_q_o); END IF;
+    v_partes := v_partes || v_geoms;
+    IF v_aj_d > 0.5 THEN v_partes := v_partes || ST_MakeLine(v_q_d, v_d); END IF;
+    v_linea := ST_MakeLine(v_partes);
 
-    RETURN QUERY
-    WITH camino AS (
-        SELECT p.path_seq, p.node, p.edge
-        FROM pgr_dijkstra(v_edges_sql, v_inicio, v_fin, directed := true) p
-        WHERE p.edge <> -1
-    ), tramos AS (
-        SELECT p.path_seq,
-               ST_Transform(CASE WHEN p.node = a.source THEN a.geom
-                                 ELSE ST_Reverse(a.geom) END, 4326) AS geom,
-               ST_Length(a.geom) AS longitud,
-               CASE WHEN p.node = a.source THEN a.cost_s
-                    ELSE a.reverse_cost_s END AS segundos
-        FROM camino p JOIN public.red_vial_arco a ON a.id = p.edge
-    ), resumen AS (
-        SELECT SUM(t.longitud)::double precision AS metros,
-               SUM(t.segundos)::double precision AS segundos,
-               ST_MakeLine(ARRAY_AGG(t.geom ORDER BY t.path_seq)) AS linea
-        FROM tramos t
-    )
-    SELECT r.metros, r.segundos, ST_AsGeoJSON(r.linea, 6),
-           v_ajuste_inicio, v_ajuste_fin
-    FROM resumen r
-    WHERE r.linea IS NOT NULL AND r.segundos >= 0;
+    RETURN QUERY SELECT v_dist + v_aj_o + v_aj_d,
+                        v_dur + (v_aj_o + v_aj_d) / c_conector_m_s,
+                        ST_AsGeoJSON(ST_Transform(ST_SetSRID(v_linea, 32721), 4326), 6),
+                        v_aj_o, v_aj_d, COALESCE(v_calles, '[]'::jsonb)::text;
 END;
 $$;

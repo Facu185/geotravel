@@ -5,7 +5,8 @@
  * Si se cambia un color allá, hay que cambiarlo acá para que la leyenda no mienta.
  *
  * Incidentes y recursos se dibujan con íconos (ver docs/ICONOS.md): en la leyenda, un ítem con `tipoIncidente` o `recurso`
- * muestra el ícono de ese tipo, uno con `color`, un punto del color del estado, y uno con `grupo`, el círculo con número en
+ * muestra el ícono de ese tipo, uno con `color`, un punto del color del estado, uno con `flecha`, la flecha de una calle de
+ * mano única, y uno con `grupo`, el círculo con número en
  * que se agrupan los objetos cercanos con el mapa alejado (ver CapaAgrupada.jsx y geoserver/agrupamiento_sld.py).
  *
  * El orden importa: la primera capa queda abajo y la última arriba en el mapa
@@ -17,13 +18,28 @@ export const CAPAS = [
     id: "calles",
     capa: "geotravel:via",
     nombre: "Calles",
-    descripcion: "Red vial de Salto, como referencia",
+    descripcion: "Las calles con nombre de todo el país, como referencia",
     forma: "linea",
     activaPorDefecto: false,
     leyenda: [
       { color: "#5f6f7e", etiqueta: "Avenida, bulevar, rambla" },
       { color: "#98a5b1", etiqueta: "Calle" },
       { color: "#b9c3cc", etiqueta: "Peatonal o proyectada" },
+    ],
+  },
+  {
+    id: "redvial",
+    capa: "geotravel:red_vial_arco",
+    nombre: "Red de rutas",
+    descripcion: "Las calles por las que se calculan las rutas, de todo el país; las flechas marcan la mano única",
+    forma: "linea",
+    activaPorDefecto: false,
+    leyenda: [
+      { color: "#0f766e", etiqueta: "Autopista, ruta y avenida principal" },
+      { color: "#2f9a91", etiqueta: "Calle secundaria" },
+      { color: "#6fbab2", etiqueta: "Calle" },
+      { color: "#a9d4cf", etiqueta: "Calle de servicio" },
+      { flecha: "#0b4f4a", etiqueta: "Mano única (la flecha marca el sentido)" },
     ],
   },
   {

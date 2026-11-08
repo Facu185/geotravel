@@ -11,8 +11,8 @@
  *
  * Búsqueda de direcciones (consultas 4 y 5):
  *   ide: departamento y localidad que se mandan al servicio de direcciones de la IDE (cubre todo el país).
- *   callesPropias: true solo en Salto, que tiene calles y números de puerta en la base propia
- *     (cruce de calles y autocompletado, sin internet). En el resto la dirección y la esquina las resuelve la IDE.
+ *   callesPropias: true solo en Salto, que tiene números de puerta en la base propia (sin internet). En el resto la dirección
+ *     con número la resuelve la IDE. Los cruces de calles y el autocompletado son de todo el país (red vial de OpenStreetMap).
  *   ejemploDireccion: texto de ayuda del campo.
  */
 export const REGIONES = {
@@ -67,3 +67,40 @@ export const CARGA_POR_ZONA = {
  * permisivo que en los ABM (donde se edita): acá solo se eligen y se miran, y el límite por pedido ya acota la cantidad.
  */
 export const ZOOM_MINIMO_ELEGIR = Math.max(1, CARGA_POR_ZONA.zoomMinimo - 2);
+
+/**
+ * Dónde buscar una dirección: "todo" es todo el país (primero las puertas propias de Salto y después el servicio de
+ * direcciones de la IDE, que cubre los 19 departamentos); los demás limitan la búsqueda a un departamento.
+ */
+export const DEPARTAMENTOS = [
+  { valor: "artigas", nombre: "Artigas" },
+  { valor: "canelones", nombre: "Canelones" },
+  { valor: "cerro largo", nombre: "Cerro Largo" },
+  { valor: "colonia", nombre: "Colonia" },
+  { valor: "durazno", nombre: "Durazno" },
+  { valor: "flores", nombre: "Flores" },
+  { valor: "florida", nombre: "Florida" },
+  { valor: "lavalleja", nombre: "Lavalleja" },
+  { valor: "maldonado", nombre: "Maldonado" },
+  { valor: "montevideo", nombre: "Montevideo" },
+  { valor: "paysandu", nombre: "Paysandú" },
+  { valor: "rio negro", nombre: "Río Negro" },
+  { valor: "rivera", nombre: "Rivera" },
+  { valor: "rocha", nombre: "Rocha" },
+  { valor: "salto", nombre: "Salto" },
+  { valor: "san jose", nombre: "San José" },
+  { valor: "soriano", nombre: "Soriano" },
+  { valor: "tacuarembo", nombre: "Tacuarembó" },
+  { valor: "treinta y tres", nombre: "Treinta y Tres" },
+];
+
+const NOMBRE_DE = Object.fromEntries(DEPARTAMENTOS.map((d) => [d.valor, d.nombre]));
+const MINUSCULAS = new Set(["y", "de", "del", "la", "el"]);
+
+/** Cómo se muestra un departamento o una localidad que llegó en minúsculas y sin tildes: "rio negro" -> "Río Negro". */
+export const nombreLugar = (texto) =>
+  NOMBRE_DE[texto] ??
+  (texto ?? "")
+    .split(" ")
+    .map((palabra, i) => (i > 0 && MINUSCULAS.has(palabra) ? palabra : palabra.charAt(0).toUpperCase() + palabra.slice(1)))
+    .join(" ");

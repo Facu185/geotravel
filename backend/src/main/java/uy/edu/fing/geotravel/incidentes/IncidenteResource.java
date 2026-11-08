@@ -64,7 +64,7 @@ public class IncidenteResource {
             "SELECT id, titulo, descripcion, tipo_incidente, prioridad, estado, "
           + "       fecha_hora_registro, equipo_responsable, "
           + "       ST_AsGeoJSON(ST_Transform(geom, 4326)) AS geom_json "
-          + "FROM incidente ORDER BY fecha_hora_registro DESC";
+          + "FROM incidente ORDER BY fecha_hora_registro DESC, id DESC LIMIT ?";
 
         private static final String SELECT_BBOX =
                         "WITH rectangulo AS ("
@@ -104,7 +104,8 @@ public class IncidenteResource {
         }
 
         if (bbox == null) {
-            return Response.ok(listarTodos()).build();
+            // Sin rectángulo y sin "limit": el máximo, no 500. Nunca se devuelven todos sin tope.
+            return listarSinRectangulo(limit == null ? Bbox.LIMITE_MAXIMO : limite);
         }
 
         Bbox rectangulo;
@@ -131,16 +132,24 @@ public class IncidenteResource {
         return Response.ok(Bbox.resultado(incidentes, total)).build();
     }
 
-    private static List<Map<String, Object>> listarTodos() throws SQLException {
+    private static Response listarSinRectangulo(int tope) throws SQLException {
         List<Map<String, Object>> incidentes = new ArrayList<>();
-        try (Connection conn = DataSourceProvider.get().getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(SELECT_ALL)) {
-            while (rs.next()) {
-                incidentes.add(filaAMapa(rs));
+        int total;
+        try (Connection conn = DataSourceProvider.get().getConnection()) {
+            try (PreparedStatement ps = conn.prepareStatement(SELECT_ALL)) {
+                ps.setInt(1, tope);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        incidentes.add(filaAMapa(rs));
+                    }
+                }
+            }
+            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery("SELECT count(*) FROM incidente")) {
+                rs.next();
+                total = rs.getInt(1);
             }
         }
-        return incidentes;
+        return Bbox.arregloAcotado(incidentes, total);
     }
 
     @GET

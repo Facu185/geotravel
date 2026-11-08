@@ -45,7 +45,7 @@ else
   echo "store $WS: creado"
 fi
 
-for tabla in zona_operativa recurso incidente via acceso; do
+for tabla in zona_operativa recurso incidente via acceso red_vial_arco lugar_osm; do
   if existe "$G/workspaces/$WS/datastores/$WS/featuretypes/$tabla.json"; then
     echo "capa $tabla: ya existe"
   else
@@ -55,8 +55,14 @@ for tabla in zona_operativa recurso incidente via acceso; do
   fi
 done
 
+# La extension de via y de red_vial_arco cambia cuando el servicio red-vial las carga (de Salto a todo el pais): se recalcula siempre.
+for tabla in via red_vial_arco; do
+  curl -sf $A -X PUT -H "$JSON" "$G/workspaces/$WS/datastores/$WS/featuretypes/$tabla?recalculate=nativebbox,latlonbbox" \
+    -d "{\"featureType\":{\"name\":\"$tabla\"}}" > /dev/null && echo "capa $tabla: extension recalculada"
+done
+
 # estilo:capa -- cada capa usa por defecto el estilo que la colorea por su dato.
-for par in incidentes_estado:incidente recursos_tipo:recurso zonas_nivel_prioridad:zona_operativa vias_tipo:via accesos_puerta:acceso; do
+for par in incidentes_estado:incidente recursos_tipo:recurso zonas_nivel_prioridad:zona_operativa vias_tipo:via accesos_puerta:acceso red_vial:red_vial_arco lugares_referencia:lugar_osm; do
   estilo="${par%%:*}"
   capa="${par##*:}"
   existe "$G/workspaces/$WS/styles/$estilo.json" || \
@@ -64,6 +70,40 @@ for par in incidentes_estado:incidente recursos_tipo:recurso zonas_nivel_priorid
   curl -sf $A -X PUT -H "Content-Type: application/vnd.ogc.sld+xml" --data-binary "@/opt/geoserver/data_dir/styles/$estilo.sld" "$G/workspaces/$WS/styles/$estilo" > /dev/null
   curl -sf $A -X PUT -H "$JSON" -d "{\"layer\":{\"defaultStyle\":{\"name\":\"$estilo\",\"workspace\":\"$WS\"}}}" "$G/layers/$WS:$capa" > /dev/null
   echo "estilo $estilo: aplicado a $capa"
+done
+
+# Estilo extra de la red de rutas: las calles de referencia en gris, por jerarquía, que el mapa de gestión dibuja debajo de todo
+# (se pide con styles=calles_referencia; el estilo por defecto de red_vial_arco sigue siendo red_vial).
+existe "$G/workspaces/$WS/styles/calles_referencia.json" ||   curl -sf $A -X POST -H "$JSON" -d "{\"style\":{\"name\":\"calles_referencia\",\"filename\":\"calles_referencia.sld\"}}" "$G/workspaces/$WS/styles" > /dev/null
+curl -sf $A -X PUT -H "Content-Type: application/vnd.ogc.sld+xml" --data-binary "@/opt/geoserver/data_dir/styles/calles_referencia.sld" "$G/workspaces/$WS/styles/calles_referencia" > /dev/null
+echo "estilo calles_referencia: disponible para red_vial_arco"
+
+# Referencia en caché: las calles y los barrios de fondo del mapa no cambian, así que el frontend los pide por GeoWebCache
+# (/geoserver/gwc/service/wms) en vez de dibujarlos de nuevo en cada pedido. GeoWebCache cachea capas o grupos de capas, no
+# combinaciones de capas con estilos: por eso se publican dos grupos, uno por cada fondo que usa el mapa.
+#   referencia_todo     calles por jerarquía (calles_referencia) + ciudades, pueblos y barrios (lugares_referencia)
+#   referencia_barrios  solo los nombres de lugares (mapa público: tiene su propio botón de Calles)
+grupo() {
+  nombre="$1"; capas="$2"; estilos="$3"
+  existe "$G/workspaces/$WS/layergroups/$nombre.json" && { echo "grupo $nombre: ya existe"; return; }
+  curl -sf $A -X POST -H "$JSON" "$G/workspaces/$WS/layergroups" -d "{\"layerGroup\":{\"name\":\"$nombre\",\"mode\":\"SINGLE\",\"title\":\"$nombre\",
+    \"workspace\":{\"name\":\"$WS\"},\"publishables\":{\"published\":[$capas]},\"styles\":{\"style\":[$estilos]},
+    \"bounds\":{\"minx\":-58.6,\"maxx\":-52.9,\"miny\":-35.1,\"maxy\":-30.0,\"crs\":\"EPSG:4326\"}}}" > /dev/null
+  echo "grupo $nombre: creado"
+}
+CALLES="{\"@type\":\"layer\",\"name\":\"$WS:red_vial_arco\"}"
+LUGARES="{\"@type\":\"layer\",\"name\":\"$WS:lugar_osm\"}"
+grupo referencia_todo "$CALLES,$LUGARES" "{\"name\":\"$WS:calles_referencia\"},{\"name\":\"$WS:lugares_referencia\"}"
+grupo referencia_barrios "$LUGARES" "{\"name\":\"$WS:lugares_referencia\"}"
+
+# Los estilos se vuelven a subir en cada corrida: se vacía el caché de los dos grupos para que un cambio en un .sld se vea.
+# Los navegadores guardan cada tesela 1 hora (expireClients); si cambió un estilo, Ctrl+F5.
+W="http://geoserver:8080/geoserver/gwc/rest"
+for g in referencia_todo referencia_barrios; do
+  curl -sf $A "$W/layers/$WS:$g.xml" | sed 's|<expireClients>0</expireClients>|<expireClients>3600</expireClients>|' > /tmp/gwc_$g.xml
+  curl -sf $A -X PUT -H "Content-Type: text/xml" --data-binary "@/tmp/gwc_$g.xml" "$W/layers/$WS:$g.xml" > /dev/null
+  curl -sf $A -X POST -H "Content-Type: text/xml" -d "<truncateLayer><layerName>$WS:$g</layerName></truncateLayer>" "$W/masstruncate" > /dev/null
+  echo "caché $g: configurado y vaciado"
 done
 
 echo "geoserver-init: listo"

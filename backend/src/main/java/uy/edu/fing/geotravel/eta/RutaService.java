@@ -15,18 +15,20 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * Origen: la ubicacion del recurso. Destino: el punto del incidente mas cercano al recurso (ST_ClosestPoint),
  * que para un Point es el propio punto y para una linea o un poligono es el punto de su geometria mas proximo.
- * El motor (OSRM) mueve cada extremo a la calle mas cercana; ese desplazamiento se informa y, si es grande,
- * se advierte que la distancia vial es aproximada.
+ * La ruta la calcula pgRouting dentro de PostgreSQL (MotorPgRouting) sobre la red vial de OpenStreetMap de todo el
+ * pais: cada extremo se engancha al punto exacto de la calle mas cercana, se respetan los sentidos de circulacion y
+ * se informa por que calles pasa. El desplazamiento hasta la calle se informa y, si es grande, se advierte que la
+ * distancia vial es aproximada.
  *
- * Criterio: OSRM con perfil driving minimiza la DURACION (ruta mas rapida). No garantiza la menor distancia.
+ * Hay un unico camino: el de menor duracion (con los sentidos de circulacion y la velocidad de cada calle).
  */
 public class RutaService {
 
-    public static final String CRITERIO = "mas_rapida";
-    public static final String CRITERIO_TEXTO = "Ruta mas rapida (OSRM driving, optimiza duracion, no distancia)";
-    public static final String MOTOR = "OSRM driving";
+    public static final String MOTOR = "pgRouting (PostgreSQL)";
     /** Desde cuantos metros de desplazamiento a la calle se advierte que el extremo no es exacto. */
     public static final double AJUSTE_ADVERTENCIA_METROS = 100;
+    /** Tiempo maximo por defecto para calcular una ruta. */
+    public static final long TIMEOUT_POR_DEFECTO_MS = 10_000;
 
     private static final long CACHE_VIGENCIA_NANOS = 5L * 60 * 1_000_000_000L;
     private static final int CACHE_MAXIMO = 500;
@@ -41,36 +43,15 @@ public class RutaService {
             "FROM recurso r CROSS JOIN incidente i " +
             "WHERE r.id = ? AND i.id = ?";
 
-    /** Motor de enrutamiento; permite reemplazar OSRM en las pruebas. */
+    /** Motor de enrutamiento; permite reemplazarlo en las pruebas. */
     public interface MotorRutas {
-        OsrmClient.Ruta calcular(double origenLon, double origenLat, double destinoLon, double destinoLat)
+        Ruta calcular(double origenLon, double origenLat, double destinoLon, double destinoLat)
                 throws IOException, InterruptedException;
 
         /** Igual, con un limite estricto de tiempo; los motores que no lo soportan lo ignoran. */
-        default OsrmClient.Ruta calcular(double origenLon, double origenLat, double destinoLon, double destinoLat,
-                                         long timeoutMs) throws IOException, InterruptedException {
+        default Ruta calcular(double origenLon, double origenLat, double destinoLon, double destinoLat,
+                              long timeoutMs) throws IOException, InterruptedException {
             return calcular(origenLon, origenLat, destinoLon, destinoLat);
-        }
-    }
-
-    /** Motor OSRM real para un criterio. */
-    static final class MotorOsrm implements MotorRutas {
-        private final Criterio criterio;
-
-        MotorOsrm(Criterio criterio) {
-            this.criterio = criterio;
-        }
-
-        @Override
-        public OsrmClient.Ruta calcular(double lonO, double latO, double lonD, double latD)
-                throws IOException, InterruptedException {
-            return OsrmClient.consultar(lonO, latO, lonD, latD, criterio);
-        }
-
-        @Override
-        public OsrmClient.Ruta calcular(double lonO, double latO, double lonD, double latD, long timeoutMs)
-                throws IOException, InterruptedException {
-            return OsrmClient.consultar(lonO, latO, lonD, latD, criterio, timeoutMs);
         }
     }
 
@@ -107,19 +88,19 @@ public class RutaService {
     /** Resultado de intentar una ruta sin lanzar excepciones: la consulta puede seguir con los demas recursos. */
     public static final class Resultado {
         public final Estado estado;
-        public final OsrmClient.Ruta ruta;
+        public final Ruta ruta;
         public final String mensaje;
         /** true si el motor no respondio (conexion, HTTP o formato): conviene no insistir con otros recursos. */
         public final boolean motorCaido;
 
-        private Resultado(Estado estado, OsrmClient.Ruta ruta, String mensaje, boolean motorCaido) {
+        private Resultado(Estado estado, Ruta ruta, String mensaje, boolean motorCaido) {
             this.estado = estado;
             this.ruta = ruta;
             this.mensaje = mensaje;
             this.motorCaido = motorCaido;
         }
 
-        public static Resultado ok(OsrmClient.Ruta ruta) {
+        public static Resultado ok(Ruta ruta) {
             return new Resultado(Estado.DISPONIBLE, ruta, null, false);
         }
 
@@ -137,70 +118,39 @@ public class RutaService {
     }
 
     private static final class Entrada {
-        final OsrmClient.Ruta ruta;
+        final Ruta ruta;
         final long vence;
 
-        Entrada(OsrmClient.Ruta ruta, long vence) {
+        Entrada(Ruta ruta, long vence) {
             this.ruta = ruta;
             this.vence = vence;
         }
     }
 
-    private static final RutaService PREDETERMINADO = crearPredeterminado();
-
-    private static RutaService crearPredeterminado() {
-        if ("pgrouting".equalsIgnoreCase(System.getenv("RUTAS_MOTOR"))) {
-            return new RutaService(new MotorPgRouting(Criterio.MAS_RAPIDA),
-                                   new MotorPgRouting(Criterio.MAS_CORTA));
-        }
-        return new RutaService(new MotorOsrm(Criterio.MAS_RAPIDA),
-                               new MotorOsrm(Criterio.MAS_CORTA));
-    }
+    private static final RutaService PREDETERMINADO = new RutaService(new MotorPgRouting());
 
     private final MotorRutas motor;
-    private final MotorRutas motorCorta;
     private final Map<String, Entrada> cache = new ConcurrentHashMap<>();
 
     public RutaService(MotorRutas motor) {
-        this(motor, null);
-    }
-
-    /** motorCorta null significa que el criterio mas_corta no esta disponible. */
-    public RutaService(MotorRutas motor, MotorRutas motorCorta) {
         this.motor = motor;
-        this.motorCorta = motorCorta;
     }
 
     public static RutaService predeterminado() {
         return PREDETERMINADO;
     }
 
-    /** Si el criterio se puede calcular con la configuracion actual. */
-    public boolean disponible(Criterio criterio) {
-        MotorRutas elegido = criterio == Criterio.MAS_CORTA ? motorCorta : motor;
-        if (elegido == null) return false;
-        if (elegido instanceof MotorPgRouting) {
-            return ((MotorPgRouting) elegido).saludable();
+    /** Si se puede calcular una ruta: la base tiene pgRouting, la red vial y la funcion de rutas. */
+    public boolean disponible() {
+        if (motor instanceof MotorPgRouting) {
+            return ((MotorPgRouting) motor).saludable();
         }
-        if (criterio == Criterio.MAS_CORTA) {
-            return elegido != PREDETERMINADO.motorCorta || OsrmClient.cortaConfigurada();
-        }
-        return true;
+        return motor != null;
     }
 
-    /** Estado real del motor: configurado Y respondiendo (en pruebas con motores simulados, siempre "ok"). */
-    public boolean saludable(Criterio criterio) {
-        if (!disponible(criterio)) {
-            return false;
-        }
-        MotorRutas m = criterio == Criterio.MAS_CORTA ? motorCorta : motor;
-        return m instanceof MotorOsrm ? OsrmClient.saludable(criterio) : true;
-    }
-
-    /** Nombre del motor efectivamente utilizado para reportar en ETA. */
-    public String nombreMotor(Criterio criterio) {
-        MotorRutas m = criterio == Criterio.MAS_CORTA ? motorCorta : motor;
-        return m instanceof MotorPgRouting ? "pgRouting (PostgreSQL)" : criterio.motor;
+    /** Nombre del motor, para informar en la respuesta. */
+    public String nombreMotor() {
+        return motor instanceof MotorPgRouting ? MOTOR : "motor de rutas";
     }
 
     /** Extremos de la ruta (en lon/lat) y distancia directa; null si el recurso o el incidente no existen. */
@@ -221,23 +171,14 @@ public class RutaService {
     }
 
     /** Consulta la ruta (con cache de pocos minutos para no repetir pedidos iguales). */
-    public OsrmClient.Ruta consultar(Extremos e) throws IOException, InterruptedException {
-        return consultar(e, Criterio.MAS_RAPIDA);
+    public Ruta consultar(Extremos e) throws IOException, InterruptedException {
+        return consultar(e, TIMEOUT_POR_DEFECTO_MS);
     }
 
-    public OsrmClient.Ruta consultar(Extremos e, Criterio criterio) throws IOException, InterruptedException {
-        return consultar(e, criterio, OsrmClient.TIMEOUT_POR_DEFECTO_MS);
-    }
-
-    /** timeoutMs limita el pedido al motor (no aplica si la ruta sale de la cache). */
-    public OsrmClient.Ruta consultar(Extremos e, Criterio criterio, long timeoutMs)
-            throws IOException, InterruptedException {
-        MotorRutas elegido = criterio == Criterio.MAS_CORTA ? motorCorta : motor;
-        if (elegido == null) {
-            throw new OsrmClient.NoConfiguradoException("Criterio de ruta no disponible: " + criterio.codigo);
-        }
-        String clave = String.format(Locale.ROOT, "%s|%.5f,%.5f;%.5f,%.5f",
-                criterio.codigo, e.origenLon, e.origenLat, e.destinoLon, e.destinoLat);
+    /** timeoutMs limita el calculo (no aplica si la ruta sale de la cache). */
+    public Ruta consultar(Extremos e, long timeoutMs) throws IOException, InterruptedException {
+        String clave = String.format(Locale.ROOT, "%.5f,%.5f;%.5f,%.5f",
+                e.origenLon, e.origenLat, e.destinoLon, e.destinoLat);
         long ahora = System.nanoTime();
 
         Entrada guardada = cache.get(clave);
@@ -245,7 +186,7 @@ public class RutaService {
             return guardada.ruta;
         }
 
-        OsrmClient.Ruta ruta = elegido.calcular(e.origenLon, e.origenLat, e.destinoLon, e.destinoLat, timeoutMs);
+        Ruta ruta = motor.calcular(e.origenLon, e.origenLat, e.destinoLon, e.destinoLat, timeoutMs);
 
         if (cache.size() >= CACHE_MAXIMO) {
             cache.clear();
@@ -256,32 +197,28 @@ public class RutaService {
 
     /** Igual que consultar, pero traduce los fallos a un estado para respuestas parciales. */
     public Resultado intentar(Extremos e) {
-        return intentar(e, Criterio.MAS_RAPIDA);
+        return intentar(e, TIMEOUT_POR_DEFECTO_MS);
     }
 
-    public Resultado intentar(Extremos e, Criterio criterio) {
-        return intentar(e, criterio, OsrmClient.TIMEOUT_POR_DEFECTO_MS);
-    }
-
-    public Resultado intentar(Extremos e, Criterio criterio, long timeoutMs) {
+    public Resultado intentar(Extremos e, long timeoutMs) {
         try {
-            return Resultado.ok(consultar(e, criterio, timeoutMs));
-        } catch (OsrmClient.SinRutaException ex) {
+            return Resultado.ok(consultar(e, timeoutMs));
+        } catch (SinRutaException ex) {
             return Resultado.sinRuta(ex.getMessage());
-        } catch (OsrmClient.PlazoAgotadoException ex) {
+        } catch (PlazoAgotadoException ex) {
             return Resultado.plazo(ex.getMessage());
-        } catch (OsrmClient.NoConfiguradoException ex) {
+        } catch (MotorNoDisponibleException ex) {
             return Resultado.error(ex.getMessage(), true);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             return Resultado.error("Consulta de rutas interrumpida", true);
         } catch (IOException | RuntimeException ex) {
-            return Resultado.error("No se pudo consultar el servicio de rutas", true);
+            return Resultado.error("No se pudo calcular la ruta", true);
         }
     }
 
-    /** Aviso cuando OSRM movio el origen o el destino lejos de donde estan; null si el ajuste es chico. */
-    public static String advertencia(OsrmClient.Ruta ruta) {
+    /** Aviso cuando la red vial movio el origen o el destino lejos de donde estan; null si el ajuste es chico. */
+    public static String advertencia(Ruta ruta) {
         double origen = ruta.ajusteOrigenMetros == null ? 0 : ruta.ajusteOrigenMetros;
         double destino = ruta.ajusteDestinoMetros == null ? 0 : ruta.ajusteDestinoMetros;
         if (origen < AJUSTE_ADVERTENCIA_METROS && destino < AJUSTE_ADVERTENCIA_METROS) {

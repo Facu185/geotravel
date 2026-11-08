@@ -17,6 +17,9 @@ import com.zaxxer.hikari.HikariDataSource;
  *   DB_NAME     (default: geotravel)
  *   DB_USER     (default: geotravel)
  *   DB_PASSWORD (default: geotravel)
+ *   DB_STATEMENT_TIMEOUT_MS (default: 15000) tiempo máximo de cada consulta; pasado ese tiempo PostgreSQL la
+ *                           corta y devuelve error, así una consulta pesada no deja ocupadas las conexiones del
+ *                           pool. 0 lo desactiva.
  */
 public final class DataSourceProvider {
 
@@ -43,6 +46,8 @@ public final class DataSourceProvider {
         config.setUsername(user);
         config.setPassword(pass);
         config.setMaximumPoolSize(10);
+        // Parámetro de sesión de PostgreSQL: vale para todas las consultas de cada conexión del pool.
+        config.addDataSourceProperty("options", "-c statement_timeout=" + env("DB_STATEMENT_TIMEOUT_MS", "15000"));
         return new HikariDataSource(config);
     }
 

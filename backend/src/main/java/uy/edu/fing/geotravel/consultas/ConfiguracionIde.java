@@ -29,7 +29,7 @@ public final class ConfiguracionIde {
         );
     }
 
-    /** Las tablas propias de calles (via) y puertas (acceso) son de Salto: solo ahí se usan en vez de la IDE. */
+    /** La tabla propia de puertas (acceso) es de Salto: solo ahí se usa en vez de la IDE (las calles y los cruces ya son de todo el país). */
     public boolean usaPuertasLocales() {
         return "salto".equalsIgnoreCase(departamento)
                 && "salto".equalsIgnoreCase(localidad);
@@ -54,6 +54,18 @@ public final class ConfiguracionIde {
                 + (esquina != null ? "&esquina=" + codificar(esquina) : "")
                 + "&departamento=" + codificar(departamento)
                 + "&localidad=" + codificar(localidad);
+    }
+
+    /**
+     * Pedido al servicio de direcciones. El departamento y la localidad son opcionales: sin ellos el servicio busca la
+     * calle en todo el país; solo con el departamento, en todo el departamento.
+     */
+    public static String urlBusqueda(String endpoint, String calle, String esquina, String departamento, String localidad) {
+        StringBuilder url = new StringBuilder(endpoint).append("?calle=").append(codificar(calle.trim()));
+        if (esquina != null && !esquina.isBlank()) url.append("&esquina=").append(codificar(esquina));
+        if (departamento != null && !departamento.isBlank()) url.append("&departamento=").append(codificar(departamento));
+        if (localidad != null && !localidad.isBlank()) url.append("&localidad=").append(codificar(localidad));
+        return url.toString();
     }
 
     private static String valorOReemplazo(String valor, String reemplazo) {

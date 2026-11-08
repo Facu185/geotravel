@@ -43,10 +43,10 @@ cp .env.example .env          # solo la primera vez; ajustar si hace falta
 docker compose up -d --build
 ```
 
-Un solo comando levanta y deja configurado todo: la base (con sus migraciones, la red vial de
-Salto de `db/data/vias.csv.gz`, los números de puerta de `db/data/accesos.csv.gz` y los datos de prueba, una sola vez), GeoServer (workspace,
+Un solo comando levanta y deja configurado todo: la base (con sus migraciones, las calles de
+Salto de `db/data/vias.csv.gz`, los números de puerta de `db/data/accesos.csv.gz` y los datos de prueba, una sola vez), la red vial de rutas de todo Uruguay (servicio `red-vial`, baja unos 56 MB de OpenStreetMap la primera vez), GeoServer (workspace,
 store, capas y estilos) y el backend en Tomcat con el `.war` ya adentro. La primera vez tarda unos minutos (compila el backend y GeoServer arranca
-lento); cuando termina quedan en `Exited (0)` `flyway`, `seed` y `geoserver-init`, es lo esperado.
+lento); cuando termina quedan en `Exited (0)` `flyway`, `seed`, `red-vial` y `geoserver-init`, es lo esperado.
 Después, solo el frontend: `cd frontend && npm install && npm run dev`.
 
 - **Día a día:** `docker compose up -d` (los datos quedan en volúmenes de Docker).
@@ -59,18 +59,15 @@ Después, solo el frontend: `cd frontend && npm install && npm run dev`.
 Todo es repetible: el seed no duplica datos y la configuración de GeoServer deja como está lo que
 ya existe. Los pasos de abajo son el mismo proceso, a mano, por si hace falta hacer uno solo.
 
-### Demostracion P2: ETA en Salto
+### Tiempo de llegada y rutas por calles
 
-En `feat/backend-p2`, Docker prepara automaticamente un recurso y un incidente
-para **Salto, Uruguay** (`db/seed/seed_salto_eta.sql`). Funciona tanto en una
-instalacion nueva como en una base Docker que ya tenga datos; nunca se asignan
-IDs fijos. La pantalla `/eta` muestra distancia, duracion y la ruta vial
-GeoJSON sobre Leaflet. El calculo de rutas utiliza un servicio OSRM con acceso
-a internet.
+Docker prepara automaticamente un recurso y un incidente para **Salto, Uruguay** (`db/seed/seed_salto_eta.sql`). La pantalla
+`/eta` muestra distancia, duracion, la ruta sobre las calles y **las calles por las que pasa**.
 
-**Ruta más corta (opcional):** el criterio `mas_corta` (minimiza distancia) usa un OSRM propio. Preparar los datos
-con `infra/osrm/preparar.ps1` (o `.sh`), definir `OSRM_URL`/`OSRM_SHORTEST_URL` en `infra/.env` y levantar con
-`docker compose --profile osrm up -d --build`. Detalles en [docs/RECURSOS_CERCANOS_RUTAS.md](docs/RECURSOS_CERCANOS_RUTAS.md).
+Las rutas las calcula **pgRouting dentro de PostgreSQL** sobre una **red vial de OpenStreetMap de todo Uruguay**, con
+sentidos de circulacion y velocidades: no hay un servicio de rutas externo. El servicio `red-vial` de Docker la arma la
+primera vez (baja el extracto de Geofabrik, unos 56 MB, y tarda un par de minutos). Hay un solo camino: el de menor
+tiempo. Detalle, fuentes de datos evaluadas y limites en [docs/RED_VIAL.md](docs/RED_VIAL.md).
 
 **Guia de instalacion en otra computadora y verificaciones:**
 [docs/ETA_SALTO_DEMO.md](docs/ETA_SALTO_DEMO.md).
@@ -80,10 +77,10 @@ con `infra/osrm/preparar.ps1` (o `.sh`), definir `OSRM_URL`/`OSRM_SHORTEST_URL` 
 `VITE_REGION` solo controla el encuadre del mapa en React. El backend configura por separado
 el servicio de direcciones IDE mediante `IDE_DEPARTAMENTO` e `IDE_LOCALIDAD` en `infra/.env`;
 ambos usan `salto` por defecto y pueden fijarse en otro lugar (por ejemplo `montevideo`).
-La tabla local `acceso` (números de puerta) y la red vial `via` disponibles en `db/data/` son de Salto.
+La tabla local `acceso` (números de puerta) disponible en `db/data/` es de Salto. La capa `via` (calles) arranca con las de Salto y el servicio `red-vial` la reemplaza por las de todo el país.
 Por eso con Salto `/consultas/geocodificar` busca primero en `acceso` y recién después en la IDE (que se usa
 siempre para las esquinas pedidas con `esquina` y para cualquier otro departamento o localidad), y
-`/consultas/calles` y `/consultas/interseccion` trabajan sobre las calles de Salto.
+`/consultas/calles` y `/consultas/interseccion` trabajan sobre la red vial de OpenStreetMap de todo el país (ver `docs/RED_VIAL.md`).
 
 ### 1. Datos: PostGIS + GeoServer (a mano)
 
@@ -105,16 +102,21 @@ que hayas puesto en `.env`). `geoserver-init` hace por la API REST lo que se har
 
 1. Workspace `geotravel` (nombre heredado del repo; es solo un identificador).
 2. Store PostGIS `geotravel` apuntando a la base (host `db`, puerto `5432`).
-3. Capas: `zona_operativa`, `recurso`, `incidente`, `via` (calles) y `acceso` (números de puerta).
+3. Capas: `zona_operativa`, `recurso`, `incidente`, `via` (calles), `acceso` (números de puerta), `red_vial_arco` (la red de rutas, con las manos únicas) y `lugar_osm` (nombres de ciudades, pueblos y barrios).
+
+**Calles y barrios de referencia.** Las pantallas de Zonas, Recursos, Incidentes, Consultas y Tiempo de llegada dibujan de fondo, en gris, las calles de `red_vial_arco` por jerarquía (estilo `calles_referencia`: a lo lejos solo las rutas y avenidas principales; al acercar, las secundarias, las de barrio y las de servicio, con su nombre desde el zoom 14 al 15) y los nombres de ciudades, pueblos y barrios de `lugar_osm` (estilo `lugares_referencia`; los de barrio se ven del zoom 12 al 14, y más cerca toman la posta los de las calles). Es el prop `referencia` de `MapView`; el mapa público solo trae los barrios, porque ahí las calles se prenden y apagan a mano. Como no cambian, se piden por GeoWebCache (`/geoserver/gwc/service/wms`, grupos de capas `referencia_todo` y `referencia_barrios` que crea `geoserver-init`): la primera vez GeoServer dibuja y guarda, después responde del caché sin tocar la base. `geoserver-init` vacía ese caché cada vez que corre, para que un cambio en un `.sld` se aplique (los navegadores guardan cada tesela 1 hora: Ctrl+F5).
+
+**Límite de tiempo de las consultas.** El backend le pone a cada conexión un `statement_timeout` de 15 s (`DB_STATEMENT_TIMEOUT_MS`, 0 lo desactiva): una consulta pesada se corta con error en vez de ocupar el pool de conexiones.
 4. Estilos de `geoserver/styles/`, uno por capa: `zonas_nivel_prioridad`, `recursos_tipo`,
-   `incidentes_estado`, `vias_tipo` y `accesos_puerta`.
+   `incidentes_estado`, `vias_tipo`, `accesos_puerta` y `red_vial`.
 
 #### Datos de referencia (calles y puertas)
 
 Son capas de consulta, no se editan desde la aplicación:
 
-- **Calles** (`via`, 3.239 tramos de Salto): ejes de calle de OpenStreetMap (© colaboradores de OpenStreetMap,
-  licencia ODbL), bajados con Overpass API (`way["highway"]["name"]` en el rectángulo de Salto, recortados a él).
+- **Calles** (`via`, 60.261 vías con nombre de todo el país): ejes de calle de OpenStreetMap (© colaboradores de OpenStreetMap,
+  licencia ODbL). El servicio `red-vial` las saca del mismo extracto de Geofabrik que la red de rutas (una fila por vía entera) y
+  reemplaza a las 3.239 de Salto que trae el seed (`db/data/vias.csv.gz`, bajadas con Overpass API en el rectángulo de Salto).
   El tipo de vía (`tipo`) se deriva de la etiqueta `highway` para que lo reconozca el estilo `vias_tipo.sld`.
   Archivo `db/data/vias.csv.gz` (nombre, tipo y geometría en WKT lon/lat; `seed.sh` la pasa a EPSG:32721).
   Si la base ya tenía calles de otra ciudad, `seed.sh` no las pisa: ver "Cambiar las calles" más abajo.
@@ -124,31 +126,44 @@ Son capas de consulta, no se editan desde la aplicación:
   (`Av.` = AVENIDA, `Gral` = GENERAL, `Dr` = DOCTOR). El archivo ya viene en el repo y no hace falta tocarlo;
   para cambiarlo, `docker compose down -v` y volver a levantar.
 
-**Datos de prueba de Salto.** Son pocos y están repartidos como en la realidad (`db/seed/seed.sql`): 10 zonas operativas
-(5 en la ciudad, dos de ellas superpuestas con otras, y 5 en el interior), 36 recursos y 44 incidentes en todo el
-departamento. La ciudad concentra la mayoría y el resto está en las localidades del interior (Daymán, Constitución, Belén,
-Termas del Arapey, Pueblo Lavalleja...). El botón "Depto. de Salto" del mapa muestra todo el departamento.
+**Datos de prueba.** Las zonas y los recursos son **reales** (`db/seed/datos_reales.sql`, que carga `db/seed/seed.sql`); los
+incidentes, en cambio, son inventados y van sobre las calles de cada ciudad (el departamento de Salto tiene 18 zonas, 52
+recursos y 114 incidentes; Montevideo, 33 zonas, 271 recursos y 83 incidentes). El botón "Depto. de Salto" del mapa muestra
+todo el departamento.
 
-- **Recursos:** en la ciudad, 12 están en sedes reales (hospital y centros de salud, estación de bomberos, jefatura y
-  seccional de policía, base de ambulancias y Policía Caminera) y 6 móviles recorren las calles a 500 m o más entre sí; en el
-  interior hay 9 sedes reales (policlínicas y seccionales policiales) y 4 unidades en las localidades más grandes. Las
-  ubicaciones y los nombres de las localidades son de OpenStreetMap (ODbL).
-- **Incidentes:** los de la ciudad (18 puntuales, 4 calles cortadas y 3 áreas inundadas) van sobre calles reales; los del
-  interior (uno en cada una de 12 localidades y dos áreas inundadas junto al río) están a menos de 1,5 km del centro de cada pueblo.
-- **Sobre una calle y del lado de Salto:** en la ciudad, recursos e incidentes quedan sobre una calle de la tabla `via`, y solo
+- **Zonas (ninguna es un rectángulo):** las **seccionales policiales** con sus límites oficiales (Ministerio del Interior /
+  UNASEV: 16 en Salto y 25 en Montevideo), que no se superponen; y encima, superpuestas, los 8 municipios de Montevideo (Intendencia
+  de Montevideo) y las localidades de Salto y Termas del Daymán (OpenStreetMap). La prioridad de cada seccional sale de su
+  densidad de población (1 = la más densa), con los habitantes que informa UNASEV. Los polígonos están simplificados (25 m en
+  Montevideo y 60 m en Salto) para que el archivo sea liviano.
+- **Recursos reales:** en Montevideo, los servicios de salud de la lista de la Intendencia (hospitales, centros de salud y
+  policlínicas) más las mutualistas, sanatorios y clínicas de OpenStreetMap (CASMU, Asociación Española, Médica Uruguaya, SMI,
+  Círculo Católico, COSEM, SEMM, UCM, Universal, Casa de Galicia...), 4 destacamentos de bomberos, 34 seccionales y comisarías
+  y 5 bases de emergencia móvil (SAME y SUAT). En Salto, el Hospital Departamental, el Centro de Asistencia Médica (CAMS) y
+  otros dos centros médicos, 6 policlínicas del interior, la estación de bomberos, la Jefatura, la Policía Caminera, 6
+  seccionales y subcomisarías, y dos ambulancias. Todos en sus coordenadas reales. **OpenStreetMap trae pocos servicios de
+  Salto y de bomberos de Montevideo** (no hay una lista oficial abierta): si falta alguno, se agrega en `datos_reales.sql`.
+- **Móviles simulados:** 28 unidades en recorrida por la ciudad de Salto (10 ambulancias, 16 patrullas y 2 camiones de bomberos, a 350 m
+  o más de otro recurso), 46 en Montevideo (16 ambulancias y 30 patrullas) y 3 ambulancias en
+  Belén, Constitución y Termas del Daymán, para que el interior tenga recursos cerca. Son inventadas y están marcadas como tales.
+- **Incidentes:** los de la ciudad (80 puntuales, 10 calles cortadas y 6 áreas inundadas) van sobre calles reales; los del
+  interior (uno en cada una de 12 localidades y dos áreas inundadas) van sobre la calle de OpenStreetMap más cercana al centro de cada pueblo.
+- **Sobre una calle y del lado de Salto:** en la ciudad, los incidentes y las unidades móviles quedan sobre una calle de la tabla `via`, y solo
   de la red de Salto (la tabla también trae Concordia, Argentina, del otro lado del río), así que se puede calcular un camino
-  hasta ellos. El interior no tiene calles en la base.
-- **Montevideo:** 7 zonas, 12 recursos y 25 incidentes, para comprobar que el sistema atiende todo el país.
+  hasta ellos. Los del interior también van sobre una calle (a menos de 100 m): un punto a más de 500 m de una calle no tiene ruta.
+  Con esto, las rutas entre cada incidente del seed y sus recursos más cercanos dan camino en todos los casos probados (396 de 396).
+- **Montevideo:** los 83 incidentes (70 puntuales, 8 calles cortadas y 5 áreas inundadas) van sobre calles reales de la red de la ciudad.
 
 La carga masiva (`db/pruebas/carga-masiva.sql`) reparte sus 3.000 recursos sobre las calles de la ciudad.
 
-**Cambiar las calles en una base que ya existe** (por ejemplo, la que tenía las de Montevideo), sin perder
-zonas, recursos ni incidentes. Desde `infra/`:
+**Volver a cargar las calles en una base que ya existe**, sin perder zonas, recursos ni incidentes (el seed carga las de Salto y
+`red-vial` las pasa a todo el país). Desde `infra/`:
 
 ```bash
 docker compose exec db psql -U geotravel -d geotravel -c "TRUNCATE via RESTART IDENTITY"
 docker compose run --rm seed
-# GeoServer guarda la extensión de cada capa al publicarla: se recalcula para que dibuje Salto
+docker compose run --rm -e RED_VIAL_REGENERAR=1 red-vial   # vuelve a dejar las calles de todo el país
+# GeoServer guarda la extensión de cada capa al publicarla: se recalcula (geoserver-init también lo hace)
 curl -u admin:geoserver -X PUT -H "Content-Type: application/json" \
   -d '{"featureType":{"name":"via","enabled":true}}' \
   "http://localhost:8082/geoserver/rest/workspaces/geotravel/datastores/geotravel/featuretypes/via?recalculate=nativebbox,latlonbbox"
@@ -203,7 +218,7 @@ Hay dos vistas, separadas por un login básico:
   reinicia hay que ingresar de nuevo) que el frontend manda en `Authorization: Bearer ...`. Un filtro del backend
   (`auth/AuthFilter.java`) **protege toda la API por defecto**: solo son públicos `/health`, `/auth/login`,
   `/auth/logout`, `GET /fotos/...` y la lectura de las Consultas del invitado (`GET /consultas/...` salvo el reporte,
-  el listado `GET /zonas|/incidentes|/recursos` y `GET /eta/criterios`). Escribir siempre exige sesión. El mapa público dibuja con GeoServer.
+  el listado `GET /zonas|/incidentes|/recursos` y `GET /eta/disponible`). Escribir siempre exige sesión. El mapa público dibuja con GeoServer.
 - **En el frontend:** `frontend/src/auth/` (sesión, pantalla de ingreso y `RutaAdmin`, que manda al ingreso si no
   hay sesión). En Postman, correr primero la carpeta 0, que guarda el token.
 

@@ -245,7 +245,7 @@ export default function InvitadoPage() {
       etiquetaBoton="Capas"
       abiertoEnMovil={false}
       hijosMapa={hijosMapa}
-      mapaProps={{ layers: capasVisibles, wmsExtra: { actualizado: version, ...(cql ? { cql_filter: cql } : {}) } }}
+      mapaProps={{ referencia: "barrios", layers: capasVisibles, wmsExtra: { actualizado: version, ...(cql ? { cql_filter: cql } : {}) } }}
       aviso={
         <>
           {capasVisibles.length === 0 && <p className="pagina-mapa__vacio">Todas las capas están ocultas</p>}

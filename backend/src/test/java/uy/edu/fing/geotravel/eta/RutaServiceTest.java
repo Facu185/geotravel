@@ -20,7 +20,7 @@ public class RutaServiceTest {
     @Test
     public void repiteSinVolverAConsultarElMotor() throws Exception {
         AtomicInteger llamadas = new AtomicInteger();
-        OsrmClient.Ruta ruta = new OsrmClient.Ruta(1150, 180);
+        Ruta ruta = new Ruta(1150, 180);
         RutaService servicio = new RutaService((a, b, c, d) -> {
             llamadas.incrementAndGet();
             return ruta;
@@ -35,7 +35,7 @@ public class RutaServiceTest {
     @Test
     public void ausenciaDeRutaSeInformaComoEstado() {
         RutaService servicio = new RutaService((a, b, c, d) -> {
-            throw new OsrmClient.SinRutaException("No se encontro ruta vial");
+            throw new SinRutaException("No se encontro ruta vial");
         });
 
         RutaService.Resultado r = servicio.intentar(EXTREMOS);
@@ -48,7 +48,7 @@ public class RutaServiceTest {
     @Test
     public void errorDelMotorSeInformaSinLanzarExcepcion() {
         RutaService servicio = new RutaService((a, b, c, d) -> {
-            throw new IOException("OSRM respondio HTTP 503");
+            throw new IOException("el motor no respondio");
         });
 
         RutaService.Resultado r = servicio.intentar(EXTREMOS);
@@ -60,7 +60,7 @@ public class RutaServiceTest {
 
     @Test
     public void rutaCorrectaSeInformaDisponible() {
-        OsrmClient.Ruta ruta = new OsrmClient.Ruta(1150, 180);
+        Ruta ruta = new Ruta(1150, 180);
         RutaService servicio = new RutaService((a, b, c, d) -> ruta);
 
         RutaService.Resultado r = servicio.intentar(EXTREMOS);
@@ -71,8 +71,8 @@ public class RutaServiceTest {
 
     @Test
     public void advierteSoloSiElAjusteALaCalleEsGrande() {
-        assertNull(RutaService.advertencia(new OsrmClient.Ruta(1, 1, null, 5.0, 99.0)));
-        assertNull(RutaService.advertencia(new OsrmClient.Ruta(1, 1)));
-        assertNotNull(RutaService.advertencia(new OsrmClient.Ruta(1, 1, null, 5.0, 100.0)));
+        assertNull(RutaService.advertencia(new Ruta(1, 1, null, 5.0, 99.0)));
+        assertNull(RutaService.advertencia(new Ruta(1, 1)));
+        assertNotNull(RutaService.advertencia(new Ruta(1, 1, null, 5.0, 100.0)));
     }
 }

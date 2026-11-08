@@ -6,6 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.ws.rs.core.Response;
+
 /**
  * Rectángulo visible del mapa, para los listados "a demanda" (zonas, recursos, ...): en vez de
  * devolver todos los objetos, se devuelven solo los que caen en lo que el usuario está mirando,
@@ -89,6 +91,25 @@ public final class Bbox {
         r.put("total", total);
         r.put("truncado", total > items.size());
         return r;
+    }
+
+    /**
+     * Límite de un listado SIN rectángulo: lo pedido (acotado a [1, LIMITE_MAXIMO]) o, sin pedido, el máximo.
+     * Ningún listado devuelve todo sin tope: con miles de objetos serían respuestas enormes.
+     */
+    public static int limiteSinRectangulo(Integer pedido) {
+        return pedido == null ? LIMITE_MAXIMO : limite(pedido);
+    }
+
+    /**
+     * Respuesta de un listado sin rectángulo: el arreglo de siempre (compatibilidad), acotado al límite, con la
+     * cantidad real en el encabezado X-Total-Count y X-Truncado=true si quedaron objetos afuera.
+     */
+    public static Response arregloAcotado(List<?> items, int total) {
+        return Response.ok(items)
+                .header("X-Total-Count", total)
+                .header("X-Truncado", total > items.size())
+                .build();
     }
 
     /** Límite pedido, acotado a [1, LIMITE_MAXIMO]; sin pedido, LIMITE_POR_DEFECTO. */

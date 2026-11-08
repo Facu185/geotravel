@@ -22,7 +22,7 @@ GET /zonas?bbox=oeste,sur,este,norte&limit=500
   Se recorta a la extensión de Uruguay antes de pasar a EPSG:32721.
 - `limit` por defecto 500, máximo 2000.
 - `total` es la cantidad real en el rectángulo (`COUNT(*) OVER ()`, calculado antes del `LIMIT`).
-- Sin `bbox` la respuesta sigue siendo el arreglo de siempre (compatibilidad con Consultas).
+- Sin `bbox` la respuesta sigue siendo un arreglo, pero acotado: las primeras `limit` (por defecto 2000, nunca todas sin tope), con la cantidad real en el encabezado `X-Total-Count` y `X-Truncado: true` si quedaron afuera.
 - Filtro: `geom && ST_Transform(ST_MakeEnvelope(?, ?, ?, ?, 4326), 32721)` usa el índice GiST
   (verificado con `EXPLAIN`: `Index Scan using idx_recurso_geom`).
 - Implementado en `/zonas` y `/recursos` con `backend/.../mapa/Bbox.java`, reusable para
@@ -124,7 +124,7 @@ Se sacaron los dos extras (incidentes por km² y dibujar una línea o un polígo
 
 Las consultas 1 a 7 las ve también el **invitado** (sin ingresar); el reporte sigue siendo solo del administrador. Por eso
 `AuthFilter` deja públicas, únicamente de lectura, `GET /consultas/...` (menos `reportes`), el listado de `GET /zonas`,
-`/incidentes` y `/recursos` y `GET /eta/criterios`. Al pie del panel, "¿Qué significa cada ícono?" muestra la misma
+`/incidentes` y `/recursos` y `GET /eta/disponible`. Al pie del panel, "¿Qué significa cada ícono?" muestra la misma
 leyenda del mapa público (`LeyendaCapa.jsx`).
 
 ## Tiempo de llegada (P2)
@@ -145,6 +145,34 @@ cantidad; del zoom 15 en adelante se ven los íconos. Hay dos mecanismos con la 
 
 Probado con `db/pruebas/carga-masiva.sql` (700 zonas, 3.000 recursos): las consultas responden en 10 a 30 ms.
 
+### Verificación a escala (2026-11-08)
+
+Se cargaron 5.000 zonas, 30.000 recursos y 100.000 incidentes sintéticos repartidos por el país (`EXPLAIN ANALYZE` y tiempos
+HTTP; después se borraron). Lo que se midió:
+
+| Qué | Tiempo |
+|---|---|
+| Zonas / recursos del rectángulo visible | 0,2 a 9 ms |
+| Incidentes: ciudad / medio país a la vista | 7 ms / 90 ms |
+| Incidente más cercano, zona por punto | ~0,1 ms |
+| Ruta con pgRouting (consulta 3) | 10 a 115 ms |
+| Conteos WFS del mapa público (país entero, 216 mil arcos) | 10 a 120 ms |
+| Teselas de GeoServer (datos y calles de referencia) | 15 a 120 ms; 12 a 29 ms desde el caché |
+| 100 pedidos a `/zonas?bbox` con 20 a la vez; 60 teselas con 20 a la vez | sin fallos |
+
+Cambios que salieron de la revisión: los listados sin `bbox` tienen tope; la referencia (calles y barrios) sale de
+GeoWebCache (grupos `referencia_todo` y `referencia_barrios`, ver `infra/init/geoserver-init.sh`); cada consulta tiene un
+`statement_timeout` de 15 s (`DB_STATEMENT_TIMEOUT_MS`).
+
+Límites conocidos, sin resolver:
+
+- El `COUNT(*) OVER ()` obliga a recorrer todo lo que cae en el rectángulo antes del límite: crece con la cantidad de objetos
+  de la vista (90 ms con 62 mil). El zoom mínimo lo acota.
+- La consulta 2 (zonas con más incidentes) y el reporte hacen un join zonas por incidentes: 245 y 295 ms con 5 mil por 100 mil.
+- Fuera de Salto, la dirección la resuelve la IDE (servicio externo): 0,4 a 0,9 s, sin caché; plazo de 10 s.
+- Los buscadores de los selectores (`/consultas/buscar`) usan `ILIKE '%texto%'` sin índice trigram: 2 a 9 ms con 30 mil filas.
+- No se probó con usuarios reales a la vez sobre 100 mil incidentes ni el navegador dibujando 500 polígonos reales complejos.
+
 ## Mapa público (P5)
 
 El mapa público ya dibujaba todo con GeoServer (imágenes), así que escala. Lo que faltaba eran los números:
@@ -154,8 +182,8 @@ El mapa público ya dibujaba todo con GeoServer (imágenes), así que escala. Lo
   `resultType=hits` usando el índice espacial, sin descargar objetos. Los filtros de incidentes y recursos se combinan
   con ese rectángulo.
 - **Detalle al tocar:** `GetFeatureInfo` trae como máximo 10 objetos.
-- **Región:** el mapa abre centrado en Salto (`region.js`). El seed trae datos en el departamento de Salto (10 zonas, 36
-  recursos y 44 incidentes, en la ciudad y en el interior) y también en Montevideo (7 zonas, 12 recursos y 25 incidentes),
+- **Región:** el mapa abre centrado en Salto (`region.js`). El seed trae datos reales en el departamento de Salto (18 zonas, 52
+  recursos y 114 incidentes, en la ciudad y en el interior) y también en Montevideo (33 zonas, 271 recursos y 83 incidentes),
   para comprobar que el sistema atiende todo el país: al mover el mapa a otra región (botones "Ir a") los conteos y las
   capas cambian.
 
@@ -163,10 +191,24 @@ El mapa público ya dibujaba todo con GeoServer (imágenes), así que escala. Lo
 
 Las consultas 4 y 5 aceptan una dirección y una esquina. Según la región (`REGION.ide` en `region.js`):
 
-| | Salto (`callesPropias: true`) | Resto del país (por ejemplo Montevideo) |
+| | Salto (`callesPropias: true`, con puertas propias) | Resto del país (por ejemplo Montevideo) |
 |---|---|---|
 | Calle y número | Tabla propia `acceso` (números de puerta de Salto) | Servicio de direcciones de la IDE (`?departamento=montevideo&localidad=montevideo`) |
-| Esquina | Cruce calculado con PostGIS sobre `via` (con autocompletado de calles) | IDE, con el parámetro `esquina` (sin autocompletado: no hay calles propias) |
+| Esquina | Cruce calculado con PostGIS sobre la red vial de OpenStreetMap **de todo el país** (con autocompletado de calles, sin internet): ver "Cruces de calles en todo el país" | Igual: la red es la misma en todo el país (la IDE queda de respaldo si las calles no se cruzan en la red) |
+
+**Dirección en todo el país.** El campo "Dónde buscar" del buscador de direcciones arranca en **Todo el país**
+(`departamento=todo`): primero se busca en las puertas propias de Salto y, si la calle no está, en la IDE **sin fijar
+departamento**. La IDE devuelve las calles con ese nombre de todo Uruguay; se ubica la mejor (la de portal exacto, y en
+Salto si empata) y las demás se ofrecen como alternativas ("Hay otras coincidencias en el país"). Se puede limitar la búsqueda
+a uno de los 19 departamentos. Ejemplo: `Minas 2091` no está en Salto; existe con portal exacto en Montevideo y es lo que se
+ubica, y la lista muestra las otras "Minas" (Young, Belén, Toledo, Mariscala, Villa Sara). Los cruces de calles siguen
+usando la región configurada.
+
+**Cruces de calles en todo el país.** `/consultas/interseccion` busca, en la red vial de OpenStreetMap (`red_vial_arco`, la misma
+de las rutas), las esquinas a las que llegan un tramo de cada calle; no usa internet. Los nombres se comparan sin tildes, mayúsculas
+ni abreviaturas (`normalizar_calle`, migración V7). Como una calle se repite en muchas localidades ("Colonia" son 60 vías en el país),
+devuelve hasta 10 cruces, del más cercano a la región, cada uno con el lugar más próximo (`lugar_osm`: ciudades, pueblos y barrios del
+mismo extracto de OpenStreetMap). Ejemplo: "Colonia" y "Convención" dan un cruce en Montevideo y otro en Pinares de Solymar.
 
 Para sumar otro departamento alcanza con agregar una entrada en `region.js`. En Salto, la dirección y el cruce
 funcionan sin internet; la IDE queda de respaldo si la calle no está en la base. Probado con "Uruguay 1000" y la

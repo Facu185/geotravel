@@ -17,7 +17,7 @@ servers:
 
 # Seguridad: toda la API exige una sesión de administrador (encabezado Authorization: Bearer <token>) salvo
 # /health, /auth/login, /auth/logout, GET /fotos/... y la lectura que usan las Consultas del invitado:
-# GET /consultas/... (menos /consultas/reportes), GET /zonas, /incidentes y /recursos (listado, sin id), GET /eta/criterios. Sin token, el resto responde 401.
+# GET /consultas/... (menos /consultas/reportes), GET /zonas, /incidentes y /recursos (listado, sin id), GET /eta/disponible. Sin token, el resto responde 401.
 # El mapa público no pasa por esta API: lo dibuja GeoServer.
 security:
   - bearerAuth: []
@@ -30,34 +30,28 @@ paths:
       responses:
         "200": { description: OK }
 
-  # ------------------------------------------------------------ ETA / OSRM
-  /eta/criterios:
+  # ------------------------------------------------------------ ETA / pgRouting
+  /eta/disponible:
     get:
-      summary: Criterios de ruta disponibles en el servidor
+      summary: Si se pueden calcular rutas en el servidor
       description: >
-        Disponibilidad real de cada motor OSRM (no solo que la URL esté configurada). Se verifica con una ruta
-        de prueba (timeout 2 s) y el resultado se cachea 5 s. mas_corta requiere OSRM_SHORTEST_URL.
+        La base debe tener pgRouting, la función de rutas y la red vial cargada (servicio red-vial). El resultado se
+        cachea 5 s.
       responses:
-        "200": { description: 'Ej. {"mas_rapida":true,"mas_corta":false,"motivos":{"mas_corta":"El servicio OSRM no responde"}}' }
+        "200": { description: 'Ej. {"disponible":true,"motivo":null}; si falta algo, {"disponible":false,"motivo":"..."}' }
 
   /eta/recursos/{recursoId}/incidentes/{incidenteId}:
     get:
       summary: Calcular tiempo estimado de llegada
       description: >
         Obtiene las ubicaciones del recurso y del incidente desde PostGIS.
-        Consulta OSRM para obtener distancia, duración y recorrido vial. Con criterio=mas_rapida (defecto) se
-        minimiza la duración (perfil driving); con criterio=mas_corta se minimiza la distancia vial usando el OSRM
-        propio (OSRM_SHORTEST_URL). La geometría se devuelve como GeoJSON en EPSG:4326.
-        No incorpora tráfico en tiempo real.
+        Calcula con pgRouting (dentro de PostgreSQL, sobre la red vial de OpenStreetMap de todo Uruguay) la distancia, la
+        duración y el recorrido por calles, respetando los sentidos de circulación. Hay un solo camino: el de menor
+        duración (con la velocidad de cada calle). Cada extremo se engancha al punto exacto de la calle
+        más cercana (hasta 500 m) y el trazado llega hasta el recurso y el incidente. Devuelve también las calles del
+        recorrido. La geometría es GeoJSON en EPSG:4326. No incorpora tráfico en tiempo real. Ver docs/RED_VIAL.md.
       tags: [eta]
       parameters:
-        - name: criterio
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [mas_rapida, mas_corta]
-            default: mas_rapida
         - name: recursoId
           in: path
           required: true
@@ -100,13 +94,6 @@ paths:
                   tiempoEstimadoMinutos:
                     type: integer
                     minimum: 0
-                  criterioRuta:
-                    type: string
-                    enum: [mas_rapida, mas_corta]
-                    description: >
-                      mas_rapida minimiza la duración; mas_corta minimiza la distancia vial (requiere
-                      OSRM propio, OSRM_SHORTEST_URL).
-                  criterioRutaTexto: { type: string }
                   distanciaDirectaMetros: { type: number, description: Línea recta recurso-incidente }
                   ajusteOrigenMetros: { type: number, nullable: true, description: Distancia a la calle más cercana (origen) }
                   ajusteDestinoMetros: { type: number, nullable: true, description: Distancia a la calle más cercana (destino) }
@@ -129,9 +116,17 @@ paths:
                           minItems: 2
                           items:
                             type: number
+                  calles:
+                    type: array
+                    description: Las calles del recorrido, en orden, con los metros que se recorren por cada una
+                    items:
+                      type: object
+                      properties:
+                        calle: { type: string, example: Avenida Juan Harriague }
+                        metros: { type: number, example: 254 }
                   motor:
                     type: string
-                    example: OSRM driving
+                    example: pgRouting (PostgreSQL)
                   aclaracion:
                     type: string
                     example: Estimacion sin trafico en tiempo real
@@ -140,9 +135,9 @@ paths:
         "404":
           $ref: "#/components/responses/NoExiste"
         "422":
-          description: OSRM no encontró una ruta vial
+          description: No hay camino por calles entre los dos puntos (alguno queda a más de 500 m de cualquier calle)
         "503":
-          description: Servicio OSRM no disponible, o criterio mas_corta sin OSRM_SHORTEST_URL configurado
+          description: Falta pgRouting, la red vial o la función de rutas en la base
 
   # ------------------------------------------------------------ Ingreso del administrador
   /auth/login:
@@ -198,7 +193,8 @@ paths:
     get:
       summary: Lista de zonas operativas (geom en GeoJSON lon/lat)
       description: >
-        Sin bbox devuelve todas las zonas como arreglo (compatibilidad). Con bbox devuelve solo las
+        Sin bbox devuelve un arreglo con las primeras zonas (hasta limit; por defecto 2000, nunca todas sin tope), con la
+        cantidad real en el encabezado X-Total-Count y X-Truncado=true si quedaron afuera. Con bbox devuelve solo las
         del rectángulo visible, hasta limit, como {items, total, truncado}: es lo que usan los ABM
         para no cargar miles de objetos en el navegador.
       tags: [zonas]
@@ -253,7 +249,7 @@ paths:
   /recursos:
     get:
       summary: Lista de recursos de emergencia (geom en GeoJSON lon/lat)
-      description: Igual que GET /zonas - sin bbox, arreglo con todos; con bbox, {items, total, truncado}.
+      description: Igual que GET /zonas - sin bbox, arreglo acotado (X-Total-Count, X-Truncado); con bbox, {items, total, truncado}.
       tags: [recursos]
       parameters:
         - $ref: "#/components/parameters/Bbox"
@@ -305,7 +301,8 @@ paths:
     get:
       summary: Lista incidentes, opcionalmente filtrados por bbox
       description: >
-        Sin bbox devuelve el arreglo tradicional. Con bbox devuelve {items, total, truncado}.
+        Sin bbox devuelve un arreglo con los primeros incidentes (hasta limit; por defecto 2000), con X-Total-Count y
+        X-Truncado en los encabezados. Con bbox devuelve {items, total, truncado}.
         El bbox usa EPSG:4326 y el orden oeste,sur,este,norte (minLon,minLat,maxLon,maxLat);
         PostGIS filtra las geometrías almacenadas en EPSG:32721. geom contiene GeoJSON serializado
         como texto y puede ser Point, LineString o Polygon en EPSG:4326.
@@ -482,32 +479,29 @@ paths:
     get:
       summary: >
         C3 con buffer. Recursos dentro de un buffer (ST_Buffer/ST_DWithin) alrededor del incidente, con distancia
-        directa y línea directa (ST_Distance/ST_ShortestLine) y, con conRutas=true, el recorrido por calles (OSRM)
-        de los 5 más cercanos. El parámetro criterio elige qué minimiza la ruta: mas_rapida (defecto, duración) o
-        mas_corta (distancia vial por calles permitidas, requiere el OSRM propio). Son criterios distintos: la ruta
-        más corta puede tardar más. Para incidentes LineString/Polygon se usa el punto del incidente más
-        cercano al recurso. Los tiempos no incluyen tráfico en tiempo real.
+        directa y línea directa (ST_Distance/ST_ShortestLine) y, con conRutas=true, el recorrido por calles (pgRouting)
+        de los 5 más cercanos, por el camino de menor duración. Para incidentes LineString/Polygon se usa el punto del
+        incidente más cercano al recurso. Los tiempos no incluyen tráfico en tiempo real.
       tags: [consultas]
       parameters:
         - { name: incidenteId, in: path, required: true, schema: { type: integer } }
-        - { name: criterio, in: query, required: false, schema: { type: string, enum: [mas_rapida, mas_corta], default: mas_rapida } }
         - { name: radioMetros, in: query, required: false, schema: { type: number, default: 2000, minimum: 1, maximum: 10000 } }
         - { name: limite, in: query, required: false, schema: { type: integer, default: 5, minimum: 1, maximum: 10 } }
         - { name: soloDisponibles, in: query, required: false, schema: { type: boolean, default: true } }
-        - { name: conRutas, in: query, required: false, schema: { type: boolean, default: false }, description: "true: consulta OSRM (máx. 5 recursos, plazo total 25 s)" }
+        - { name: conRutas, in: query, required: false, schema: { type: boolean, default: false }, description: "true: calcula la ruta por calles (máx. 5 recursos, plazo total 25 s)" }
       responses:
         "200":
           description: >
             { incidenteId, radioMetros, soloDisponibles, conRutas, incidente, bufferGeom (GeoJSON Polygon 4326),
-            totalEnRadio, truncado, criterioRuta ("mas_rapida"|"mas_corta"), criterioRutaTexto, rutasMaximas,
-            rutasDisponibles, recursoMejorId (según el criterio), recursoMasRapidoId, recursoMasCortoId,
+            totalEnRadio, truncado, rutasMaximas,
+            rutasDisponibles, recursoMasRapidoId (el de menor duración entre los que tienen ruta),
             items[{ recursoId, identificacion, tipo, estadoOperativo, geom, distanciaDirectaM,
             lineaDirecta (LineString), estadoRuta (no_calculada|disponible|sin_ruta|error|plazo_agotado), mensajeRuta,
             distanciaViaM, duracionS, tiempoEstimadoMinutos, geometriaRuta, ajusteOrigenM, ajusteDestinoM,
-            advertencia }] }
-        "400": { description: radioMetros, limite o criterio inválidos }
+            calles, advertencia }] }
+        "400": { description: radioMetros o limite inválidos }
         "404": { description: Incidente inexistente }
-        "503": { description: "conRutas=true con criterio mas_corta y OSRM_SHORTEST_URL sin configurar" }
+        "503": { description: "conRutas=true y falta pgRouting, la red vial o la función de rutas en la base" }
 
   /consultas/incidente-mas-cercano:
     get:
@@ -544,9 +538,9 @@ paths:
   /consultas/calles:
     get:
       summary: >
-        Auxiliar de C4 y C5. Nombres de calle que contienen el texto dado (mínimo 2 letras; vacío si es menos), con
-        los que empiezan por él primero. Máximo 10. Para el autocompletado de intersecciones. Usa la red vial local
-        (tabla via, de Salto).
+        Auxiliar de C4 y C5. Nombres de calle de TODO el país que contienen el texto dado (mínimo 2 letras; vacío si es
+        menos), sin distinguir mayúsculas ni tildes, con los que empiezan por él primero y después los más repetidos.
+        Máximo 10. Para el autocompletado de intersecciones. Sale de la red vial de OpenStreetMap (red_vial_arco).
       tags: [consultas]
       parameters:
         - { name: q, in: query, required: true, schema: { type: string } }
@@ -560,14 +554,19 @@ paths:
   /consultas/interseccion:
     get:
       summary: >
-        Auxiliar de C4 y C5. Puntos donde se cruzan dos calles (lon/lat, EPSG:4326), calculados en PostGIS sobre la
-        red vial local (tabla via, de Salto). Lista vacía si no se cruzan o algún nombre no existe; varios
-        elementos si hay nombres repetidos en la ciudad. El resultado se usa como lon/lat en
-        /consultas/incidente-mas-cercano y /consultas/zona-por-punto.
+        Auxiliar de C4 y C5. Lugares donde se cruzan dos calles en TODO el país (lon/lat, EPSG:4326), calculados en PostGIS
+        sobre la red vial de OpenStreetMap: un cruce es una esquina (vértice del grafo) a la que llegan un tramo de cada
+        calle. Sin distinguir mayúsculas, tildes ni abreviaturas (Av. = AVENIDA); si no hay calles con ese nombre exacto se
+        buscan las que lo contienen. Como una calle se repite en muchas localidades, devuelve hasta 10 cruces del más cercano
+        al punto "cerca" (por defecto el centro de Salto), cada uno con la ciudad, pueblo o barrio más próximo. Lista vacía si
+        no se cruzan o algún nombre no existe. El resultado se usa como lon/lat en /consultas/incidente-mas-cercano y
+        /consultas/zona-por-punto.
       tags: [consultas]
       parameters:
-        - { name: calle1, in: query, required: true, schema: { type: string }, description: "Nombre exacto, sin distinguir mayúsculas (ver /consultas/calles)" }
+        - { name: calle1, in: query, required: true, schema: { type: string }, description: "Nombre de la calle (ver /consultas/calles)" }
         - { name: calle2, in: query, required: true, schema: { type: string } }
+        - { name: cercaLon, in: query, required: false, schema: { type: number }, description: "Longitud del punto al que ordenar los cruces (por defecto Salto)" }
+        - { name: cercaLat, in: query, required: false, schema: { type: number }, description: "Latitud del punto al que ordenar los cruces (por defecto Salto)" }
       responses:
         "200":
           description: OK
@@ -580,6 +579,10 @@ paths:
                   properties:
                     lon: { type: number }
                     lat: { type: number }
+                    lugar: { type: string, nullable: true, description: "Ciudad, pueblo o barrio más próximo (OpenStreetMap)" }
+                    lugarTipo: { type: string, nullable: true, description: "city, town, village, hamlet, suburb o neighbourhood" }
+                    distanciaLugarM: { type: number, nullable: true }
+                    distanciaKm: { type: number, description: "Distancia al punto cerca, en km" }
         "400": { description: Falta una de las dos calles }
 
   /consultas/geocodificar:
@@ -591,16 +594,19 @@ paths:
         ("Av." = AVENIDA, "Gral" = GENERAL, "Dr" = DOCTOR) y tolerando errores de tipeo. Si el número no
         existe se devuelve la puerta más cercana de la calle y se marca "aproximada". La tabla de puertas es
         solo de Salto: con otro departamento o localidad, o con el parámetro esquina, se usa el servicio de
-        direcciones de la IDE de Uruguay, que cubre todo el país (requiere internet). Sin departamento ni
-        localidad se usan los configurados en el backend (IDE_DEPARTAMENTO e IDE_LOCALIDAD, por defecto Salto).
+        direcciones de la IDE de Uruguay, que cubre todo el país (requiere internet). Con departamento=todo la
+        dirección se busca en TODO el país: primero en las puertas de Salto y, si no está, en la IDE sin fijar
+        departamento; se elige la mejor coincidencia (la del portal exacto) y las otras se devuelven en "alternativas".
+        Sin departamento ni localidad se usan los configurados en el backend (IDE_DEPARTAMENTO e IDE_LOCALIDAD,
+        por defecto Salto).
         El resultado se usa como lon/lat en
         /consultas/incidente-mas-cercano y /consultas/zona-por-punto.
       tags: [consultas]
       parameters:
         - { name: direccion, in: query, required: true, schema: { type: string }, description: "Por ejemplo: Buenos Aires 451" }
         - { name: esquina, in: query, required: false, schema: { type: string }, description: "Segunda calle: ubica la esquina de direccion y esquina (siempre con la IDE)" }
-        - { name: departamento, in: query, required: false, schema: { type: string }, description: "Departamento donde buscar (por defecto, el de IDE_DEPARTAMENTO: salto). Fuera de Salto se usa la IDE, que cubre todo el país" }
-        - { name: localidad, in: query, required: false, schema: { type: string }, description: "Localidad (por defecto, igual al departamento si se indicó; si no, la de IDE_LOCALIDAD)" }
+        - { name: departamento, in: query, required: false, schema: { type: string }, description: "Departamento donde buscar (por defecto, el de IDE_DEPARTAMENTO: salto), o todo para buscar en todo el país. Fuera de Salto se usa la IDE, que cubre todo el país; solo con el departamento busca en todo el departamento" }
+        - { name: localidad, in: query, required: false, schema: { type: string }, description: "Localidad (opcional; si se indicó el departamento y no la localidad, se busca en todo el departamento; si no, la de IDE_LOCALIDAD)" }
       responses:
         "200":
           description: OK
@@ -615,6 +621,20 @@ paths:
                   aproximada: { type: boolean }
                   aviso: { type: string, nullable: true }
                   fuente: { type: string, description: "Puertas de Salto (tabla local) o IDE para otras localidades" }
+                  departamento: { type: string, description: "Donde se encontró (la IDE lo informa)" }
+                  localidad: { type: string }
+                  alternativas:
+                    type: array
+                    description: "Solo con departamento=todo: otras coincidencias de la calle en el país (hasta 5)"
+                    items:
+                      type: object
+                      properties:
+                        direccion: { type: string }
+                        departamento: { type: string }
+                        localidad: { type: string }
+                        lon: { type: number }
+                        lat: { type: number }
+                        aproximada: { type: boolean }
         "400": { description: Falta la dirección }
         "404": { description: No se encontró la calle (solo con el respaldo de la IDE) }
         "502": { description: Respaldo de la IDE no disponible (sin internet) }
@@ -713,7 +733,7 @@ components:
       name: limit
       in: query
       required: false
-      description: Máximo de objetos a devolver con bbox (por defecto 500, máximo 2000).
+      description: Máximo de objetos a devolver (máximo 2000). Por defecto 500 con bbox y 2000 sin bbox.
       schema: { type: integer, minimum: 1, maximum: 2000, default: 500 }
   responses:
     DatosInvalidos:

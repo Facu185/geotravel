@@ -33,5 +33,5 @@ Thumbs.db
 # --- Logs ---
 *.log
 
-# Datos procesados de OSRM (grandes, se generan con infra/osrm/preparar.ps1)
-infra/osrm/data/
+# Red vial de OpenStreetMap (el extracto de Uruguay y el CSV de arcos; los baja y genera infra/red-vial)
+infra/red-vial/data/

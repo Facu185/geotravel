@@ -1,6 +1,6 @@
 import { useState } from "react";
 import L from "leaflet";
-import { MapContainer, TileLayer, WMSTileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, Pane, TileLayer, WMSTileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
 import { REGION, REGIONES } from "./region.js";
 
 export const GEOSERVER_WMS_URL =
@@ -28,6 +28,24 @@ const MAPAS_BASE = {
     maxZoom: 19,
   },
 };
+
+/**
+ * Fondo de referencia para guiarse: las calles de GeoServer por jerarquía (a lo lejos solo las rutas y avenidas principales; al
+ * acercarse, las secundarias y las de barrio, con sus nombres) y los nombres de ciudades, pueblos y barrios (hasta el zoom 14,
+ * cuando toman la posta los nombres de las calles). Salen de la red de rutas (red_vial_arco, estilo calles_referencia) y de
+ * lugar_osm (estilo lugares_referencia); ver geoserver/styles. Es una sola imagen por tesela, en un panel propio por encima de las zonas y por debajo de los marcadores.
+ */
+const REFERENCIA = {
+  todo: "geotravel:referencia_todo", // grupo de capas: calles (calles_referencia) y lugares (lugares_referencia)
+  barrios: "geotravel:referencia_barrios", // grupo de capas: solo los lugares
+};
+
+/**
+ * La referencia no cambia, así que se pide por GeoWebCache (el caché de teselas de GeoServer): la primera vez dibuja y guarda
+ * el bloque de 4x4 teselas, y después responde del caché sin tocar la base. Si la URL de GeoServer no tiene el formato de
+ * siempre (.../geotravel/wms), se usa tal cual: sigue andando, pero sin caché.
+ */
+const GWC_URL = GEOSERVER_WMS_URL.replace(/\/geotravel\/wms$/, "/gwc/service/wms");
 
 /**
  * Botones para llevar el mapa a cada región de region.js (el sistema atiende todo el país: hay datos en Salto y en
@@ -88,6 +106,8 @@ function IndicadorZoom({ zoomMinimo }) {
  *   bounds        [[lat, lng], [lat, lng]]: encuadra el mapa a ese rectángulo en vez de center/zoom
  *   boundsOptions opciones de Leaflet para bounds (p. ej. paddingTopLeft)
  *   wmsExtra      parámetros extra para el pedido WMS; cambiarlos fuerza a recargar las capas
+ *   referencia    "todo" (default): calles por jerarquía y nombres de barrios de fondo; "barrios": solo los nombres de
+ *                 barrios (el mapa público tiene sus propias calles, que se prenden y apagan); false: nada
  *   irARegion     true: botones para llevar el mapa a cada región de region.js (Salto, Montevideo...)
  *   mostrarZoom   true: muestra el nivel de zoom actual en una esquina (útil donde algo depende del zoom)
  *   zoomMinimo    con mostrarZoom, el zoom desde el que se ven los objetos, para mostrarlo junto al actual
@@ -102,6 +122,7 @@ export default function MapView({
   bounds,
   boundsOptions,
   wmsExtra,
+  referencia = "todo",
   irARegion = false,
   mostrarZoom = false,
   zoomMinimo,
@@ -124,6 +145,23 @@ export default function MapView({
         maxNativeZoom={mapaBase.maxNativeZoom}
         maxZoom={mapaBase.maxZoom}
       />
+      {/* Un panel propio entre las formas (400) y los marcadores (600): así las calles y los nombres se ven también encima de las
+          zonas pintadas, y los íconos quedan arriba. Las teselas no reciben clics: no estorban. */}
+      {REFERENCIA[referencia] && (
+        <Pane name="referencia" style={{ zIndex: 450 }}>
+          <WMSTileLayer
+            key={`referencia|${referencia}`}
+            url={GWC_URL}
+            layers={REFERENCIA[referencia]}
+            format="image/png"
+            transparent
+            // tiled: GeoWebCache solo atiende teselas alineadas a su grilla (256 px, la misma de Leaflet).
+            tiled
+            opacity={0.9}
+            pane="referencia"
+          />
+        </Pane>
+      )}
       {zoomPosition && <ZoomControl position={zoomPosition} />}
       {irARegion && <IrARegion />}
       {mostrarZoom && <IndicadorZoom zoomMinimo={zoomMinimo} />}

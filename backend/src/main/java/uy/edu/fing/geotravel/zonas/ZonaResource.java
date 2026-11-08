@@ -48,7 +48,8 @@ public class ZonaResource {
             "SELECT id, nombre, descripcion, nivel_prioridad, responsable, observaciones, "
           + "       ST_AsGeoJSON(ST_Transform(geom, 4326)) AS geom_json ";
 
-    private static final String SELECT_ALL = COLUMNAS + "FROM zona_operativa ORDER BY id";
+    /** Sin rectángulo: las primeras "limit" (nunca todas). El total real se cuenta aparte, sin armar el GeoJSON. */
+    private static final String SELECT_ALL = COLUMNAS + "FROM zona_operativa ORDER BY id LIMIT ?";
 
     /** Zonas del rectángulo visible. COUNT(*) OVER() se calcula antes del LIMIT: es el total real. */
     private static final String SELECT_BBOX =
@@ -65,14 +66,21 @@ public class ZonaResource {
     }
 
     /**
-     * Sin bbox: todas las zonas, como lista (lo sigue usando Consultas).
+     * Sin bbox: las primeras zonas (hasta "limit", por defecto el máximo de 2000), como lista; la cantidad real va en
+     * el encabezado X-Total-Count y X-Truncado avisa si quedaron afuera.
      * Con bbox: solo las del rectángulo visible, hasta "limit", como {items, total, truncado}.
      */
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Response listar(@QueryParam("bbox") String bbox, @QueryParam("limit") Integer limit) throws SQLException {
         if (bbox == null) {
-            return Response.ok(listarTodas()).build();
+            int tope;
+            try {
+                tope = Bbox.limiteSinRectangulo(limit);
+            } catch (IllegalArgumentException e) {
+                return error(400, e.getMessage());
+            }
+            return listarSinRectangulo(tope);
         }
         Bbox rect;
         int limite;
@@ -99,17 +107,24 @@ public class ZonaResource {
         return Response.ok(Bbox.resultado(zonas, total)).build();
     }
 
-    private static List<Map<String, Object>> listarTodas() throws SQLException {
+    private static Response listarSinRectangulo(int tope) throws SQLException {
         List<Map<String, Object>> zonas = new ArrayList<>();
-        try (Connection conn = DataSourceProvider.get().getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(SELECT_ALL)) {
-
-            while (rs.next()) {
-                zonas.add(aZona(rs));
+        int total;
+        try (Connection conn = DataSourceProvider.get().getConnection()) {
+            try (PreparedStatement ps = conn.prepareStatement(SELECT_ALL)) {
+                ps.setInt(1, tope);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        zonas.add(aZona(rs));
+                    }
+                }
+            }
+            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery("SELECT count(*) FROM zona_operativa")) {
+                rs.next();
+                total = rs.getInt(1);
             }
         }
-        return zonas;
+        return Bbox.arregloAcotado(zonas, total);
     }
 
     private static Map<String, Object> aZona(ResultSet rs) throws SQLException {

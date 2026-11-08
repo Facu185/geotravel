@@ -10,6 +10,23 @@ const etiquetaDe = (tipo, o) => (tipo === "zona" ? o.nombre : tipo === "incident
 
 const COLOR_GRUPO = { incidente: "#13202c", recurso: "#0f766e" };
 
+/** true si el punto [lng, lat] está dentro del anillo (lista de [lng, lat]); método del rayo. */
+const dentroDelAnillo = (x, y, anillo) => {
+  let dentro = false;
+  for (let i = 0, j = anillo.length - 1; i < anillo.length; j = i++) {
+    const [xi, yi] = anillo[i];
+    const [xj, yj] = anillo[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) dentro = !dentro;
+  }
+  return dentro;
+};
+
+/** true si la geometría (Polygon o MultiPolygon, en lon/lat) contiene el punto; los huecos no cuentan. */
+const contiene = (geometria, lng, lat) => {
+  const poligonos = geometria.type === "Polygon" ? [geometria.coordinates] : geometria.type === "MultiPolygon" ? geometria.coordinates : [];
+  return poligonos.some(([exterior, ...huecos]) => dentroDelAnillo(lng, lat, exterior) && !huecos.some((h) => dentroDelAnillo(lng, lat, h)));
+};
+
 /**
  * Los objetos de la vista que se pueden elegir con un clic en el mapa: zonas, incidentes o recursos, cada uno con su
  * color (prioridad, estado) o su ícono. El elegido se dibuja más marcado. Va dentro del mapa.
@@ -85,6 +102,16 @@ export default function CapaElegibles({ elegibles }) {
             capa.bindTooltip(etiquetaDe(tipo, o), { sticky: true });
             capa.on("click", (e) => {
               L.DomEvent.stopPropagation(e);
+              // Las zonas pueden superponerse: con un clic en un lugar que está en varias, se elige la siguiente de las que
+              // lo contienen (un clic más pasa a la próxima), así se puede llegar también a las que quedan debajo.
+              if (tipo === "zona") {
+                const aqui = ultimo.current.items.filter((z) => contiene(z.geometria, e.latlng.lng, e.latlng.lat));
+                if (aqui.length > 1) {
+                  const actual = aqui.findIndex((z) => z.id === ultimo.current.elegidoId);
+                  ultimo.current.elegir(aqui[(actual + 1) % aqui.length]);
+                  return;
+                }
+              }
               ultimo.current.elegir(o);
             });
           }}

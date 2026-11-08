@@ -15,7 +15,15 @@ import { GEOSERVER_WMS_URL } from "../../components/MapView.jsx";
 const aLatLng = ([x, y]) => L.CRS.EPSG3857.unproject(L.point(x, y));
 
 const WFS_URL = GEOSERVER_WMS_URL.replace(/\/wms$/, "/ows");
-const ORDEN = { incidente: 0, recurso: 1, zona_operativa: 2, via: 3 };
+const ORDEN = { incidente: 0, recurso: 1, zona_operativa: 2, via: 3, red_vial_arco: 4 };
+
+/** Cómo se llama cada tipo de vía de OpenStreetMap (campo highway de la red de rutas). */
+const TIPO_VIA = {
+  motorway: "Autopista", motorway_link: "Enlace de autopista", trunk: "Ruta", trunk_link: "Enlace de ruta",
+  primary: "Avenida principal", primary_link: "Enlace", secondary: "Calle secundaria", secondary_link: "Enlace",
+  tertiary: "Calle secundaria", tertiary_link: "Enlace", residential: "Calle", unclassified: "Calle",
+  living_street: "Calle residencial", service: "Calle de servicio",
+};
 const capaDe = (objeto) => objeto.id.split(".")[0];
 
 async function consultarObjetos(map, latlng, capas, cql) {
@@ -54,15 +62,25 @@ async function consultarObjetos(map, latlng, capas, cql) {
   // con ese nombre (WFS) para resaltarla entera.
   const calles = [...new Set(objetos.filter((o) => capaDe(o) === "via").map((o) => o.properties.nom_calle))];
   for (const nombre of calles) {
-    const tramos = await tramosDeCalle(nombre);
+    const tocados = objetos.filter((o) => capaDe(o) === "via" && o.properties.nom_calle === nombre);
+    const tramos = await tramosDeCalle(nombre, tocados);
     const sinTramos = objetos.filter((o) => !(capaDe(o) === "via" && o.properties.nom_calle === nombre));
     objetos.splice(0, objetos.length, ...sinTramos, ...tramos);
   }
   return objetos.sort((a, b) => (ORDEN[capaDe(a)] ?? 9) - (ORDEN[capaDe(b)] ?? 9));
 }
 
-/** Todos los tramos de una calle, por WFS, en EPSG:3857 como el resto de las geometrías del detalle. */
-async function tramosDeCalle(nombre) {
+/**
+ * Todos los tramos de una calle, por WFS, en EPSG:3857 como el resto de las geometrías del detalle. La capa es de todo el país y un
+ * nombre se repite en muchas ciudades: solo se piden los tramos a menos de 4 km de los que se tocaron.
+ */
+async function tramosDeCalle(nombre, tocados) {
+  const xs = [];
+  const ys = [];
+  const recorrer = (c) => (typeof c[0] === "number" ? (xs.push(c[0]), ys.push(c[1])) : c.forEach(recorrer));
+  tocados.forEach((o) => o.geometry && recorrer(o.geometry.coordinates));
+  const margen = 4000;
+  const cerca = xs.length ? ` AND BBOX(geom, ${Math.min(...xs) - margen}, ${Math.min(...ys) - margen}, ${Math.max(...xs) + margen}, ${Math.max(...ys) + margen}, 'EPSG:3857')` : "";
   const params = new URLSearchParams({
     service: "WFS",
     version: "2.0.0",
@@ -70,7 +88,7 @@ async function tramosDeCalle(nombre) {
     typeNames: "geotravel:via",
     outputFormat: "application/json",
     srsName: "EPSG:3857",
-    cql_filter: `nom_calle='${nombre.replace(/'/g, "''")}'`,
+    cql_filter: `nom_calle='${nombre.replace(/'/g, "''")}'${cerca}`,
   });
   const respuesta = await fetch(`${WFS_URL}?${params}`);
   if (!respuesta.ok) throw new Error(`GeoServer respondió ${respuesta.status}`);
@@ -196,6 +214,25 @@ function Objeto({ objeto }) {
     );
   }
 
+  if (capa === "red_vial_arco") {
+    return (
+      <article className="seleccion">
+        <header className="detalle__cabecera">
+          <div>
+            <p className="seleccion__tipo">Red de rutas</p>
+            <h3 className="bloque__titulo">{p.nombre ?? "Calle sin nombre"}</h3>
+          </div>
+          <Insignia color="#0f766e">{TIPO_VIA[p.highway] ?? p.highway}</Insignia>
+        </header>
+        <dl className="datos">
+          <Dato nombre="Sentido">{p.mano_unica ? "Mano única (el sentido permitido es el de la flecha)" : "Doble mano"}</Dato>
+          <Dato nombre="Velocidad">{p.velocidad_kmh ? `${p.velocidad_kmh} km/h` : null}</Dato>
+          <Dato nombre="Ruta">{p.referencia}</Dato>
+        </dl>
+      </article>
+    );
+  }
+
   if (capa === "via") {
     return (
       <article className="seleccion">
@@ -232,9 +269,22 @@ function Objeto({ objeto }) {
 export function DetalleFlotante({ objetos: todos, alCerrar }) {
   // Una calle son varios tramos: en un cruce se tocan dos o más tramos de la misma calle, y se
   // muestra una sola tarjeta por nombre (en el mapa se resaltan todos).
-  const objetos = todos.filter(
-    (o, i) => capaDe(o) !== "via" || todos.findIndex((x) => capaDe(x) === "via" && x.properties.nom_calle === o.properties.nom_calle) === i,
+  // Si además se tocó la red de rutas con esa misma calle, solo se muestra esa tarjeta: trae lo mismo y además el sentido y la velocidad.
+  const nombresDeRed = new Set(
+    todos.filter((o) => capaDe(o) === "red_vial_arco" && o.properties.nombre).map((o) => o.properties.nombre.toUpperCase()),
   );
+  // Lo mismo con los tramos de la red de rutas: una calle son muchos tramos (uno por esquina) y, con el mapa alejado, un clic toca varios.
+  // Se muestra una tarjeta por cada combinación distinta de nombre, tipo, sentido, velocidad y ruta.
+  const clave = (o) => {
+    const p = o.properties;
+    return capaDe(o) === "via" ? `via|${p.nom_calle}` : `red|${p.nombre}|${p.highway}|${p.mano_unica}|${p.velocidad_kmh}|${p.referencia}`;
+  };
+  const objetos = todos.filter((o, i) => {
+    const capa = capaDe(o);
+    if (capa !== "via" && capa !== "red_vial_arco") return true;
+    if (capa === "via" && nombresDeRed.has(o.properties.nom_calle?.toUpperCase())) return false;
+    return todos.findIndex((x) => capaDe(x) === capa && clave(x) === clave(o)) === i;
+  });
   return (
     <aside className="detalle-flotante" aria-label="Detalle de lo seleccionado">
       <button type="button" className="panel__cerrar detalle-flotante__cerrar" onClick={alCerrar} aria-label="Cerrar el detalle">
