@@ -118,6 +118,7 @@ public class IncidenteBboxIntegrationTest {
 
         assertEquals(200, response.getStatus());
         assertTrue(response.getEntity() instanceof List);
+        assertNotNull(response.getHeaderString("X-Total-Count"));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> todos = (List<Map<String, Object>>) response.getEntity();
         Map<String, Object> fixture = todos.stream()
@@ -129,6 +130,16 @@ public class IncidenteBboxIntegrationTest {
         assertTrue(fixture.get("titulo") instanceof String);
         assertTrue(fixture.get("fechaHoraRegistro") instanceof String);
         assertTrue(fixture.get("geom") instanceof String);
+    }
+
+    @Test
+    public void sinBboxElListadoTieneTopeYAvisaCuantosHay() throws Exception {
+        Response response = resource.listar(null, "1");
+
+        assertEquals(200, response.getStatus());
+        assertEquals(1, ((List<?>) response.getEntity()).size());
+        assertTrue(Integer.parseInt(response.getHeaderString("X-Total-Count")) >= fixtureIds.size());
+        assertEquals("true", response.getHeaderString("X-Truncado"));
     }
 
     @Test

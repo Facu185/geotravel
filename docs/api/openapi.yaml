@@ -193,7 +193,8 @@ paths:
     get:
       summary: Lista de zonas operativas (geom en GeoJSON lon/lat)
       description: >
-        Sin bbox devuelve todas las zonas como arreglo (compatibilidad). Con bbox devuelve solo las
+        Sin bbox devuelve un arreglo con las primeras zonas (hasta limit; por defecto 2000, nunca todas sin tope), con la
+        cantidad real en el encabezado X-Total-Count y X-Truncado=true si quedaron afuera. Con bbox devuelve solo las
         del rectángulo visible, hasta limit, como {items, total, truncado}: es lo que usan los ABM
         para no cargar miles de objetos en el navegador.
       tags: [zonas]
@@ -248,7 +249,7 @@ paths:
   /recursos:
     get:
       summary: Lista de recursos de emergencia (geom en GeoJSON lon/lat)
-      description: Igual que GET /zonas - sin bbox, arreglo con todos; con bbox, {items, total, truncado}.
+      description: Igual que GET /zonas - sin bbox, arreglo acotado (X-Total-Count, X-Truncado); con bbox, {items, total, truncado}.
       tags: [recursos]
       parameters:
         - $ref: "#/components/parameters/Bbox"
@@ -300,7 +301,8 @@ paths:
     get:
       summary: Lista incidentes, opcionalmente filtrados por bbox
       description: >
-        Sin bbox devuelve el arreglo tradicional. Con bbox devuelve {items, total, truncado}.
+        Sin bbox devuelve un arreglo con los primeros incidentes (hasta limit; por defecto 2000), con X-Total-Count y
+        X-Truncado en los encabezados. Con bbox devuelve {items, total, truncado}.
         El bbox usa EPSG:4326 y el orden oeste,sur,este,norte (minLon,minLat,maxLon,maxLat);
         PostGIS filtra las geometrías almacenadas en EPSG:32721. geom contiene GeoJSON serializado
         como texto y puede ser Point, LineString o Polygon en EPSG:4326.
@@ -731,7 +733,7 @@ components:
       name: limit
       in: query
       required: false
-      description: Máximo de objetos a devolver con bbox (por defecto 500, máximo 2000).
+      description: Máximo de objetos a devolver (máximo 2000). Por defecto 500 con bbox y 2000 sin bbox.
       schema: { type: integer, minimum: 1, maximum: 2000, default: 500 }
   responses:
     DatosInvalidos:

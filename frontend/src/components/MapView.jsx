@@ -36,9 +36,16 @@ const MAPAS_BASE = {
  * lugar_osm (estilo lugares_referencia); ver geoserver/styles. Es una sola imagen por tesela, en un panel propio por encima de las zonas y por debajo de los marcadores.
  */
 const REFERENCIA = {
-  todo: { layers: "geotravel:red_vial_arco,geotravel:lugar_osm", styles: "calles_referencia,lugares_referencia" },
-  barrios: { layers: "geotravel:lugar_osm", styles: "lugares_referencia" },
+  todo: "geotravel:referencia_todo", // grupo de capas: calles (calles_referencia) y lugares (lugares_referencia)
+  barrios: "geotravel:referencia_barrios", // grupo de capas: solo los lugares
 };
+
+/**
+ * La referencia no cambia, así que se pide por GeoWebCache (el caché de teselas de GeoServer): la primera vez dibuja y guarda
+ * el bloque de 4x4 teselas, y después responde del caché sin tocar la base. Si la URL de GeoServer no tiene el formato de
+ * siempre (.../geotravel/wms), se usa tal cual: sigue andando, pero sin caché.
+ */
+const GWC_URL = GEOSERVER_WMS_URL.replace(/\/geotravel\/wms$/, "/gwc/service/wms");
 
 /**
  * Botones para llevar el mapa a cada región de region.js (el sistema atiende todo el país: hay datos en Salto y en
@@ -144,17 +151,14 @@ export default function MapView({
         <Pane name="referencia" style={{ zIndex: 450 }}>
           <WMSTileLayer
             key={`referencia|${referencia}`}
-            url={GEOSERVER_WMS_URL}
-            layers={REFERENCIA[referencia].layers}
-            styles={REFERENCIA[referencia].styles}
+            url={GWC_URL}
+            layers={REFERENCIA[referencia]}
             format="image/png"
             transparent
-            buffer={32}
+            // tiled: GeoWebCache solo atiende teselas alineadas a su grilla (256 px, la misma de Leaflet).
+            tiled
             opacity={0.9}
             pane="referencia"
-            // Teselas de 512 px (una por cada cuatro de 256): la mitad de pedidos por lado y menos nombres cortados en el borde.
-            tileSize={512}
-            zoomOffset={-1}
           />
         </Pane>
       )}

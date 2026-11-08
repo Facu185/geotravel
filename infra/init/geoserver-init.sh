@@ -78,4 +78,32 @@ existe "$G/workspaces/$WS/styles/calles_referencia.json" ||   curl -sf $A -X POS
 curl -sf $A -X PUT -H "Content-Type: application/vnd.ogc.sld+xml" --data-binary "@/opt/geoserver/data_dir/styles/calles_referencia.sld" "$G/workspaces/$WS/styles/calles_referencia" > /dev/null
 echo "estilo calles_referencia: disponible para red_vial_arco"
 
+# Referencia en caché: las calles y los barrios de fondo del mapa no cambian, así que el frontend los pide por GeoWebCache
+# (/geoserver/gwc/service/wms) en vez de dibujarlos de nuevo en cada pedido. GeoWebCache cachea capas o grupos de capas, no
+# combinaciones de capas con estilos: por eso se publican dos grupos, uno por cada fondo que usa el mapa.
+#   referencia_todo     calles por jerarquía (calles_referencia) + ciudades, pueblos y barrios (lugares_referencia)
+#   referencia_barrios  solo los nombres de lugares (mapa público: tiene su propio botón de Calles)
+grupo() {
+  nombre="$1"; capas="$2"; estilos="$3"
+  existe "$G/workspaces/$WS/layergroups/$nombre.json" && { echo "grupo $nombre: ya existe"; return; }
+  curl -sf $A -X POST -H "$JSON" "$G/workspaces/$WS/layergroups" -d "{\"layerGroup\":{\"name\":\"$nombre\",\"mode\":\"SINGLE\",\"title\":\"$nombre\",
+    \"workspace\":{\"name\":\"$WS\"},\"publishables\":{\"published\":[$capas]},\"styles\":{\"style\":[$estilos]},
+    \"bounds\":{\"minx\":-58.6,\"maxx\":-52.9,\"miny\":-35.1,\"maxy\":-30.0,\"crs\":\"EPSG:4326\"}}}" > /dev/null
+  echo "grupo $nombre: creado"
+}
+CALLES="{\"@type\":\"layer\",\"name\":\"$WS:red_vial_arco\"}"
+LUGARES="{\"@type\":\"layer\",\"name\":\"$WS:lugar_osm\"}"
+grupo referencia_todo "$CALLES,$LUGARES" "{\"name\":\"$WS:calles_referencia\"},{\"name\":\"$WS:lugares_referencia\"}"
+grupo referencia_barrios "$LUGARES" "{\"name\":\"$WS:lugares_referencia\"}"
+
+# Los estilos se vuelven a subir en cada corrida: se vacía el caché de los dos grupos para que un cambio en un .sld se vea.
+# Los navegadores guardan cada tesela 1 hora (expireClients); si cambió un estilo, Ctrl+F5.
+W="http://geoserver:8080/geoserver/gwc/rest"
+for g in referencia_todo referencia_barrios; do
+  curl -sf $A "$W/layers/$WS:$g.xml" | sed 's|<expireClients>0</expireClients>|<expireClients>3600</expireClients>|' > /tmp/gwc_$g.xml
+  curl -sf $A -X PUT -H "Content-Type: text/xml" --data-binary "@/tmp/gwc_$g.xml" "$W/layers/$WS:$g.xml" > /dev/null
+  curl -sf $A -X POST -H "Content-Type: text/xml" -d "<truncateLayer><layerName>$WS:$g</layerName></truncateLayer>" "$W/masstruncate" > /dev/null
+  echo "caché $g: configurado y vaciado"
+done
+
 echo "geoserver-init: listo"

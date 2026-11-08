@@ -114,7 +114,7 @@ Los pedidos del cliente se reparten según lo que necesitan. El **fondo y las im
 WMS. Los **conteos y el detalle** de lo que se toca en el mapa público salen de GeoServer por WFS (`resultType=hits` con un
 filtro CQL por el rectángulo visible) y GetFeatureInfo. Los **objetos de la vista actual** (con su geometría, para dibujarlos y
 editarlos) y todas las acciones salen del backend por REST, con `bbox` y `limit`. El backend consulta la base por JDBC; no pasa
-por GeoServer.
+por GeoServer. Las pantallas de gestión dibujan además un fondo de referencia, sin clics, con las calles de la red de rutas por jerarquía (a lo lejos solo las rutas y avenidas; al acercarse, las de barrio con su nombre) y los nombres de ciudades, pueblos y barrios (`lugar_osm`). Como no cambia, se pide por el caché de teselas de GeoServer (GeoWebCache) y no se dibuja de nuevo en cada pedido.
 
 Un filtro de autenticación (`AuthFilter`) niega todo por defecto y deja públicas solo las lecturas que ve el invitado y el
 inicio de sesión del administrador.
@@ -158,7 +158,7 @@ aceptan `?bbox=oeste,sur,este,norte&limit=N` y devuelven `{items, total, truncad
 Uruguay antes de transformarlo. En el frontend, un componente compartido pide solo lo visible, espera 300 ms tras mover el
 mapa, cancela el pedido anterior y reemplaza la capa en lugar de acumularla; con el mapa alejado no pide nada y deja que
 GeoServer dibuje todos los objetos como imagen (WMS). Si hay más objetos que el límite, la pantalla avisa ("Mostrando 500
-de 3000"). Se probó con una carga masiva de 700 zonas y 3000 recursos en Salto (`db/pruebas/carga-masiva.sql`).
+de 3000"). Se probó con una carga masiva de 700 zonas y 3000 recursos en Salto (`db/pruebas/carga-masiva.sql`). Además se midió con 100.000 incidentes, 30.000 recursos y 5.000 zonas sintéticos (cargados y borrados después): los listados por rectángulo responden en 0,2 a 90 ms y los dibujos de GeoServer en menos de 130 ms. Esa revisión dejó tres cambios: los listados sin rectángulo también tienen tope (2.000, con la cantidad real en el encabezado `X-Total-Count`), el fondo de calles y barrios se sirve desde el caché de teselas de GeoServer (GeoWebCache) y las consultas a la base tienen un tiempo máximo de 15 s.
 
 **Pruebas.** Hay pruebas unitarias del rectángulo y del límite (`BboxTest`) y pruebas de integración contra PostGIS
 (`ZonasRecursosIntegrationTest`, se ejecutan con `URBANSAFE_INTEGRATION_TESTS=true`): comprueban que una zona idéntica a otra
@@ -172,7 +172,7 @@ superpuestos, los 8 municipios de Montevideo (Intendencia de Montevideo) y las l
 (OpenStreetMap). Los **recursos** son 21 en Salto y 225 en Montevideo: hospitales, mutualistas, policlínicas, destacamentos de
 bomberos, comisarías y bases de emergencia móvil, en sus coordenadas reales (lista de servicios de salud de la Intendencia de
 Montevideo y OpenStreetMap). OpenStreetMap trae pocos servicios de Salto, así que el resto de los recursos de ahí (unidades
-móviles en recorrida y ambulancias del interior) son simulados y están marcados como tales. Los incidentes de la ciudad van
+móviles en recorrida y ambulancias del interior) son simulados y están marcados como tales. El conjunto trae 198 incidentes (114 en Salto y 83 en Montevideo) y 77 unidades móviles simuladas, que suman 88 patrullas y 37 ambulancias en total. Los incidentes de la ciudad van
 sobre las calles, más donde hay más calles, siempre del lado de Salto (la tabla de calles también trae Concordia, del otro lado del río). Esto no es solo estético: un recurso o un
 incidente en el río no tiene camino, y el cálculo de rutas (distancia y tiempo de llegada) necesita que ambos extremos
 estén en la red vial.
@@ -196,7 +196,7 @@ mapa se encuadra solo sobre el resultado. Los desplegables para elegir una zona,
 texto (`/consultas/buscar`) que busca en todo el sistema y no obliga a cargar listas completas. Se probó con una carga masiva de
 700 zonas y 3.000 recursos.
 
-**Vista del invitado.** El mapa público muestra zonas, recursos, incidentes y capas de referencia (calles y la red de rutas).
+**Vista del invitado.** El mapa público muestra zonas, recursos, incidentes y capas de referencia (calles y la red de rutas) y los nombres de barrios.
 Los conteos de cada capa son los de **lo que se ve**: se piden a GeoServer por WFS con `resultType=hits` y un filtro CQL
 `BBOX(geom, ...)` con el rectángulo visible, y se actualizan al mover el mapa. Al hacer clic se pide el detalle con
 GetFeatureInfo y se resalta el objeto. Con el mapa alejado, los objetos superpuestos se agrupan con un número: GeoServer usa la
@@ -258,7 +258,7 @@ unos 300 ms; y una de 489 km entre Salto y Montevideo, 1,1 s. Con la red de todo
 la ruta salga y llegue a los puntos pedidos, que informe las calles del recorrido, que funcione en Montevideo (la red cubre todo el
 país), que un punto fuera de cobertura dé "sin ruta", que dos puntos iguales den una ruta nula y que el plazo agotado se traduzca
 en un error claro.
-`BusquedaEnTodoElPaisTest` cubre las direcciones y los cruces. En total, la suite del backend tiene 88 pruebas; 30 de integración
+`BusquedaEnTodoElPaisTest` cubre las direcciones y los cruces. En total, la suite del backend tiene 118 pruebas; 31 de integración
 se activan con una variable de entorno.
 
 ### Autenticación y vistas por rol (P5)

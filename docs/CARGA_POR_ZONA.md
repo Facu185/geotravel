@@ -22,7 +22,7 @@ GET /zonas?bbox=oeste,sur,este,norte&limit=500
   Se recorta a la extensión de Uruguay antes de pasar a EPSG:32721.
 - `limit` por defecto 500, máximo 2000.
 - `total` es la cantidad real en el rectángulo (`COUNT(*) OVER ()`, calculado antes del `LIMIT`).
-- Sin `bbox` la respuesta sigue siendo el arreglo de siempre (compatibilidad con Consultas).
+- Sin `bbox` la respuesta sigue siendo un arreglo, pero acotado: las primeras `limit` (por defecto 2000, nunca todas sin tope), con la cantidad real en el encabezado `X-Total-Count` y `X-Truncado: true` si quedaron afuera.
 - Filtro: `geom && ST_Transform(ST_MakeEnvelope(?, ?, ?, ?, 4326), 32721)` usa el índice GiST
   (verificado con `EXPLAIN`: `Index Scan using idx_recurso_geom`).
 - Implementado en `/zonas` y `/recursos` con `backend/.../mapa/Bbox.java`, reusable para
@@ -145,6 +145,34 @@ cantidad; del zoom 15 en adelante se ven los íconos. Hay dos mecanismos con la 
 
 Probado con `db/pruebas/carga-masiva.sql` (700 zonas, 3.000 recursos): las consultas responden en 10 a 30 ms.
 
+### Verificación a escala (2026-11-08)
+
+Se cargaron 5.000 zonas, 30.000 recursos y 100.000 incidentes sintéticos repartidos por el país (`EXPLAIN ANALYZE` y tiempos
+HTTP; después se borraron). Lo que se midió:
+
+| Qué | Tiempo |
+|---|---|
+| Zonas / recursos del rectángulo visible | 0,2 a 9 ms |
+| Incidentes: ciudad / medio país a la vista | 7 ms / 90 ms |
+| Incidente más cercano, zona por punto | ~0,1 ms |
+| Ruta con pgRouting (consulta 3) | 10 a 115 ms |
+| Conteos WFS del mapa público (país entero, 216 mil arcos) | 10 a 120 ms |
+| Teselas de GeoServer (datos y calles de referencia) | 15 a 120 ms; 12 a 29 ms desde el caché |
+| 100 pedidos a `/zonas?bbox` con 20 a la vez; 60 teselas con 20 a la vez | sin fallos |
+
+Cambios que salieron de la revisión: los listados sin `bbox` tienen tope; la referencia (calles y barrios) sale de
+GeoWebCache (grupos `referencia_todo` y `referencia_barrios`, ver `infra/init/geoserver-init.sh`); cada consulta tiene un
+`statement_timeout` de 15 s (`DB_STATEMENT_TIMEOUT_MS`).
+
+Límites conocidos, sin resolver:
+
+- El `COUNT(*) OVER ()` obliga a recorrer todo lo que cae en el rectángulo antes del límite: crece con la cantidad de objetos
+  de la vista (90 ms con 62 mil). El zoom mínimo lo acota.
+- La consulta 2 (zonas con más incidentes) y el reporte hacen un join zonas por incidentes: 245 y 295 ms con 5 mil por 100 mil.
+- Fuera de Salto, la dirección la resuelve la IDE (servicio externo): 0,4 a 0,9 s, sin caché; plazo de 10 s.
+- Los buscadores de los selectores (`/consultas/buscar`) usan `ILIKE '%texto%'` sin índice trigram: 2 a 9 ms con 30 mil filas.
+- No se probó con usuarios reales a la vez sobre 100 mil incidentes ni el navegador dibujando 500 polígonos reales complejos.
+
 ## Mapa público (P5)
 
 El mapa público ya dibujaba todo con GeoServer (imágenes), así que escala. Lo que faltaba eran los números:
@@ -154,8 +182,8 @@ El mapa público ya dibujaba todo con GeoServer (imágenes), así que escala. Lo
   `resultType=hits` usando el índice espacial, sin descargar objetos. Los filtros de incidentes y recursos se combinan
   con ese rectángulo.
 - **Detalle al tocar:** `GetFeatureInfo` trae como máximo 10 objetos.
-- **Región:** el mapa abre centrado en Salto (`region.js`). El seed trae datos reales en el departamento de Salto (18 zonas, 30
-  recursos y 44 incidentes, en la ciudad y en el interior) y también en Montevideo (33 zonas, 225 recursos y 25 incidentes),
+- **Región:** el mapa abre centrado en Salto (`region.js`). El seed trae datos reales en el departamento de Salto (18 zonas, 52
+  recursos y 114 incidentes, en la ciudad y en el interior) y también en Montevideo (33 zonas, 271 recursos y 83 incidentes),
   para comprobar que el sistema atiende todo el país: al mover el mapa a otra región (botones "Ir a") los conteos y las
   capas cambian.
 

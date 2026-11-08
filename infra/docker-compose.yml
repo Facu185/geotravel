@@ -126,6 +126,7 @@ services:
       DB_NAME: ${POSTGRES_DB:-geotravel}
       DB_USER: ${POSTGRES_USER:-geotravel}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      DB_STATEMENT_TIMEOUT_MS: ${DB_STATEMENT_TIMEOUT_MS:-15000}
       IDE_DEPARTAMENTO: ${IDE_DEPARTAMENTO:-salto}
       IDE_LOCALIDAD: ${IDE_LOCALIDAD:-salto}
       FOTOS_DIR: /data/fotos

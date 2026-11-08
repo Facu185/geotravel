@@ -57,11 +57,13 @@ INSERT INTO historial_estado (incidente_id, estado, fecha_hora, usuario) VALUES
 -- Datos de prueba para recorrer el sistema, en cantidad moderada y repartidos como en la realidad:
 --   * Salto: 18 zonas operativas reales (16 seccionales policiales, que no se superponen, y encima las localidades de Salto
 --     y de Termas del Daymán), 21 recursos reales (hospital, centros médicos y mutualista, policlínicas del interior, estación
---     de bomberos, jefatura y seccionales de policía, ambulancias) más 9 unidades móviles, y 43 incidentes. La ciudad tiene la
+--     de bomberos, jefatura y seccionales de policía, ambulancias) más 31 unidades móviles (10 ambulancias, 16 patrullas y 2 camiones
+--     de bomberos en la ciudad, y 3 ambulancias en el interior), y 114 incidentes. La ciudad tiene la
 --     mayoría, a lo largo de sus calles reales; el resto está en las localidades del departamento (Daymán, Belén, Constitución,
 --     Termas del Arapey, Pueblo Lavalleja...).
 --   * Montevideo: 33 zonas reales (25 seccionales y, superpuestos, 8 municipios), 225 recursos reales (servicios de salud,
---     bomberos, seccionales y comisarías móviles, ambulancias) y 25 incidentes sobre calles (el sistema atiende todo el país).
+--     bomberos, seccionales y comisarías móviles, ambulancias) más 46 unidades móviles (16 ambulancias y 30 patrullas) y 83
+--     incidentes sobre calles (el sistema atiende todo el país).
 -- Zonas y recursos son de la Intendencia de Montevideo, del Ministerio del Interior (UNASEV) y de OpenStreetMap (ODbL):
 -- ver el encabezado de datos_reales.sql. Los incidentes y las unidades móviles son inventados y deterministas (semilla fija).
 -- Va después de la carga de la red vial (seed.sh la carga antes).
@@ -88,8 +90,8 @@ WHERE red = (SELECT red FROM c ORDER BY geom <-> ST_Transform(ST_SetSRID(ST_Make
 CREATE INDEX ON _calles_salto USING gist (geom);
 ANALYZE _calles_salto;
 
--- Móviles de la ciudad: 6 (ambulancias, patrullas y un camión de bomberos) en recorrida por toda la ciudad, fuera de las
--- sedes. Se sortea una calle (más probable cuanto más larga) y un punto sobre ella; si hay otro recurso a menos de 500 m se
+-- Móviles de la ciudad: 28 (10 ambulancias, 16 patrullas y 2 camiones de bomberos) en recorrida por toda la ciudad, fuera de las
+-- sedes. Se sortea una calle (más probable cuanto más larga) y un punto sobre ella; si hay otro recurso a menos de 350 m se
 -- vuelve a sortear. Estados: 55 % disponible, 30 % en servicio, 15 % fuera de servicio.
 DO $$
 DECLARE
@@ -104,7 +106,7 @@ BEGIN
         SELECT t.tipo, row_number() OVER (PARTITION BY t.tipo) AS n
         FROM (
             SELECT tipo, generate_series(1, cantidad) AS g
-            FROM (VALUES ('ambulancia', 2), ('patrulla', 3), ('bomberos', 1)) AS v(tipo, cantidad)
+            FROM (VALUES ('ambulancia', 10), ('patrulla', 16), ('bomberos', 2)) AS v(tipo, cantidad)
         ) t
         ORDER BY random()
     LOOP
@@ -115,7 +117,7 @@ BEGIN
             SELECT ST_LineInterpolatePoint(c.geom, random()) INTO punto
             FROM _calles_salto c WHERE c.acum >= sorteo ORDER BY c.acum LIMIT 1;
             EXIT WHEN intentos >= 200 OR NOT EXISTS (
-                SELECT 1 FROM recurso r JOIN _gen_recurso g ON g.id = r.id WHERE ST_DWithin(r.geom, punto, 500));
+                SELECT 1 FROM recurso r JOIN _gen_recurso g ON g.id = r.id WHERE ST_DWithin(r.geom, punto, 350));
         END LOOP;
         sorteo := random();
         INSERT INTO recurso (identificacion, nombre, tipo, estado_operativo, descripcion, geom)
@@ -145,7 +147,7 @@ WITH nuevos AS (
 INSERT INTO _gen_recurso SELECT id FROM nuevos;
 
 
--- Incidentes puntuales de la ciudad: 18, sobre calles reales y repartidos por toda la red (no solo en el centro).
+-- Incidentes puntuales de la ciudad: 80, sobre calles reales y repartidos por toda la red (no solo en el centro).
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
     SELECT initcap(replace(s.tipo, '_', ' ')) || ' ' || s.g,
@@ -162,14 +164,14 @@ WITH nuevos AS (
                (ARRAY['accidente_transito', 'accidente_transito', 'incendio', 'corte_servicio', 'inundacion', 'otro'])[1 + floor(random() * 6)::int] AS tipo,
                random() * (SELECT max(acum) FROM _calles_salto) AS r,
                random() AS f
-        FROM generate_series(1, 18) g
+        FROM generate_series(1, 80) g
     ) s
     CROSS JOIN LATERAL (SELECT geom FROM _calles_salto WHERE acum >= s.r ORDER BY acum LIMIT 1) c
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
 
--- Calles cortadas de la ciudad: 4 incidentes de LÍNEA sobre calles reales (tramos de 80 a 300 m).
+-- Calles cortadas de la ciudad: 10 incidentes de LÍNEA sobre calles reales (tramos de 80 a 300 m).
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
     SELECT 'Calle cortada: ' || nom_calle,
@@ -187,13 +189,13 @@ WITH nuevos AS (
           AND gid IN (SELECT gid FROM _calles_salto)
           AND ST_Length(geom) BETWEEN 80 AND 300
         ORDER BY random()
-        LIMIT 4
+        LIMIT 10
     ) calles
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
 
--- Inundaciones de la ciudad: 3 incidentes de POLÍGONO (áreas de 60 a 140 m de radio) en la parte baja, cerca del río.
+-- Inundaciones de la ciudad: 6 incidentes de POLÍGONO (áreas de 60 a 140 m de radio) en la parte baja, cerca del río.
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
     SELECT 'Área inundada ' || z.g,
@@ -207,7 +209,7 @@ WITH nuevos AS (
     FROM (
         SELECT row_number() OVER () AS g, geom
         FROM (SELECT geom FROM _calles_salto
-              WHERE ST_X(ST_Transform(ST_Centroid(geom), 4326)) < -57.965 ORDER BY random() LIMIT 3) bajas
+              WHERE ST_X(ST_Transform(ST_Centroid(geom), 4326)) < -57.965 ORDER BY random() LIMIT 6) bajas
     ) z
     RETURNING id
 )
@@ -301,8 +303,8 @@ ANALYZE incidente;
 
 -- =====================================================================================================
 -- Montevideo: el sistema atiende todo el país, y la defensa es en Salto, pero también tiene que haber datos en otro lugar.
--- Las zonas y los recursos reales de Montevideo ya se cargaron arriba (datos_reales.sql); acá van 25 incidentes (puntos, líneas
--- y polígonos) repartidos sobre las calles reales de la ciudad (tabla via, que trae el país entero): la red conectada con
+-- Las zonas y los recursos reales de Montevideo ya se cargaron arriba (datos_reales.sql); acá van 30 unidades móviles (ambulancias y
+-- patrullas) y 83 incidentes (puntos, líneas y polígonos) repartidos sobre las calles reales de la ciudad (tabla via, que trae el país entero): la red conectada con
 -- la Plaza Independencia. Las líneas son calles reales cortadas, no tramos rectos.
 -- =====================================================================================================
 SELECT setseed(0.2028);
@@ -324,7 +326,49 @@ WHERE red = (SELECT red FROM c ORDER BY geom <-> ST_Transform(ST_SetSRID(ST_Make
 CREATE INDEX ON _calles_mvd USING gist (geom);
 ANALYZE _calles_mvd;
 
--- Incidentes puntuales: 20, sobre calles reales y repartidos por toda la red.
+-- Móviles de la ciudad: 46 (16 ambulancias y 30 patrullas, que se suman a las de los servicios reales) en recorrida por la red de
+-- calles, igual que en Salto: se sortea una calle (más probable cuanto más larga) y un punto sobre ella; si hay otro recurso a
+-- menos de 250 m se vuelve a sortear. Estados: 55 % disponible, 30 % en servicio, 15 % fuera de servicio.
+DO $$
+DECLARE
+    unidad record;
+    punto geometry;
+    total double precision := (SELECT max(acum) FROM _calles_mvd);
+    sorteo double precision;
+    intentos integer;
+    nuevo_id integer;
+BEGIN
+    FOR unidad IN
+        SELECT t.tipo, row_number() OVER (PARTITION BY t.tipo) AS n
+        FROM (
+            SELECT tipo, generate_series(1, cantidad) AS g
+            FROM (VALUES ('ambulancia', 16), ('patrulla', 30)) AS v(tipo, cantidad)
+        ) t
+        ORDER BY random()
+    LOOP
+        intentos := 0;
+        LOOP
+            intentos := intentos + 1;
+            sorteo := random() * total;
+            SELECT ST_LineInterpolatePoint(c.geom, random()) INTO punto
+            FROM _calles_mvd c WHERE c.acum >= sorteo ORDER BY c.acum LIMIT 1;
+            EXIT WHEN intentos >= 200 OR NOT EXISTS (
+                SELECT 1 FROM recurso r JOIN _gen_recurso g ON g.id = r.id WHERE ST_DWithin(r.geom, punto, 250));
+        END LOOP;
+        sorteo := random();
+        INSERT INTO recurso (identificacion, nombre, tipo, estado_operativo, descripcion, geom)
+        VALUES (upper(left(unidad.tipo, 3)) || '-M' || (100 + unidad.n),
+                initcap(replace(unidad.tipo, '_', ' ')) || ' móvil ' || unidad.n || ' (Montevideo)',
+                unidad.tipo,
+                CASE WHEN sorteo < 0.55 THEN 'Disponible' WHEN sorteo < 0.85 THEN 'En servicio' ELSE 'Fuera de servicio' END,
+                'Móvil en recorrida por Montevideo (simulado)',
+                punto)
+        RETURNING id INTO nuevo_id;
+        INSERT INTO _gen_recurso VALUES (nuevo_id);
+    END LOOP;
+END $$;
+
+-- Incidentes puntuales: 70, sobre calles reales y repartidos por toda la red.
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
     SELECT initcap(replace(s.tipo, '_', ' ')) || ' ' || s.g || ' (Montevideo)',
@@ -341,14 +385,14 @@ WITH nuevos AS (
                (ARRAY['accidente_transito', 'incendio', 'corte_servicio', 'inundacion', 'otro'])[1 + floor(random() * 5)::int] AS tipo,
                random() * (SELECT max(acum) FROM _calles_mvd) AS r,
                random() AS f
-        FROM generate_series(1, 20) g
+        FROM generate_series(1, 70) g
     ) s
     CROSS JOIN LATERAL (SELECT geom FROM _calles_mvd WHERE acum >= s.r ORDER BY acum LIMIT 1) c
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
 
--- Calles cortadas: 3 incidentes de LÍNEA sobre calles reales (tramos de 80 a 300 m).
+-- Calles cortadas: 8 incidentes de LÍNEA sobre calles reales (tramos de 80 a 300 m).
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
     SELECT 'Calle cortada: ' || calles.nom_calle,
@@ -362,13 +406,13 @@ WITH nuevos AS (
     FROM (
         SELECT row_number() OVER () AS n, nom_calle, geom
         FROM (SELECT nom_calle, geom FROM _calles_mvd
-              WHERE largo BETWEEN 80 AND 300 AND nom_calle IS NOT NULL ORDER BY random() LIMIT 3) elegidas
+              WHERE largo BETWEEN 80 AND 300 AND nom_calle IS NOT NULL ORDER BY random() LIMIT 8) elegidas
     ) calles
     RETURNING id
 )
 INSERT INTO _gen_incidente SELECT id FROM nuevos;
 
--- Inundaciones: 2 incidentes de POLÍGONO (áreas de 60 a 140 m de radio) sobre calles de la zona baja de la costa.
+-- Inundaciones: 5 incidentes de POLÍGONO (áreas de 60 a 140 m de radio) sobre calles de la zona baja de la costa.
 WITH nuevos AS (
     INSERT INTO incidente (titulo, descripcion, tipo_incidente, prioridad, estado, fecha_hora_registro, equipo_responsable, geom)
     SELECT 'Área inundada ' || z.g || ' (Montevideo)',
@@ -382,7 +426,7 @@ WITH nuevos AS (
     FROM (
         SELECT row_number() OVER () AS g, geom
         FROM (SELECT geom FROM _calles_mvd
-              WHERE ST_Y(ST_Transform(ST_Centroid(geom), 4326)) < -34.90 ORDER BY random() LIMIT 2) bajas
+              WHERE ST_Y(ST_Transform(ST_Centroid(geom), 4326)) < -34.90 ORDER BY random() LIMIT 5) bajas
     ) z
     RETURNING id
 )

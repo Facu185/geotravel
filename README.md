@@ -104,7 +104,9 @@ que hayas puesto en `.env`). `geoserver-init` hace por la API REST lo que se har
 2. Store PostGIS `geotravel` apuntando a la base (host `db`, puerto `5432`).
 3. Capas: `zona_operativa`, `recurso`, `incidente`, `via` (calles), `acceso` (números de puerta), `red_vial_arco` (la red de rutas, con las manos únicas) y `lugar_osm` (nombres de ciudades, pueblos y barrios).
 
-**Calles y barrios de referencia.** Las pantallas de Zonas, Recursos, Incidentes, Consultas y Tiempo de llegada dibujan de fondo, en gris, las calles de `red_vial_arco` por jerarquía (estilo `calles_referencia`: a lo lejos solo las rutas y avenidas principales; al acercar, las secundarias, las de barrio y las de servicio, con su nombre desde el zoom 14 al 15) y los nombres de ciudades, pueblos y barrios de `lugar_osm` (estilo `lugares_referencia`; los de barrio se ven del zoom 12 al 14, y más cerca toman la posta los de las calles). Es el prop `referencia` de `MapView`; el mapa público solo trae los barrios, porque ahí las calles se prenden y apagan a mano.
+**Calles y barrios de referencia.** Las pantallas de Zonas, Recursos, Incidentes, Consultas y Tiempo de llegada dibujan de fondo, en gris, las calles de `red_vial_arco` por jerarquía (estilo `calles_referencia`: a lo lejos solo las rutas y avenidas principales; al acercar, las secundarias, las de barrio y las de servicio, con su nombre desde el zoom 14 al 15) y los nombres de ciudades, pueblos y barrios de `lugar_osm` (estilo `lugares_referencia`; los de barrio se ven del zoom 12 al 14, y más cerca toman la posta los de las calles). Es el prop `referencia` de `MapView`; el mapa público solo trae los barrios, porque ahí las calles se prenden y apagan a mano. Como no cambian, se piden por GeoWebCache (`/geoserver/gwc/service/wms`, grupos de capas `referencia_todo` y `referencia_barrios` que crea `geoserver-init`): la primera vez GeoServer dibuja y guarda, después responde del caché sin tocar la base. `geoserver-init` vacía ese caché cada vez que corre, para que un cambio en un `.sld` se aplique (los navegadores guardan cada tesela 1 hora: Ctrl+F5).
+
+**Límite de tiempo de las consultas.** El backend le pone a cada conexión un `statement_timeout` de 15 s (`DB_STATEMENT_TIMEOUT_MS`, 0 lo desactiva): una consulta pesada se corta con error en vez de ocupar el pool de conexiones.
 4. Estilos de `geoserver/styles/`, uno por capa: `zonas_nivel_prioridad`, `recursos_tipo`,
    `incidentes_estado`, `vias_tipo`, `accesos_puerta` y `red_vial`.
 
@@ -125,8 +127,8 @@ Son capas de consulta, no se editan desde la aplicación:
   para cambiarlo, `docker compose down -v` y volver a levantar.
 
 **Datos de prueba.** Las zonas y los recursos son **reales** (`db/seed/datos_reales.sql`, que carga `db/seed/seed.sql`); los
-incidentes, en cambio, son inventados y van sobre las calles de cada ciudad (el departamento de Salto tiene 18 zonas, 30
-recursos y 44 incidentes; Montevideo, 33 zonas, 225 recursos y 25 incidentes). El botón "Depto. de Salto" del mapa muestra
+incidentes, en cambio, son inventados y van sobre las calles de cada ciudad (el departamento de Salto tiene 18 zonas, 52
+recursos y 114 incidentes; Montevideo, 33 zonas, 271 recursos y 83 incidentes). El botón "Depto. de Salto" del mapa muestra
 todo el departamento.
 
 - **Zonas (ninguna es un rectángulo):** las **seccionales policiales** con sus límites oficiales (Ministerio del Interior /
@@ -141,15 +143,16 @@ todo el departamento.
   otros dos centros médicos, 6 policlínicas del interior, la estación de bomberos, la Jefatura, la Policía Caminera, 6
   seccionales y subcomisarías, y dos ambulancias. Todos en sus coordenadas reales. **OpenStreetMap trae pocos servicios de
   Salto y de bomberos de Montevideo** (no hay una lista oficial abierta): si falta alguno, se agrega en `datos_reales.sql`.
-- **Móviles simulados:** 6 unidades en recorrida por la ciudad de Salto (a 500 m o más de otro recurso) y 3 ambulancias en
+- **Móviles simulados:** 28 unidades en recorrida por la ciudad de Salto (10 ambulancias, 16 patrullas y 2 camiones de bomberos, a 350 m
+  o más de otro recurso), 46 en Montevideo (16 ambulancias y 30 patrullas) y 3 ambulancias en
   Belén, Constitución y Termas del Daymán, para que el interior tenga recursos cerca. Son inventadas y están marcadas como tales.
-- **Incidentes:** los de la ciudad (18 puntuales, 4 calles cortadas y 3 áreas inundadas) van sobre calles reales; los del
+- **Incidentes:** los de la ciudad (80 puntuales, 10 calles cortadas y 6 áreas inundadas) van sobre calles reales; los del
   interior (uno en cada una de 12 localidades y dos áreas inundadas) van sobre la calle de OpenStreetMap más cercana al centro de cada pueblo.
 - **Sobre una calle y del lado de Salto:** en la ciudad, los incidentes y las unidades móviles quedan sobre una calle de la tabla `via`, y solo
   de la red de Salto (la tabla también trae Concordia, Argentina, del otro lado del río), así que se puede calcular un camino
   hasta ellos. Los del interior también van sobre una calle (a menos de 100 m): un punto a más de 500 m de una calle no tiene ruta.
-  Con esto, las rutas entre cada incidente del seed y sus recursos más cercanos dan camino en todos los casos probados (138 de 138).
-- **Montevideo:** los 25 incidentes (20 puntuales, 3 calles cortadas y 2 áreas inundadas) van sobre calles reales de la red de la ciudad.
+  Con esto, las rutas entre cada incidente del seed y sus recursos más cercanos dan camino en todos los casos probados (396 de 396).
+- **Montevideo:** los 83 incidentes (70 puntuales, 8 calles cortadas y 5 áreas inundadas) van sobre calles reales de la red de la ciudad.
 
 La carga masiva (`db/pruebas/carga-masiva.sql`) reparte sus 3.000 recursos sobre las calles de la ciudad.
 
