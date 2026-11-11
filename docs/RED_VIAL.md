@@ -92,6 +92,22 @@ que el servicio `red-vial` carga del mismo extracto: 1.353 ciudades, pueblos y b
 `GET /eta/disponible` informa si se pueden calcular rutas: pgRouting instalado, función presente y red vial cargada
 (se cachea 5 s). Si falta algo, la pantalla lo avisa y deshabilita el botón; no hay otro motor de respaldo.
 
+## El recurso más cercano a un incidente, por las calles
+
+Desde el detalle de un incidente (pantalla **Incidentes**), el botón **"Trazar ruta al recurso más cercano"** busca el recurso que
+llega antes y dibuja su recorrido en el mapa. Lo resuelve `GET /eta/incidentes/{id}/recurso-mas-cercano` (`RecursoMasCercano.java`):
+
+1. **PostGIS** toma los N recursos más cercanos **en línea recta** (por defecto 5, solo los disponibles; operador `<->`, que usa el
+   índice espacial). El incidente puede ser un punto, una línea o un polígono: la distancia es a su geometría y el destino de cada ruta
+   es el punto del incidente más próximo al recurso.
+2. **pgRouting** calcula la ruta de cada uno (`p2_calcular_ruta`, la misma función que el tiempo de llegada) y gana el de **menor
+   tiempo**; a igual tiempo, el de menor distancia.
+
+Hace falta el segundo paso porque el más cercano en línea recta no siempre es el que llega antes: un recurso a 300 m al otro lado de
+una avenida sin cruce, un arroyo o una mano única puede tardar más que otro a 800 m. La respuesta incluye también los otros recursos
+evaluados con su tiempo (o el motivo por el que no tienen ruta) y las calles del recorrido. Las rutas se piden de a una y con un plazo
+total de 25 s; si el motor no responde, no se insiste con las demás. Con `soloDisponibles=false` se consideran todos los recursos.
+
 ## Límites (para decirlos antes de que los encuentren)
 
 - **No hay giros prohibidos ni semáforos** (solo una demora fija por esquina) ni tránsito en vivo: los tiempos son estimaciones

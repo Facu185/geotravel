@@ -1835,3 +1835,17 @@ body {
 .leyenda__flecha {
   flex: none;
 }
+
+/* Ruta al recurso más cercano, en el detalle de un incidente. */
+.ruta-recurso {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.ruta-recurso__otros summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--tinta-suave);
+}
