@@ -30,9 +30,13 @@ const CLAUSULAS = {
   recursos: (f) => [f.tipo && `tipo = ${texto(f.tipo)}`, f.estado && `estado_operativo = ${texto(f.estado)}`],
 };
 
+/** Las capas que no tienen filtros propios y usan los de otra: el mapa de calor sigue los filtros de los incidentes. */
+const FILTROS_DE = { calor: "incidentes" };
+
 /** Filtro CQL de una capa ("INCLUDE" = sin filtro). */
 export function cqlDeCapa(capaId, filtros) {
-  const clausulas = (CLAUSULAS[capaId]?.(filtros[capaId]) ?? []).filter(Boolean);
+  const clave = FILTROS_DE[capaId] ?? capaId;
+  const clausulas = (CLAUSULAS[clave]?.(filtros[clave]) ?? []).filter(Boolean);
   return clausulas.length ? clausulas.join(" AND ") : "INCLUDE";
 }
 

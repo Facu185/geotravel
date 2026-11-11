@@ -26,7 +26,7 @@ export function LeyendaCapa({ capa, suelta = false }) {
               3
             </span>
           ) : (
-            <span className={`leyenda__marca leyenda__marca--${capa.id === "recursos" || capa.id === "incidentes" ? "circulo" : capa.forma}`} style={{ "--color": item.color }} aria-hidden="true" />
+            <span className={`leyenda__marca leyenda__marca--${capa.id === "recursos" || capa.id === "incidentes" || capa.id === "calor" ? "circulo" : capa.forma}`} style={{ "--color": item.color }} aria-hidden="true" />
           )}
           {item.etiqueta}
         </li>

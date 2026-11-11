@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useMap } from "react-leaflet";
 import { GEOSERVER_WMS_URL } from "../../components/MapView.jsx";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
+import CapaCalor from "../../components/CapaCalor.jsx";
 import { Selector } from "../../components/ui.jsx";
 import { api } from "../../api/client.js";
 import { COLOR_ESTADO_INCIDENTE, COLOR_ESTADO_RECURSO, TIPOS_RECURSO } from "../../components/colores.js";
@@ -146,6 +147,18 @@ function IconoCapa({ forma }) {
       {forma === "linea" && <path d="M4 17.5 10 9l4.5 6L20 6.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
       {forma === "circulo" && <circle cx="12" cy="12" r="6.2" fill="currentColor" stroke="#fff" strokeWidth="1.6" />}
       {forma === "cuadrado" && <rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="#fff" strokeWidth="1.6" />}
+      {forma === "calor" && (
+        <>
+          <defs>
+            <radialGradient id="icono-calor">
+              <stop offset="0" stopColor="#d7191c" />
+              <stop offset="0.5" stopColor="#fdae61" />
+              <stop offset="1" stopColor="#2c7bb6" stopOpacity="0.2" />
+            </radialGradient>
+          </defs>
+          <circle cx="12" cy="12" r="9" fill="url(#icono-calor)" />
+        </>
+      )}
     </svg>
   );
 }
@@ -227,12 +240,16 @@ export default function InvitadoPage() {
 
   // Se respeta el orden de CAPAS: la primera queda abajo en el mapa.
   const visibles = CAPAS.filter((c) => activas.has(c.id));
-  const capasVisibles = visibles.map((c) => c.capa);
-  const cql = cqlParaCapas(visibles, filtros);
+  // El mapa de calor no va con las demás capas en el pedido por teselas: se pide aparte, como una sola imagen (CapaCalor).
+  const calor = visibles.find((c) => c.imagen);
+  const conTeselas = visibles.filter((c) => !c.imagen);
+  const capasVisibles = conTeselas.map((c) => c.capa);
+  const cql = cqlParaCapas(conTeselas, filtros);
 
   const hijosMapa = (
     <>
       <VistaDelMapa alCambiar={setVista} />
+      {calor && <CapaCalor capa={calor.capa} estilo={calor.estilo} cql={cqlDeCapa(calor.id, filtros)} version={version} />}
       <ClickConsulta capas={capasVisibles} cql={cql} alResultado={setObjetos} alError={setErrorDetalle} />
       <Seleccion objetos={objetos} />
     </>
@@ -248,7 +265,7 @@ export default function InvitadoPage() {
       mapaProps={{ referencia: "barrios", layers: capasVisibles, wmsExtra: { actualizado: version, ...(cql ? { cql_filter: cql } : {}) } }}
       aviso={
         <>
-          {capasVisibles.length === 0 && <p className="pagina-mapa__vacio">Todas las capas están ocultas</p>}
+          {visibles.length === 0 && <p className="pagina-mapa__vacio">Todas las capas están ocultas</p>}
           {errorDetalle && <p className="pagina-mapa__vacio">No se pudo consultar el detalle: {errorDetalle}</p>}
           {objetos.length > 0 && <DetalleFlotante objetos={objetos} alCerrar={() => setObjetos([])} />}
         </>

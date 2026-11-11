@@ -20,8 +20,10 @@ Con un cuarto argumento escribe además las CALLES de todo el país (la capa de 
 las peatonales y los caminos, una fila por vía entera), con el tipo que usa el estilo vias_tipo.sld.
 Cubre todo lo que traiga el extracto, no solo Salto. © colaboradores de OpenStreetMap, licencia ODbL.
 """
+import contextlib
 import csv
 import gzip
+import os
 import re
 import sys
 
@@ -191,6 +193,17 @@ class Arcos(osmium.SimpleHandler):
         self.arcos += 1
 
 
+@contextlib.contextmanager
+def escribir_atomico(destino):
+    """Abre un .gz para escribir texto y lo deja en su lugar recién cuando se terminó de escribir. Si el proceso se corta
+    a la mitad (se reinicia Docker, falta memoria), queda un .parcial y NO un archivo truncado que cargar.sh daría por
+    bueno (solo mira si el archivo existe)."""
+    parcial = destino + ".parcial"
+    with gzip.open(parcial, "wt", encoding="utf-8", newline="") as f:
+        yield f
+    os.replace(parcial, destino)
+
+
 def main(pbf, destino, destino_lugares=None, destino_vias=None):
     print(f"Pasada 1: contando nodos de {pbf} ...", flush=True)
     cuenta = CuentaNodos()
@@ -204,7 +217,7 @@ def main(pbf, destino, destino_lugares=None, destino_vias=None):
     del todos, ids, veces, cuenta
 
     print("Pasada 2: partiendo las vías en tramos ...", flush=True)
-    with gzip.open(destino, "wt", encoding="utf-8", newline="") as f:
+    with escribir_atomico(destino) as f:
         salida = csv.writer(f)
         salida.writerow(["osm_way_id", "origen", "destino", "nombre", "referencia", "highway", "sentido",
                          "velocidad_kmh", "rotonda", "puente", "tunel", "wkt"])
@@ -213,7 +226,7 @@ def main(pbf, destino, destino_lugares=None, destino_vias=None):
     print(f"  {arcos.arcos} arcos escritos en {destino}", flush=True)
 
     if destino_lugares:
-        with gzip.open(destino_lugares, "wt", encoding="utf-8", newline="") as f:
+        with escribir_atomico(destino_lugares) as f:
             salida = csv.writer(f)
             salida.writerow(["nombre", "tipo", "poblacion", "lon", "lat"])
             lugares = Lugares(salida)
@@ -221,7 +234,7 @@ def main(pbf, destino, destino_lugares=None, destino_vias=None):
         print(f"  {lugares.cantidad} lugares escritos en {destino_lugares}", flush=True)
 
     if destino_vias:
-        with gzip.open(destino_vias, "wt", encoding="utf-8", newline="") as f:
+        with escribir_atomico(destino_vias) as f:
             salida = csv.writer(f)
             salida.writerow(["nom_calle", "tipo", "wkt"])
             vias = Vias(salida)

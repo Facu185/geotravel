@@ -3,7 +3,7 @@
 *Borrador colaborativo. Estructura tomada de `template-paper-2013.doc` del curso —
 antes de entregar, pasar este contenido al formato/plantilla que pida la cátedra.*
 
-Autores: [Nombre y correo de P1] · [P2] · [P3] · [P4] · [P5]
+Autores: Nahuel Leguisamon nanuleguisamoncabrera@gmail.com · Carlos Barrios charlynbc1991@gmail.com · Facundo Cabrera facufa12@gmail.com · Bruno Salvatore brunosalvatore2604@gmail.com · Gonzalo Soba gonzalosoba99@gmail.com
 
 ## Resumen
 
@@ -99,7 +99,49 @@ vial de OpenStreetMap de todo Uruguay que se carga una vez, de modo que las ruta
 Todo se levanta con `docker compose up -d --build`: la base con sus migraciones (Flyway), los datos de prueba, la red vial, la
 configuración de GeoServer y el backend con su `.war`.
 
-*[Insertar acá el diagrama de `docs/diagramas/arquitectura.md`.]*
+```mermaid
+flowchart LR
+    subgraph Cliente
+        Invitado[Invitado<br/>sin login]
+        Admin[Administrador]
+    end
+
+    subgraph Frontend[React + Leaflet/OpenLayers]
+        Mapa[Mapa]
+        ABM[Pantallas ABM]
+    end
+
+    subgraph Backend[JEE / Tomcat]
+        API[REST API<br/>Jersey]
+        Reglas[Reglas de negocio<br/>validacion de tipos y geometrias,<br/>maquina de estados de incidentes]
+    end
+
+    subgraph GeoServer
+        WMS[WMS]
+        WFS[WFS]
+        SLD[Estilos SLD]
+    end
+
+    DB[(PostgreSQL + PostGIS + pgRouting<br/>zonas, recursos, incidentes<br/>y red vial de Uruguay)]
+    RedVial[Servicio red-vial<br/>carga la red de OpenStreetMap]
+
+    Invitado --> Mapa
+    Admin --> Mapa
+    Admin --> ABM
+
+    Mapa -->|WMS: fondo, imágenes de las capas| WMS
+    Mapa -->|WFS hits y GetFeatureInfo: conteos y detalle| WFS
+    Mapa -->|REST: objetos de la vista, bbox y limit| API
+    ABM -->|REST: ABM y acciones| API
+
+    API --> Reglas --> DB
+    RedVial -->|una sola vez| DB
+    WMS --> DB
+    WFS --> DB
+    SLD -.estiliza.-> WMS
+```
+
+*Figura 1. Arquitectura de UrbanSafe (fuente: `docs/diagramas/arquitectura.md`; para el documento final, exportarla como imagen).*
 
 ## Arquitectura del sistema
 
@@ -278,6 +320,20 @@ permite Registrado → En atención / Derivado / Cancelado, En atención → Res
 Cancelado; Resuelto y Cancelado son terminales. Es un supuesto a confirmar con el tutor, y cada cambio queda en
 `historial_estado` con su fecha y usuario.
 
+### Mapa de calor de incidentes (opcional)
+
+El mapa público tiene una capa "Mapa de calor de incidentes", apagada por defecto, que muestra dónde se concentran los
+incidentes, de azul (pocos) a rojo (muchos). La calcula **GeoServer** con la transformación de renderizado `vec:Heatmap`
+(`geoserver/styles/incidentes_calor.sld`): cada incidente suma una "campana" de 45 píxeles y donde se juntan varios la intensidad
+sube. Es la misma capa `geotravel:incidente` con otro estilo, así que no se traen los incidentes al navegador y el cálculo se
+hace donde están los datos. Un incidente que es una línea o un polígono entra por su centroide. La capa respeta el mismo
+`CQL_FILTER` que los demás pedidos, de modo que el calor sigue los filtros de Incidentes (tipo, estado, prioridad y fechas): al elegir
+"Incendio", queda el calor de los incendios.
+
+La intensidad es **relativa a lo que se ve**: GeoServer escala cada imagen según su propio máximo. Por eso el mapa de calor no se
+pide en teselas de 256 px, como las demás capas, sino como **una sola imagen** del área visible (`CapaCalor.jsx`), que se vuelve a
+pedir cuando el mapa deja de moverse; con teselas, un pueblo con tres incidentes quedaba tan rojo como la ciudad con cuarenta.
+
 ### Productos y herramientas
 
 | Producto | Puntos fuertes | Puntos débiles | Evaluación general |
@@ -328,6 +384,9 @@ Cancelado; Resuelto y Cancelado son terminales. Es un supuesto a confirmar con e
 - **GeoServer con la capa rota tras recrear la base:** quedaron conexiones cortadas ("terminating connection due to
   administrator command") y el WMS devolvía un error de servicio con código 200. Se resolvió reiniciando GeoServer; además,
   `geoserver-init.sh` recalcula la extensión de las capas que cambian al cargarse la red vial.
+- **Mapa de calor con colores que mentían:** pedido por teselas, GeoServer escala la intensidad de cada una según su propio máximo,
+  y una tesela con pocos incidentes se veía tan roja como la de la ciudad. Se resolvió pidiendo el calor como una sola imagen de lo
+  visible, con la misma escala para todo.
 - **Una librería rehacía la barra de dibujo en cada render** (`react-leaflet-draw`) y cancelaba el trazo en curso: se resolvió con
   un componente propio (`EditorGeometria`) que mantiene estables las opciones.
 
@@ -349,7 +408,7 @@ Cancelado; Resuelto y Cancelado son terminales. Es un supuesto a confirmar con e
   abierta de Montevideo de la Intendencia (377.883 puertas, unos 145 MB en la base) no se cargó.
 - La primera instalación baja 56 MB de OpenStreetMap; el extracto no se actualiza solo.
 - La autenticación es básica: un único usuario definido por variables de entorno.
-- La máquina de estados es un supuesto a confirmar, y no hay mapa de calor.
+- La máquina de estados es un supuesto a confirmar. La intensidad del mapa de calor es relativa a lo que se ve en pantalla.
 - Faltan por confirmar o completar el histórico de estados agrupado por zona y el filtro por ubicación de los recursos para el
   invitado, que pide la letra.
 
@@ -362,19 +421,33 @@ llevó a la carga a demanda, al login y, más tarde, a las direcciones y las rut
 módulos entre cinco integrantes: datos y GeoServer (P1), tiempo de llegada y rutas (P2), ABM de zonas y recursos (P3), ABM de
 incidentes (P4) y consultas, mapa público y direcciones (P5); la red de rutas con pgRouting se rehízo después sobre la rama de P2.
 
-*[Completar entre todos: porcentaje de tiempo por tarea, desvío respecto al cronograma inicial y motivos.]*
+Los hitos, según el historial de Git (fechas de los *pull requests* integrados a `main`):
+
+| Fecha | Hito |
+|---|---|
+| 17/09 | Base del proyecto: monorepo con backend, frontend, esquema PostGIS, estilos de GeoServer y entorno Docker |
+| 30/09 | Cambio de letra: de GeoTravel a UrbanSafe; se reestructura el repositorio sobre la misma arquitectura |
+| 07/10 | ABM de zonas operativas y de recursos; datos y estilos de GeoServer |
+| 11/10 - 14/10 | Tipo de recurso cerrado, consultas geográficas, incidentes con línea y polígono, primer cálculo de tiempo de llegada con OSRM (se revirtió el 18/10 y se rehízo) |
+| 18/10 - 20/10 | Monitoreo del 18/10: carga a demanda por rectángulo visible y límite, mapa centrado en Salto, datos de prueba de Salto, login del administrador |
+| 21/10 | ABM de incidentes con punto, línea o polígono y carga a demanda |
+| 25/10 - 28/10 | Íconos por tipo y estado, zonas superpuestas, consulta 3 con buffer y caminos por calles, agrupación con número al alejar el mapa |
+| 02/11 - 04/11 | pgRouting dentro de la base: grafo vial de Salto, función de rutas y su validación |
+| 08/11 | Red vial de todo Uruguay con sentidos de circulación, cruces de calles nacionales y datos de prueba reales |
+
+*[Completar entre todos: porcentaje de tiempo por tarea y por integrante, desvío respecto al cronograma inicial y motivos.]*
 
 ## Conclusiones y trabajo a futuro
 
 UrbanSafe cumple lo pedido: ABM de zonas, recursos e incidentes, consultas geográficas, vista pública, direcciones y cruces de
-calles, tiempo de llegada y recurso más cercano, con el sistema atendiendo todo el país y aguantando miles de objetos. La
+calles, tiempo de llegada, recurso más cercano y mapa de calor, con el sistema atendiendo todo el país y aguantando miles de objetos. La
 experiencia deja tres recomendaciones. **Usar PostGIS y pgRouting para todo el cálculo espacial:** simplifica la aplicación y
 da rutas por calle sin depender de un servicio externo. **Publicar con GeoServer lo que se mira y pedir por REST solo lo que se
 edita:** los dos canales se complementan. **Resolver la escala desde el comienzo** (rectángulo, límite e índice espacial), no
 después.
 
 Quedó pendiente, o a confirmar con el tutor: el histórico de estados agrupado por zona, el filtro por ubicación de los recursos
-para el invitado, el mapa de calor (opcional) y las transiciones de estado en cualquier sentido. Como trabajo a futuro:
+para el invitado y las transiciones de estado en cualquier sentido. Como trabajo a futuro:
 cargar los números de puerta de Montevideo para no depender de internet, usar velocidades reales o históricas de tránsito en
 el tiempo de llegada, actualizar la red vial de forma periódica y reemplazar el login básico por usuarios y roles reales.
 
