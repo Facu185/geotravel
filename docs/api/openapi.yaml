@@ -145,8 +145,8 @@ paths:
       description: >
         "Más cercano" por las calles, no en línea recta. PostGIS toma los N recursos más cercanos en línea recta
         (por defecto 5; solo los disponibles) y pgRouting calcula la ruta de cada uno respetando los sentidos de circulación;
-        gana el de menor tiempo (a igual tiempo, el de menor distancia). El incidente puede ser un punto, una línea o un
-        polígono: el destino de cada ruta es el punto del incidente más próximo al recurso. Se devuelven también los otros
+        gana el mejor según el criterio: el de menor distancia por calles (`distancia`, por defecto) o el que llega antes
+        (`tiempo`); en un empate decide el otro dato. El incidente puede ser un punto, una línea o un polígono: el destino de cada ruta es el punto del incidente más próximo al recurso. Se devuelven también los otros
         recursos evaluados, con su tiempo o el motivo por el que no tienen ruta. Exige sesión de administrador.
         Ver docs/RED_VIAL.md.
       tags: [eta]
@@ -162,6 +162,11 @@ paths:
           required: false
           schema: { type: integer, minimum: 1, maximum: 10, default: 5 }
           description: Cuántos recursos (los más cercanos en línea recta) se evalúan por calles
+        - name: criterio
+          in: query
+          required: false
+          schema: { type: string, enum: [distancia, tiempo], default: distancia }
+          description: Qué se minimiza al buscar el camino. distancia = el más corto en metros; tiempo = el más rápido.
       responses:
         "200":
           description: Recurso elegido y su ruta
@@ -468,7 +473,6 @@ paths:
               required: [estado]
               properties:
                 estado: { type: string, enum: [Registrado, "En atención", Derivado, Resuelto, Cancelado] }
-                usuario: { type: string, description: "Quién hace el cambio (sin login real: texto libre, opcional)" }
       responses:
         "200": { description: Estado actualizado }
         "400": { description: Estado destino inválido }
