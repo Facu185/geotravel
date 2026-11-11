@@ -761,7 +761,7 @@
             "url": "{{base}}/incidentes/{{nuevoIncidenteId}}/avanzar",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"estado\": \"En atención\",\n  \"usuario\": \"gonzalo\"\n}",
+              "raw": "{\n  \"estado\": \"En atención\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -827,7 +827,7 @@
             "url": "{{base}}/incidentes/{{nuevoIncidenteId}}/avanzar",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"estado\": \"Resuelto\",\n  \"usuario\": \"gonzalo\"\n}",
+              "raw": "{\n  \"estado\": \"Resuelto\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

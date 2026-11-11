@@ -93,7 +93,6 @@ export default function IncidentesPage() {
   const [seleccionado, setSeleccionado] = useState(null);
   const [historial, setHistorial] = useState([]);
   const [estadoDestino, setEstadoDestino] = useState("");
-  const [usuario, setUsuario] = useState("");
   const [rutaRecurso, setRutaRecurso] = useState(null); // la ruta al recurso más cercano del incidente elegido (ver RutaRecursoCercano)
   const [form, setForm] = useState(FORM_VACIO);
   const [forma, setForma] = useState("Point"); // forma elegida en el formulario
@@ -234,7 +233,7 @@ export default function IncidentesPage() {
     if (!estadoDestino) return;
     setError(null);
     try {
-      await api.post(`/incidentes/${seleccionado.id}/avanzar`, { estado: estadoDestino, usuario });
+      await api.post(`/incidentes/${seleccionado.id}/avanzar`, { estado: estadoDestino });
       setMensaje(`Pasó a "${estadoDestino}".`);
       const actualizado = { ...seleccionado, estado: estadoDestino };
       setSeleccionado(actualizado);
@@ -452,10 +451,6 @@ export default function IncidentesPage() {
             {opcionesDestino.length > 0 ? (
               <>
                 <Segmentado leyenda="Pasar a" nombre="estadoDestino" opciones={opcionesDestino} valor={estadoDestino} onChange={setEstadoDestino} />
-                <label className="campo">
-                  <span className="campo__etiqueta">Tu usuario (opcional)</span>
-                  <input value={usuario} onChange={(e) => setUsuario(e.target.value)} />
-                </label>
                 <button type="button" className="btn btn--primario" onClick={avanzar} disabled={!estadoDestino}>
                   Confirmar cambio
                 </button>

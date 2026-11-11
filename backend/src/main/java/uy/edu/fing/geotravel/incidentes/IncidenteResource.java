@@ -1,7 +1,9 @@
 package uy.edu.fing.geotravel.incidentes;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import uy.edu.fing.geotravel.auth.Sesiones;
 import uy.edu.fing.geotravel.db.DataSourceProvider;
 import uy.edu.fing.geotravel.mapa.Bbox;
 
@@ -25,7 +27,7 @@ import java.util.*;
  *  - La máquina de estados pasa de ser una secuencia lineal (3 pasos) a tener RAMAS:
  *    5 estados, con Derivado y Cancelado alcanzables desde más de un estado. Por eso
  *    "avanzar" ahora recibe el estado DESTINO en el cuerpo, no es un botón único.
- *  - El historial guarda también qué usuario hizo el cambio.
+ *  - El historial guarda también qué usuario hizo el cambio: el de la sesión que pidió el cambio.
  *
  * SUPUESTO a confirmar con el tutor (ver TRANSICIONES abajo): el diagrama de estados no
  * está dibujado en la letra, solo un ejemplo ("Registrado → En atención → Resuelto") y la
@@ -87,9 +89,10 @@ public class IncidenteResource {
         public String geomGeoJson; // GeoJSON Point en lon/lat, como texto
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true) // un cliente viejo puede seguir mandando "usuario": se ignora
     public static class AvanzarInput {
         public String estado;   // estado destino
-        public String usuario;  // quién hace el cambio (sin login real: texto libre, opcional)
+        // El usuario del cambio sale de la sesión (encabezado Authorization), no del cuerpo: no se puede falsear.
     }
 
     @GET
@@ -254,7 +257,8 @@ public class IncidenteResource {
     @Path("/{id}/avanzar")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response avanzar(@PathParam("id") int id, AvanzarInput in) throws SQLException {
+    public Response avanzar(@PathParam("id") int id, AvanzarInput in,
+                            @HeaderParam("Authorization") String autorizacion) throws SQLException {
         if (in == null || in.estado == null || !ESTADOS.contains(in.estado)) {
             return error(400, "Estado destino inválido. Debe ser uno de: " + String.join(", ", ESTADOS));
         }
@@ -290,7 +294,8 @@ public class IncidenteResource {
                     "INSERT INTO historial_estado (incidente_id, estado, usuario) VALUES (?, ?, ?)")) {
                 hist.setInt(1, id);
                 hist.setString(2, in.estado);
-                hist.setString(3, (in.usuario == null || in.usuario.trim().isEmpty()) ? "desconocido" : in.usuario.trim());
+                String usuario = Sesiones.usuarioDe(Sesiones.tokenDe(autorizacion));
+                hist.setString(3, usuario == null ? "desconocido" : usuario);
                 hist.executeUpdate();
             }
 
