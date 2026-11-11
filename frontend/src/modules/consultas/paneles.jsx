@@ -990,11 +990,18 @@ function PanelRankings({ setResultado, setElegibles, vista }) {
 
 // ------------------------------------------ reporte de incidentes por zona (filtros)
 
-function PanelReporte({ setResultado }) {
-  const [filtros, setFiltros] = useState({ zonaId: "", tipo: "", prioridad: "", estado: "", desde: "", hasta: "" });
+/**
+ * Listado de incidentes filtrable. La zona (opcional) se elige con un clic en el mapa, como en la consulta 1, o
+ * escribiendo su nombre; sin zona se muestran todas.
+ */
+function PanelReporte({ setResultado, setElegibles, carga }) {
+  const [filtros, setFiltros] = useState({ tipo: "", prioridad: "", estado: "", desde: "", hasta: "" });
   const cambiar = (clave) => (valor) => setFiltros((f) => ({ ...f, [clave]: valor }));
+  const [zona, setZona] = useState(null);
+  const zonas = useObjetosDeLaVista(carga);
+  useElegibles(setElegibles, "zona", zonas, zona, setZona);
 
-  const ruta = `/consultas/reportes/incidentes-por-zona${query({ ...filtros, hasta: diaSiguiente(filtros.hasta) })}`;
+  const ruta = `/consultas/reportes/incidentes-por-zona${query({ ...filtros, zonaId: zona ? zona.id : "", hasta: diaSiguiente(filtros.hasta) })}`;
   const { fase, datos: r, error } = useRuta(ruta);
   const filas = r?.items;
   const { datos: tiposIncidente } = useRuta("/consultas/tipos-incidente");
@@ -1009,25 +1016,37 @@ function PanelReporte({ setResultado }) {
   }, [filas]);
 
   useEffect(() => {
+    const zonasElegidas = zona ? [comoZona(zona)] : [];
     if (!filas) {
-      setResultado(RESULTADO_VACIO);
+      setResultado({ ...RESULTADO_VACIO, zonas: zonasElegidas });
       return;
     }
     // Un incidente que cruza dos zonas aparece en las dos filas del reporte: se dibuja una sola vez.
     const unicos = new Map(filas.map((f) => [f.id, f]));
-    setResultado({ ...RESULTADO_VACIO, incidentes: [...unicos.values()].map(conGeometria) });
-  }, [filas, setResultado]);
+    setResultado({ ...RESULTADO_VACIO, zonas: zonasElegidas, incidentes: [...unicos.values()].map(conGeometria) });
+  }, [filas, zona, setResultado]);
 
   const tipos = (tiposIncidente ?? []).map((t) => ({ valor: t, texto: t }));
 
   return (
     <>
-      <BuscadorObjeto
-        etiqueta="Zona"
-        tipo="zona"
-        onChange={(zona) => cambiar("zonaId")(zona ? zona.id : "")}
-        placeholder="Todas (escribí para elegir una)"
-      />
+      {zona ? (
+        <section className="bloque">
+          <h4 className="resultado__grupo">Zona: {zona.nombre}</h4>
+          <button type="button" className="btn btn--secundario" onClick={() => setZona(null)}>
+            Quitar la zona (ver todas)
+          </button>
+        </section>
+      ) : (
+        <>
+          <BuscadorObjeto etiqueta="Zona" tipo="zona" onChange={(z) => z && setZona(z)} placeholder="Todas (escribí para elegir una)" />
+          <p className="ayuda">
+            {carga.estado === "lejos"
+              ? "Acercá el mapa para elegir una zona con un clic, o escribí su nombre."
+              : "Elegí una zona con un clic en el mapa o escribí su nombre; sin zona se muestran todas."}
+          </p>
+        </>
+      )}
       <Selector etiqueta="Tipo" valor={filtros.tipo} onChange={cambiar("tipo")} opciones={tipos} vacio="Todos" />
       <div className="campos-2">
         <Selector
@@ -1158,8 +1177,9 @@ export const CONSULTAS = [
     soloAdmin: true, // el invitado no lo ve ni puede pedirlo (la API lo exige, ver AuthFilter)
     fondo: "zona", // lo que GeoServer dibuja de fondo
     titulo: "Reporte de incidentes por zona",
-    descripcion: "Listado filtrable por zona, tipo, prioridad, estado y fechas, agrupado por zona.",
+    descripcion: "Listado filtrable por zona, tipo, prioridad, estado y fechas, agrupado por zona. La zona se elige con un clic en el mapa (o escribiendo su nombre); sin zona se muestran todas.",
     postgis: "ST_Contains(zona, incidente) con filtros",
+    objetos: "/zonas",
     Panel: PanelReporte,
   },
 ];
