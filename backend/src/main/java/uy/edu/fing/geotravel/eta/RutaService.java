@@ -20,7 +20,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * se informa por que calles pasa. El desplazamiento hasta la calle se informa y, si es grande, se advierte que la
  * distancia vial es aproximada.
  *
- * Hay un unico camino: el de menor duracion (con los sentidos de circulacion y la velocidad de cada calle).
+ * Hay un unico camino, segun el criterio: el de menor duracion (por defecto, con los sentidos de circulacion y la velocidad
+ * de cada calle) o el de menor distancia. Se informan siempre las dos cosas del camino elegido.
  */
 public class RutaService {
 
@@ -52,6 +53,12 @@ public class RutaService {
         default Ruta calcular(double origenLon, double origenLat, double destinoLon, double destinoLat,
                               long timeoutMs) throws IOException, InterruptedException {
             return calcular(origenLon, origenLat, destinoLon, destinoLat);
+        }
+
+        /** Igual, minimizando el criterio pedido; los motores que no distinguen criterios lo ignoran. */
+        default Ruta calcular(double origenLon, double origenLat, double destinoLon, double destinoLat,
+                              long timeoutMs, Criterio criterio) throws IOException, InterruptedException {
+            return calcular(origenLon, origenLat, destinoLon, destinoLat, timeoutMs);
         }
     }
 
@@ -177,8 +184,13 @@ public class RutaService {
 
     /** timeoutMs limita el calculo (no aplica si la ruta sale de la cache). */
     public Ruta consultar(Extremos e, long timeoutMs) throws IOException, InterruptedException {
-        String clave = String.format(Locale.ROOT, "%.5f,%.5f;%.5f,%.5f",
-                e.origenLon, e.origenLat, e.destinoLon, e.destinoLat);
+        return consultar(e, timeoutMs, Criterio.TIEMPO);
+    }
+
+    /** La ruta que minimiza el criterio pedido; cada criterio tiene su propia entrada en la cache. */
+    public Ruta consultar(Extremos e, long timeoutMs, Criterio criterio) throws IOException, InterruptedException {
+        String clave = String.format(Locale.ROOT, "%s;%.5f,%.5f;%.5f,%.5f",
+                criterio.codigo, e.origenLon, e.origenLat, e.destinoLon, e.destinoLat);
         long ahora = System.nanoTime();
 
         Entrada guardada = cache.get(clave);
@@ -186,7 +198,7 @@ public class RutaService {
             return guardada.ruta;
         }
 
-        Ruta ruta = motor.calcular(e.origenLon, e.origenLat, e.destinoLon, e.destinoLat, timeoutMs);
+        Ruta ruta = motor.calcular(e.origenLon, e.origenLat, e.destinoLon, e.destinoLat, timeoutMs, criterio);
 
         if (cache.size() >= CACHE_MAXIMO) {
             cache.clear();
@@ -201,8 +213,12 @@ public class RutaService {
     }
 
     public Resultado intentar(Extremos e, long timeoutMs) {
+        return intentar(e, timeoutMs, Criterio.TIEMPO);
+    }
+
+    public Resultado intentar(Extremos e, long timeoutMs, Criterio criterio) {
         try {
-            return Resultado.ok(consultar(e, timeoutMs));
+            return Resultado.ok(consultar(e, timeoutMs, criterio));
         } catch (SinRutaException ex) {
             return Resultado.sinRuta(ex.getMessage());
         } catch (PlazoAgotadoException ex) {

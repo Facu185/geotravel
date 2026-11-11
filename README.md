@@ -70,9 +70,10 @@ primera vez (baja el extracto de Geofabrik, unos 56 MB, y tarda un par de minuto
 tiempo. Detalle, fuentes de datos evaluadas y limites en [docs/RED_VIAL.md](docs/RED_VIAL.md).
 
 **Recurso mas cercano a un incidente:** en la pantalla Incidentes, al elegir un incidente, el boton "Trazar ruta al recurso mas
-cercano" busca (por defecto entre los recursos disponibles) el que llega antes **por las calles** y dibuja su ruta en el mapa
-(`GET /eta/incidentes/{id}/recurso-mas-cercano`). Primero toma los mas cercanos en linea recta y despues compara su tiempo real
-con pgRouting; ver [docs/RED_VIAL.md](docs/RED_VIAL.md).
+cercano" busca (por defecto entre los recursos disponibles) el mas cercano **por las calles** y dibuja su ruta en el mapa
+(`GET /eta/incidentes/{id}/recurso-mas-cercano`). Primero toma los mas cercanos en linea recta y despues compara su ruta real
+con pgRouting, con el criterio que se elija: **"Mas corto"** (menos metros, por defecto) o **"Mas rapido"** (menos minutos);
+ver [docs/RED_VIAL.md](docs/RED_VIAL.md).
 
 **Guia de instalacion en otra computadora y verificaciones:**
 [docs/ETA_SALTO_DEMO.md](docs/ETA_SALTO_DEMO.md).

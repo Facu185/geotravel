@@ -94,15 +94,22 @@ que el servicio `red-vial` carga del mismo extracto: 1.353 ciudades, pueblos y b
 
 ## El recurso más cercano a un incidente, por las calles
 
-Desde el detalle de un incidente (pantalla **Incidentes**), el botón **"Trazar ruta al recurso más cercano"** busca el recurso que
-llega antes y dibuja su recorrido en el mapa. Lo resuelve `GET /eta/incidentes/{id}/recurso-mas-cercano` (`RecursoMasCercano.java`):
+Desde el detalle de un incidente (pantalla **Incidentes**), el botón **"Trazar ruta al recurso más cercano"** busca el recurso más
+cercano por las calles y dibuja su recorrido en el mapa. Se elige qué significa "más cercano": **más corto** (menos metros, por
+defecto) o **más rápido** (menos minutos). Lo resuelve `GET /eta/incidentes/{id}/recurso-mas-cercano` (`RecursoMasCercano.java`):
 
 1. **PostGIS** toma los N recursos más cercanos **en línea recta** (por defecto 5, solo los disponibles; operador `<->`, que usa el
    índice espacial). El incidente puede ser un punto, una línea o un polígono: la distancia es a su geometría y el destino de cada ruta
    es el punto del incidente más próximo al recurso.
-2. **pgRouting** calcula la ruta de cada uno (`p2_calcular_ruta`, la misma función que el tiempo de llegada) y gana el de **menor
-   tiempo**; a igual tiempo, el de menor distancia.
+2. **pgRouting** calcula la ruta de cada uno (`p2_calcular_ruta`, la misma función que el tiempo de llegada) minimizando el
+   **criterio** pedido (`criterio=distancia`, por defecto, o `criterio=tiempo`) y gana el mejor. Con `distancia`, Dijkstra minimiza los
+   metros (`cost_m`) y gana el de menor distancia por calles; con `tiempo`, minimiza los segundos (`cost_s`) y gana el que llega
+   antes. En un empate decide el otro dato.
 
+Las dos cosas pueden dar recursos y caminos distintos: una avenida más larga puede tardar menos, y una mano única obliga a dar
+vueltas. En una prueba con 40 pares recurso-incidente de Salto, el camino más corto y el más rápido fueron distintos en 24; el más
+corto ahorró 64 m en promedio y el más rápido, 18 s. Con cualquiera de los dos criterios se informan la distancia y el tiempo del
+camino elegido.
 Hace falta el segundo paso porque el más cercano en línea recta no siempre es el que llega antes: un recurso a 300 m al otro lado de
 una avenida sin cruce, un arroyo o una mano única puede tardar más que otro a 800 m. La respuesta incluye también los otros recursos
 evaluados con su tiempo (o el motivo por el que no tienen ruta) y las calles del recorrido. Las rutas se piden de a una y con un plazo

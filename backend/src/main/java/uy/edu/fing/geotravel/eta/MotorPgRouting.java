@@ -13,16 +13,16 @@ import java.sql.SQLException;
 /**
  * Motor de rutas: llama a la funcion SQL p2_calcular_ruta (db/sql/p2_rutas_pgrouting.sql), que corre pgRouting
  * sobre la red vial de OpenStreetMap (tablas red_vial_arco y red_vial_vertice) dentro de PostgreSQL.
- * Hay un unico camino: el de menor duracion.
+ * Hay un unico camino: el de menor tiempo (por defecto) o el de menor distancia, segun el criterio.
  */
 public final class MotorPgRouting implements RutaService.MotorRutas {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String SQL_RUTA =
             "SELECT distancia_m, duracion_s, geometria_geojson, ajuste_origen_m, ajuste_destino_m, calles_json " +
-            "FROM public.p2_calcular_ruta(?, ?, ?, ?)";
+            "FROM public.p2_calcular_ruta(?, ?, ?, ?, ?)";
     private static final String SQL_SALUD =
             "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgrouting') " +
-            "AND to_regprocedure('public.p2_calcular_ruta(double precision,double precision,double precision,double precision)') IS NOT NULL " +
+            "AND to_regprocedure('public.p2_calcular_ruta(double precision,double precision,double precision,double precision,text)') IS NOT NULL " +
             "AND EXISTS (SELECT 1 FROM public.red_vial_arco WHERE componente_grande LIMIT 1)";
 
     /** Una comprobacion de salud vale unos segundos: una red vial que se carga se refleja enseguida. */
@@ -60,6 +60,12 @@ public final class MotorPgRouting implements RutaService.MotorRutas {
     @Override
     public Ruta calcular(double origenLon, double origenLat, double destinoLon, double destinoLat,
                          long timeoutMs) throws IOException, InterruptedException {
+        return calcular(origenLon, origenLat, destinoLon, destinoLat, timeoutMs, Criterio.TIEMPO);
+    }
+
+    @Override
+    public Ruta calcular(double origenLon, double origenLat, double destinoLon, double destinoLat,
+                         long timeoutMs, Criterio criterio) throws IOException, InterruptedException {
         if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Ruta interrumpida");
         if (timeoutMs <= 0) throw new PlazoAgotadoException("Se agoto el tiempo disponible");
         try (Connection conn = DataSourceProvider.get().getConnection();
@@ -69,6 +75,7 @@ public final class MotorPgRouting implements RutaService.MotorRutas {
             ps.setDouble(2, origenLat);
             ps.setDouble(3, destinoLon);
             ps.setDouble(4, destinoLat);
+            ps.setString(5, criterio.codigo);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
                     throw new SinRutaException("No hay camino por calles entre los dos puntos (alguno queda fuera de la red vial)");

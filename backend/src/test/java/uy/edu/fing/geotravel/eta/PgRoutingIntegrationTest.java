@@ -67,6 +67,29 @@ public class PgRoutingIntegrationTest {
     }
 
     @Test
+    public void elCriterioDistanciaDaRutaIgualOMasCortaYElDeTiempoIgualOMasRapida() throws Exception {
+        for (double[] par : new double[][] {DEMO, LARGO, MONTEVIDEO}) {
+            Ruta rapida = motor.calcular(par[0], par[1], par[2], par[3], 20_000, Criterio.TIEMPO);
+            Ruta corta = motor.calcular(par[0], par[1], par[2], par[3], 20_000, Criterio.DISTANCIA);
+
+            assertTrue("la ruta por distancia no es mas larga que la de tiempo",
+                    corta.distanciaMetros <= rapida.distanciaMetros + 0.5);
+            assertTrue("la ruta por tiempo no es mas lenta que la de distancia",
+                    rapida.duracionSegundos <= corta.duracionSegundos + 0.5);
+            assertTrue(corta.duracionSegundos > 0 && rapida.distanciaMetros > 0);
+        }
+    }
+
+    @Test
+    public void sinCriterioSeUsaElTiempo() throws Exception {
+        Ruta sinCriterio = motor.calcular(DEMO[0], DEMO[1], DEMO[2], DEMO[3]);
+        Ruta conTiempo = motor.calcular(DEMO[0], DEMO[1], DEMO[2], DEMO[3], 20_000, Criterio.TIEMPO);
+
+        assertEquals(conTiempo.distanciaMetros, sinCriterio.distanciaMetros, 0.001);
+        assertEquals(conTiempo.duracionSegundos, sinCriterio.duracionSegundos, 0.001);
+    }
+
+    @Test
     public void laRutaSaleYLlegaALosPuntosPedidos() throws Exception {
         Ruta ruta = motor.calcular(DEMO[0], DEMO[1], DEMO[2], DEMO[3]);
         JsonNode coordenadas = ruta.geometriaRuta.path("coordinates");

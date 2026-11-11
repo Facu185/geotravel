@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Aviso } from "../../components/ui.jsx";
+import { Aviso, Segmentado } from "../../components/ui.jsx";
 import { IconoRecurso } from "../../components/iconos.jsx";
 import { nombreTipoRecurso } from "../../components/colores.js";
 import { api } from "../../api/client.js";
@@ -10,7 +10,8 @@ import useRutasDisponibles from "../../api/useRutasDisponibles.js";
  *
  * El backend (GET /eta/incidentes/{id}/recurso-mas-cercano) toma los recursos más cercanos en línea recta (por defecto
  * solo los disponibles), calcula con pgRouting la ruta de cada uno respetando los sentidos de circulación y se queda con el
- * que llega antes. El trazado se dibuja en el mapa de la página (IncidentesPage); acá está el botón y el resultado.
+ * mejor según el criterio: el de menor distancia por calles ("Más corto", por defecto) o el que llega antes ("Más rápido").
+ * El trazado se dibuja en el mapa de la página (IncidentesPage); acá está el botón y el resultado.
  *
  *   incidente    el elegido (para pedir su ruta)
  *   datos        la respuesta del backend (la guarda la página, que dibuja la ruta), o null si no hay ruta trazada
@@ -18,6 +19,11 @@ import useRutasDisponibles from "../../api/useRutasDisponibles.js";
  */
 
 const metros = (m) => (m == null ? "—" : m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${m} m`);
+
+const CRITERIOS = [
+  { valor: "distancia", etiqueta: "Más corto (menos metros)" },
+  { valor: "tiempo", etiqueta: "Más rápido (menos minutos)" },
+];
 
 const TEXTO_ESTADO_RUTA = {
   sin_ruta: "sin ruta por calles",
@@ -28,6 +34,7 @@ const TEXTO_ESTADO_RUTA = {
 
 export default function RutaRecursoCercano({ incidente, datos, alResultado }) {
   const [soloDisponibles, setSoloDisponibles] = useState(true);
+  const [criterio, setCriterio] = useState("distancia");
   const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState(null);
   const { aviso: avisoRutas } = useRutasDisponibles();
@@ -39,7 +46,7 @@ export default function RutaRecursoCercano({ incidente, datos, alResultado }) {
     setError(null);
     alResultado(null);
     try {
-      const respuesta = await api.get(`/eta/incidentes/${incidente.id}/recurso-mas-cercano?soloDisponibles=${soloDisponibles}`);
+      const respuesta = await api.get(`/eta/incidentes/${incidente.id}/recurso-mas-cercano?soloDisponibles=${soloDisponibles}&criterio=${criterio}`);
       if (numero === pedido.current) alResultado(respuesta);
     } catch (e) {
       if (numero === pedido.current) setError(e.message);
@@ -63,8 +70,9 @@ export default function RutaRecursoCercano({ incidente, datos, alResultado }) {
     <section className="bloque">
       <h4 className="bloque__titulo">Recurso más cercano</h4>
       <p className="ayuda">
-        Busca entre los recursos más cercanos el que llega antes por las calles (respetando los sentidos de circulación) y traza su ruta en el mapa.
+        Busca entre los recursos más cercanos en línea recta el mejor por las calles (respetando los sentidos de circulación) y traza su ruta en el mapa.
       </p>
+      <Segmentado leyenda="Qué se busca" nombre="criterioRuta" opciones={CRITERIOS} valor={criterio} onChange={setCriterio} />
       <label className="casilla">
         <input type="checkbox" checked={soloDisponibles} onChange={(e) => setSoloDisponibles(e.target.checked)} disabled={buscando} />
         Solo recursos disponibles

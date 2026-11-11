@@ -9,8 +9,11 @@
 --      calle, que cuenta en la distancia y el tiempo. Si un extremo queda a más de 500 m de cualquier calle, no hay ruta.
 --   2. SENTIDOS. Los arcos de mano única tienen costo negativo en el sentido prohibido (convención de pgRouting) y
 --      Dijkstra se calcula dirigido.
---   3. UN SOLO CAMINO: el de menor duración (costo cost_s: largo / velocidad de cada calle + demora por esquina). La
---      distancia informada es la suma de los largos de ese camino.
+--   3. UN SOLO CAMINO, según el criterio (quinto parámetro):
+--        'tiempo' (por defecto): el de menor duración (costo cost_s: largo / velocidad de cada calle + demora por esquina);
+--        'distancia': el de menor cantidad de metros (costo cost_m: el largo de cada arco), aunque tarde más.
+--      Sea cual sea el criterio, se informan las dos cosas del camino elegido: la distancia (suma de los largos) y la
+--      duración (suma de cost_s). Con 'tiempo' la distancia es la del camino más rápido, que puede no ser la más corta.
 --   4. ESCALA. Para no armar el grafo de todo el país en cada pedido, se usan solo los arcos dentro de una caja alrededor de
 --      los dos puntos (con índice espacial), que se agranda si no aparece camino.
 --   5. LAS CALLES DEL RECORRIDO: se devuelve, en orden, el nombre de cada calle por la que pasa la ruta y cuántos metros.
@@ -18,12 +21,14 @@
 
 DROP FUNCTION IF EXISTS public.p2_calcular_ruta(double precision, double precision, double precision, double precision, text);
 DROP FUNCTION IF EXISTS public.p2_calcular_ruta(double precision, double precision, double precision, double precision);
+DROP FUNCTION IF EXISTS public.p2_calcular_ruta(double precision, double precision, double precision, double precision, text);
 
 CREATE OR REPLACE FUNCTION public.p2_calcular_ruta(
     p_origen_lon double precision,
     p_origen_lat double precision,
     p_destino_lon double precision,
-    p_destino_lat double precision
+    p_destino_lat double precision,
+    p_criterio text DEFAULT 'tiempo'
 )
 RETURNS TABLE (
     distancia_m double precision,
@@ -59,7 +64,17 @@ DECLARE
     v_calles jsonb;
     v_partes geometry[];
     v_linea geometry;
+    v_col text;   -- columna de costo de Dijkstra según el criterio
+    v_rcol text;  -- y la del sentido contrario
 BEGIN
+    IF p_criterio = 'tiempo' THEN
+        v_col := 'cost_s'; v_rcol := 'reverse_cost_s';
+    ELSIF p_criterio = 'distancia' THEN
+        v_col := 'cost_m'; v_rcol := 'reverse_cost_m';
+    ELSE
+        RAISE EXCEPTION 'criterio invalido (tiempo o distancia)' USING ERRCODE = '22023';
+    END IF;
+
     IF p_origen_lon IS NULL OR p_origen_lat IS NULL OR p_destino_lon IS NULL OR p_destino_lat IS NULL
        OR NOT (p_origen_lon BETWEEN -180 AND 180) OR NOT (p_destino_lon BETWEEN -180 AND 180)
        OR NOT (p_origen_lat BETWEEN -90 AND 90) OR NOT (p_destino_lat BETWEEN -90 AND 90) THEN
@@ -126,17 +141,20 @@ BEGIN
             piezas AS (
                 SELECT (-(100 + row_number() OVER (ORDER BY t.arco, t.f1)))::bigint AS id, t.source, t.target,
                        ST_LineSubstring(a.geom, t.f1, t.f2) AS geom, a.nombre,
-                       CASE WHEN a.cost_s < 0 THEN -1 ELSE a.cost_s * (t.f2 - t.f1) END AS cost,
-                       CASE WHEN a.reverse_cost_s < 0 THEN -1 ELSE a.reverse_cost_s * (t.f2 - t.f1) END AS reverse_cost
+                       CASE WHEN a.%6$s < 0 THEN -1 ELSE a.%6$s * (t.f2 - t.f1) END AS cost,
+                       CASE WHEN a.%7$s < 0 THEN -1 ELSE a.%7$s * (t.f2 - t.f1) END AS reverse_cost,
+                       CASE WHEN a.cost_s < 0 THEN -1 ELSE a.cost_s * (t.f2 - t.f1) END AS dur,
+                       CASE WHEN a.reverse_cost_s < 0 THEN -1 ELSE a.reverse_cost_s * (t.f2 - t.f1) END AS rdur
                 FROM tramos t JOIN public.red_vial_arco a ON a.id = t.arco
                 WHERE t.target IS NOT NULL AND t.f2 > t.f1
             )
-            SELECT a.id, a.source, a.target, a.geom, a.nombre, a.cost_s AS cost, a.reverse_cost_s AS reverse_cost
+            SELECT a.id, a.source, a.target, a.geom, a.nombre, a.%6$s AS cost, a.%7$s AS reverse_cost,
+                   a.cost_s AS dur, a.reverse_cost_s AS rdur
             FROM public.red_vial_arco a
             WHERE %5$s AND a.id NOT IN (SELECT arco FROM usados)
             UNION ALL
-            SELECT id, source, target, geom, nombre, cost, reverse_cost FROM piezas
-        $ext$, a_o.id, v_f_o, a_d.id, v_f_d, v_caja);
+            SELECT id, source, target, geom, nombre, cost, reverse_cost, dur, rdur FROM piezas
+        $ext$, a_o.id, v_f_o, a_d.id, v_f_d, v_caja, v_col, v_rcol);
 
         -- 2 y 3. Dijkstra dirigido, de un vértice virtual al otro.
         EXECUTE format($q$
@@ -149,7 +167,7 @@ BEGIN
             tramos AS (
                 SELECT c.path_seq, e.nombre,
                        CASE WHEN c.node = e.source THEN e.geom ELSE ST_Reverse(e.geom) END AS geom,
-                       CASE WHEN c.node = e.source THEN e.cost ELSE e.reverse_cost END AS seg
+                       CASE WHEN c.node = e.source THEN e.dur ELSE e.rdur END AS seg
                 FROM camino c JOIN ext e ON e.id = c.edge
             ),
             grupos AS (
