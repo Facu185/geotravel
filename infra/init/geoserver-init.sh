@@ -78,6 +78,12 @@ existe "$G/workspaces/$WS/styles/calles_referencia.json" ||   curl -sf $A -X POS
 curl -sf $A -X PUT -H "Content-Type: application/vnd.ogc.sld+xml" --data-binary "@/opt/geoserver/data_dir/styles/calles_referencia.sld" "$G/workspaces/$WS/styles/calles_referencia" > /dev/null
 echo "estilo calles_referencia: disponible para red_vial_arco"
 
+# Estilo extra de los incidentes: el mapa de calor (vec:Heatmap), que el mapa público pide con styles=incidentes_calor.
+# La capa sigue dibujando los íconos por defecto (incidentes_estado).
+existe "$G/workspaces/$WS/styles/incidentes_calor.json" ||   curl -sf $A -X POST -H "$JSON" -d "{\"style\":{\"name\":\"incidentes_calor\",\"filename\":\"incidentes_calor.sld\"}}" "$G/workspaces/$WS/styles" > /dev/null
+curl -sf $A -X PUT -H "Content-Type: application/vnd.ogc.sld+xml" --data-binary "@/opt/geoserver/data_dir/styles/incidentes_calor.sld" "$G/workspaces/$WS/styles/incidentes_calor" > /dev/null
+echo "estilo incidentes_calor: disponible para incidente (mapa de calor)"
+
 # Referencia en caché: las calles y los barrios de fondo del mapa no cambian, así que el frontend los pide por GeoWebCache
 # (/geoserver/gwc/service/wms) en vez de dibujarlos de nuevo en cada pedido. GeoWebCache cachea capas o grupos de capas, no
 # combinaciones de capas con estilos: por eso se publican dos grupos, uno por cada fondo que usa el mapa.

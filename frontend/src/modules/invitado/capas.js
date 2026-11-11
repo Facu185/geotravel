@@ -57,6 +57,22 @@ export const CAPAS = [
     ],
   },
   {
+    id: "calor",
+    capa: "geotravel:incidente",
+    estilo: "incidentes_calor", // otro estilo de la misma capa (ver geoserver/styles/incidentes_calor.sld)
+    imagen: true, // no va con las demás en el pedido por teselas: es una sola imagen de lo visible (ver CapaCalor.jsx)
+    nombre: "Mapa de calor de incidentes",
+    descripcion: "Dónde se concentran los incidentes (con los filtros de Incidentes): más rojo, más incidentes juntos",
+    forma: "calor",
+    activaPorDefecto: false,
+    leyenda: [
+      { color: "#2c7bb6", etiqueta: "Pocos incidentes cerca" },
+      { color: "#ffffbf", etiqueta: "Varios" },
+      { color: "#fdae61", etiqueta: "Muchos" },
+      { color: "#d7191c", etiqueta: "Concentración máxima" },
+    ],
+  },
+  {
     id: "incidentes",
     capa: "geotravel:incidente",
     nombre: "Incidentes",

@@ -212,6 +212,12 @@ Hay dos vistas, separadas por un login básico:
 | **Invitado** | Sin ingresar: es la pantalla inicial | El mapa público (filtros, conteos y detalle) y las Consultas geográficas, con la leyenda de los íconos |
 | **Administrador** | `/login` (botón "Ingresar") | Todo lo anterior, más zonas, recursos, incidentes, tiempo de llegada y el reporte de incidentes |
 
+- **Mapa de calor de incidentes** (opcional de la letra): en el mapa público, la capa "Mapa de calor de incidentes" (apagada por
+  defecto) muestra dónde se concentran los incidentes, de azul (pocos) a rojo (muchos). Lo calcula GeoServer con la
+  transformación `vec:Heatmap` (`geoserver/styles/incidentes_calor.sld`, el mismo layer `geotravel:incidente` con otro estilo), sin traer
+  los incidentes al navegador, y sigue los filtros de Incidentes (tipo, estado, prioridad y fechas). Se pide como una sola imagen de
+  lo que se ve (`CapaCalor.jsx`), no en teselas: GeoServer escala la intensidad de cada imagen según su propio máximo, y con teselas un
+  pueblo con pocos incidentes se vería tan rojo como la ciudad. Por eso la intensidad es relativa a lo visible.
 - **Usuario de prueba:** `admin` / `urbansafe`. Se cambian con `ADMIN_USUARIO` y `ADMIN_CLAVE` en `infra/.env`
   (ver `infra/.env.example`). Hay un único usuario; no hay ABM de usuarios.
 - **Cómo funciona:** `POST /auth/login` devuelve un token (vale 8 horas, vive en la memoria del backend: si se

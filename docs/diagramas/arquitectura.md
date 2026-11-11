@@ -23,7 +23,8 @@ flowchart LR
         SLD[Estilos SLD]
     end
 
-    DB[(PostgreSQL + PostGIS<br/>geotravel)]
+    DB[(PostgreSQL + PostGIS + pgRouting<br/>zonas, recursos, incidentes<br/>y red vial de Uruguay)]
+    RedVial[Servicio red-vial<br/>carga la red de OpenStreetMap]
 
     Invitado --> Mapa
     Admin --> Mapa
@@ -35,6 +36,7 @@ flowchart LR
     ABM -->|REST: ABM y acciones| API
 
     API --> Reglas --> DB
+    RedVial -->|una sola vez| DB
     WMS --> DB
     WFS --> DB
     SLD -.estiliza.-> WMS
