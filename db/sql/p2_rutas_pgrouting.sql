@@ -159,7 +159,7 @@ BEGIN
         -- 2 y 3. Dijkstra dirigido, de un vértice virtual al otro.
         EXECUTE format($q$
             WITH camino AS (
-                SELECT p.path_seq, p.node, p.edge
+                SELECT p.seq AS path_seq, p.node, p.edge  -- seq (no path_seq): en pgRouting 4 el primer tramo repite path_seq
                 FROM pgr_dijkstra(%L, -1::bigint, -2::bigint, true) p
                 WHERE p.edge <> -1
             ),

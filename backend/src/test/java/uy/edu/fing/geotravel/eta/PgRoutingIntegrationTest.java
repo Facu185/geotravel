@@ -29,6 +29,8 @@ public class PgRoutingIntegrationTest {
     private static final double[] LARGO = {-57.9606, -31.3857, -56.1949, -34.9063};
     private static final double[] MONTEVIDEO = {-56.19, -34.90, -56.1685, -34.9158};
     private static final double[] MAR = {-55.0, -35.8, -54.9, -35.85};
+    /** Sale de una avenida de dos calzadas de mano unica (Av. Wilson Ferreira Aldunate, Salto): hay que dar la vuelta. */
+    private static final double[] CALZADA_UNICA = {-57.94953, -31.40363, -57.953308, -31.405874};
 
     private final MotorPgRouting motor = new MotorPgRouting();
 
@@ -64,6 +66,24 @@ public class PgRoutingIntegrationTest {
         assertTrue("latitud en Salto", primera.path(1).asDouble() < -31.3 && primera.path(1).asDouble() > -31.5);
         assertNotNull("informa el ajuste del origen", ruta.ajusteOrigenMetros);
         assertNotNull("informa el ajuste del destino", ruta.ajusteDestinoMetros);
+    }
+
+    @Test
+    public void laRutaNoRecorreDosVecesElMismoTramo() throws Exception {
+        for (double[] par : new double[][] {CALZADA_UNICA, DEMO, MONTEVIDEO}) {
+            for (Criterio criterio : Criterio.values()) {
+                Ruta ruta = motor.calcular(par[0], par[1], par[2], par[3], 20_000, criterio);
+                JsonNode puntos = ruta.geometriaRuta.path("coordinates");
+                java.util.Set<String> tramos = new java.util.HashSet<>();
+                for (int i = 1; i < puntos.size(); i++) {
+                    String a = puntos.path(i - 1).toString();
+                    String b = puntos.path(i).toString();
+                    if (a.equals(b)) continue;
+                    String clave = a.compareTo(b) < 0 ? a + "|" + b : b + "|" + a;
+                    assertTrue("tramo repetido " + clave + " (" + criterio + ")", tramos.add(clave));
+                }
+            }
+        }
     }
 
     @Test
