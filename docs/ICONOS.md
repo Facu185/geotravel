@@ -76,8 +76,8 @@ GeoServer dibuja las capas hasta 1:1.200.000 (zoom 9, el departamento de Salto e
 Las líneas y los polígonos de incidentes cuentan en el grupo por su centro (y su forma se dibuja igual).
 
 - **Lo que dibuja GeoServer** (mapa público, y el fondo de las demás pantallas cuando está lejos): una transformación de
-  renderizado `vec:PointStacker` agrupa en celdas de 64 px (un cuarto de la tesela de 256 px, así un círculo no cruza el
-  borde entre teselas). Está en un segundo `FeatureTypeStyle` del SLD; lo genera `geoserver/agrupamiento_sld.py` (para
+  renderizado `vec:PointStacker` agrupa en celdas de 64 px. Los puntos se piden como una sola imagen de lo que se ve
+  (`CapaWmsImagen.jsx`) y no en teselas: con teselas, los círculos del borde quedaban cortados. Está en un segundo `FeatureTypeStyle` del SLD; lo genera `geoserver/agrupamiento_sld.py` (para
   incidentes lo usa `generar_sld_incidentes.py`; para recursos reescribe el bloque marcado en `recursos_tipo.sld`).
   Un objeto solo se ve como un punto neutro: GeoServer no conserva su tipo ni su estado al agrupar.
 - **Lo que dibuja el navegador** (Consultas, Tiempo de llegada y los ABM de Incidentes y Recursos): `CapaAgrupada.jsx`
