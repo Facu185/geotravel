@@ -3,7 +3,7 @@
 *Borrador colaborativo. Estructura tomada de `template-paper-2013.doc` del curso —
 antes de entregar, pasar este contenido al formato/plantilla que pida la cátedra.*
 
-Autores: Nahuel Leguisamon · Nicolas · Facundo Cabrera facufa12@gmail.com · Bruno Salvatore · Gonzalo Soba
+Autores: Nahuel Leguisamon nanuleguisamoncabrera@gmail.com · Carlos Barrios charlynbc1991@gmail.com · Facundo Cabrera facufa12@gmail.com · Bruno Salvatore brunosalvatore2604@gmail.com · Gonzalo Soba gonzalosoba99@gmail.com
 
 ## Resumen
 
