@@ -139,6 +139,104 @@ paths:
         "503":
           description: Falta pgRouting, la red vial o la función de rutas en la base
 
+  /eta/incidentes/{incidenteId}/recurso-mas-cercano:
+    get:
+      summary: Recurso más cercano a un incidente por las calles, con su ruta
+      description: >
+        "Más cercano" por las calles, no en línea recta. PostGIS toma los N recursos más cercanos en línea recta
+        (por defecto 5; solo los disponibles) y pgRouting calcula la ruta de cada uno respetando los sentidos de circulación;
+        gana el de menor tiempo (a igual tiempo, el de menor distancia). El incidente puede ser un punto, una línea o un
+        polígono: el destino de cada ruta es el punto del incidente más próximo al recurso. Se devuelven también los otros
+        recursos evaluados, con su tiempo o el motivo por el que no tienen ruta. Exige sesión de administrador.
+        Ver docs/RED_VIAL.md.
+      tags: [eta]
+      parameters:
+        - { name: incidenteId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - name: soloDisponibles
+          in: query
+          required: false
+          schema: { type: boolean, default: true }
+          description: Si es true, solo se consideran los recursos con estado operativo Disponible
+        - name: candidatos
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 10, default: 5 }
+          description: Cuántos recursos (los más cercanos en línea recta) se evalúan por calles
+      responses:
+        "200":
+          description: Recurso elegido y su ruta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  incidente:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      titulo: { type: string }
+                      tipoIncidente: { type: string }
+                      estado: { type: string }
+                      geom: { type: object, description: Geometría del incidente, GeoJSON lon/lat }
+                  recurso:
+                    type: object
+                    description: El recurso elegido
+                    properties:
+                      id: { type: integer }
+                      identificacion: { type: string }
+                      nombre: { type: string, nullable: true }
+                      tipo: { type: string }
+                      estadoOperativo: { type: string }
+                      geom: { type: object, description: Ubicación del recurso, GeoJSON Point lon/lat }
+                  ruta:
+                    type: object
+                    properties:
+                      distanciaMetros: { type: integer }
+                      duracionSegundos: { type: integer }
+                      tiempoEstimadoMinutos: { type: integer }
+                      distanciaDirectaMetros: { type: integer }
+                      geometriaRuta: { type: object, description: GeoJSON LineString lon/lat }
+                      calles:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            calle: { type: string }
+                            metros: { type: number }
+                      ajusteOrigenMetros: { type: integer, nullable: true }
+                      ajusteDestinoMetros: { type: integer, nullable: true }
+                      advertencia: { type: string, nullable: true }
+                  criterio: { type: string, example: Menor tiempo por calles entre los 5 recursos disponibles mas cercanos en linea recta }
+                  soloDisponibles: { type: boolean }
+                  candidatosEvaluados: { type: integer }
+                  alternativas:
+                    type: array
+                    description: Todos los recursos evaluados, en orden de cercanía en línea recta
+                    items:
+                      type: object
+                      properties:
+                        recursoId: { type: integer }
+                        identificacion: { type: string }
+                        tipo: { type: string }
+                        estadoOperativo: { type: string }
+                        distanciaDirectaMetros: { type: integer }
+                        estadoRuta: { type: string, enum: [disponible, sin_ruta, error, plazo_agotado, no_consultado] }
+                        distanciaMetros: { type: integer, description: Solo con ruta }
+                        duracionSegundos: { type: integer, description: Solo con ruta }
+                        tiempoEstimadoMinutos: { type: integer, description: Solo con ruta }
+                        mensaje: { type: string, description: Solo sin ruta }
+                        elegido: { type: boolean }
+                  motor: { type: string, example: pgRouting (PostgreSQL) }
+                  aclaracion: { type: string }
+        "400":
+          $ref: "#/components/responses/DatosInvalidos"
+        "404":
+          $ref: "#/components/responses/NoExiste"
+        "422":
+          description: No hay recursos disponibles, o ninguno de los evaluados tiene ruta por calles hasta el incidente
+        "503":
+          description: Falta pgRouting o la red vial, el motor no respondió o el cálculo superó el tiempo disponible
+
   # ------------------------------------------------------------ Ingreso del administrador
   /auth/login:
     post:

@@ -3,6 +3,7 @@ package uy.edu.fing.geotravel.eta;
 
 import uy.edu.fing.geotravel.db.DataSourceProvider;
 
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -101,6 +102,38 @@ public class EtaResource {
             Thread.currentThread().interrupt();
             return error(503, "Calculo de ruta interrumpido");
 
+        } catch (IOException e) {
+            return error(503, "No se pudo consultar el motor de rutas");
+        }
+    }
+
+    /**
+     * El recurso mas cercano al incidente POR LAS CALLES, con su ruta: de los N recursos mas cercanos en linea recta
+     * (por defecto 5, solo los disponibles) gana el de menor tiempo por calles. Ver RecursoMasCercano.
+     */
+    @GET
+    @Path("/incidentes/{incidenteId}/recurso-mas-cercano")
+    public Response recursoMasCercano(
+            @PathParam("incidenteId") int incidenteId,
+            @QueryParam("soloDisponibles") @DefaultValue("true") boolean soloDisponibles,
+            @QueryParam("candidatos") String candidatos)
+            throws SQLException {
+
+        if (incidenteId <= 0) {
+            return error(400, "Identificador invalido");
+        }
+        int cantidad;
+        try {
+            cantidad = RecursoMasCercano.candidatos(candidatos);
+        } catch (IllegalArgumentException e) {
+            return error(400, e.getMessage());
+        }
+        if (!rutas.disponible()) {
+            return error(503, "El calculo de rutas no esta disponible: falta pgRouting, la red vial o la funcion de rutas");
+        }
+        try (Connection conexion = DataSourceProvider.get().getConnection()) {
+            RecursoMasCercano.Respuesta r = new RecursoMasCercano(rutas).buscar(conexion, incidenteId, soloDisponibles, cantidad);
+            return Response.status(r.estado).entity(r.cuerpo).build();
         } catch (IOException e) {
             return error(503, "No se pudo consultar el motor de rutas");
         }

@@ -334,6 +334,19 @@ La intensidad es **relativa a lo que se ve**: GeoServer escala cada imagen segú
 pide en teselas de 256 px, como las demás capas, sino como **una sola imagen** del área visible (`CapaCalor.jsx`), que se vuelve a
 pedir cuando el mapa deja de moverse; con teselas, un pueblo con tres incidentes quedaba tan rojo como la ciudad con cuarenta.
 
+### Recurso más cercano a un incidente (P3)
+
+Desde el detalle de un incidente, el botón "Trazar ruta al recurso más cercano" dibuja en el mapa la ruta por calles del recurso
+que llega antes. El endpoint `GET /eta/incidentes/{id}/recurso-mas-cercano` (`RecursoMasCercano.java`) trabaja en dos pasos: PostGIS
+toma los N recursos más cercanos en línea recta (operador `<->`, apoyado en el índice espacial; por defecto 5 y solo los
+disponibles) y pgRouting calcula la ruta de cada uno con la misma función que el tiempo de llegada; gana el de menor tiempo y, a
+igual tiempo, el de menor distancia. El primer paso solo acota el trabajo: el más cercano en línea recta no siempre es el que llega
+antes (una mano única, un arroyo o una avenida sin cruce pueden alargar el camino), por eso se compara el tiempo real. Si el incidente
+es una línea o un polígono, el destino es el punto del incidente más próximo al recurso. La respuesta incluye los demás recursos
+evaluados con su tiempo o el motivo por el que no tienen ruta. Las rutas se piden de a una con un plazo total de 25 s, y si el motor
+no responde no se insiste con el resto. `RecursoMasCercanoTest` (8 pruebas, con un motor falso) cubre la elección, los empates, la
+ausencia de ruta, la caída del motor y el plazo.
+
 ### Productos y herramientas
 
 | Producto | Puntos fuertes | Puntos débiles | Evaluación general |

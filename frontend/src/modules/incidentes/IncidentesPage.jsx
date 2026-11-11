@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
-import { GeoJSON } from "react-leaflet";
+import { GeoJSON, Marker, Tooltip } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import CargaPorZona, { AvisoCarga, SIN_CARGAR } from "../../components/CargaPorZona.jsx";
 import Enfocar from "../../components/Enfocar.jsx";
@@ -9,7 +9,8 @@ import { posicion } from "../consultas/geometria.js";
 import EditorGeometria, { cargarGeometria, formaDe, geometriaDelGrupo } from "../../components/EditorGeometria.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Insignia, Segmentado } from "../../components/ui.jsx";
 import { COLOR_ESTADO_INCIDENTE, OPCIONES_PRIORIDAD, TIPOS_INCIDENTE, nombreTipoIncidente } from "../../components/colores.js";
-import { IconoIncidente, iconoIncidente } from "../../components/iconos.jsx";
+import { IconoIncidente, iconoIncidente, iconoRecurso } from "../../components/iconos.jsx";
+import RutaRecursoCercano from "./RutaRecursoCercano.jsx";
 import { api } from "../../api/client.js";
 import { CARGA_POR_ZONA } from "../../components/region.js";
 
@@ -93,6 +94,7 @@ export default function IncidentesPage() {
   const [historial, setHistorial] = useState([]);
   const [estadoDestino, setEstadoDestino] = useState("");
   const [usuario, setUsuario] = useState("");
+  const [rutaRecurso, setRutaRecurso] = useState(null); // la ruta al recurso más cercano del incidente elegido (ver RutaRecursoCercano)
   const [form, setForm] = useState(FORM_VACIO);
   const [forma, setForma] = useState("Point"); // forma elegida en el formulario
   const [hayForma, setHayForma] = useState(false); // solo indica si hay algo dibujado; la forma se lee de la capa
@@ -122,6 +124,7 @@ export default function IncidentesPage() {
     setSeleccionado(null);
     setHistorial([]);
     setEstadoDestino("");
+    setRutaRecurso(null);
     setForm(FORM_VACIO);
     setHayForma(false);
     setPedido(null);
@@ -243,6 +246,14 @@ export default function IncidentesPage() {
     }
   };
 
+  // La ruta al recurso más cercano llegó (o se quitó): con ruta, el mapa se encuadra en el incidente, el recurso y el recorrido.
+  const alRutaRecurso = (datos) => {
+    setRutaRecurso(datos);
+    if (datos) {
+      setEnfoque({ geom: { type: "GeometryCollection", geometries: [JSON.parse(seleccionado.geom), datos.recurso.geom, datos.ruta.geometriaRuta] } });
+    }
+  };
+
   const campo = (nombre) => ({
     value: form[nombre],
     onChange: (e) => setForm({ ...form, [nombre]: e.target.value }),
@@ -302,6 +313,26 @@ export default function IncidentesPage() {
           style={(f) => estiloIncidente(f.properties.estado, f.geometry.type, true)}
           interactive={false}
         />
+      )}
+      {vista === "detalle" && seleccionado && rutaRecurso && (
+        <>
+          <GeoJSON
+            key={`ruta-${seleccionado.id}-${rutaRecurso.recurso.id}`}
+            data={rutaRecurso.ruta.geometriaRuta}
+            interactive={false}
+            style={{ color: "#0f766e", weight: 6, opacity: 0.9 }}
+          />
+          <Marker
+            key={`recurso-${rutaRecurso.recurso.id}`}
+            position={[rutaRecurso.recurso.geom.coordinates[1], rutaRecurso.recurso.geom.coordinates[0]]}
+            icon={iconoRecurso(rutaRecurso.recurso.tipo, rutaRecurso.recurso.estadoOperativo, { resaltado: true })}
+            interactive={false}
+          >
+            <Tooltip permanent direction="top">
+              {rutaRecurso.recurso.identificacion}
+            </Tooltip>
+          </Marker>
+        </>
       )}
       <EditorGeometria grupoRef={grupoRef} pedido={pedido} dibujando={dibujando} alCrear={alDibujar} alEditar={alEditar} alBorrar={alBorrar} />
     </>
@@ -413,6 +444,8 @@ export default function IncidentesPage() {
               Eliminar
             </button>
           </div>
+
+          <RutaRecursoCercano key={seleccionado.id} incidente={seleccionado} datos={rutaRecurso} alResultado={alRutaRecurso} />
 
           <section className="bloque">
             <h4 className="bloque__titulo">Cambiar estado</h4>

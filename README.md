@@ -69,6 +69,11 @@ sentidos de circulacion y velocidades: no hay un servicio de rutas externo. El s
 primera vez (baja el extracto de Geofabrik, unos 56 MB, y tarda un par de minutos). Hay un solo camino: el de menor
 tiempo. Detalle, fuentes de datos evaluadas y limites en [docs/RED_VIAL.md](docs/RED_VIAL.md).
 
+**Recurso mas cercano a un incidente:** en la pantalla Incidentes, al elegir un incidente, el boton "Trazar ruta al recurso mas
+cercano" busca (por defecto entre los recursos disponibles) el que llega antes **por las calles** y dibuja su ruta en el mapa
+(`GET /eta/incidentes/{id}/recurso-mas-cercano`). Primero toma los mas cercanos en linea recta y despues compara su tiempo real
+con pgRouting; ver [docs/RED_VIAL.md](docs/RED_VIAL.md).
+
 **Guia de instalacion en otra computadora y verificaciones:**
 [docs/ETA_SALTO_DEMO.md](docs/ETA_SALTO_DEMO.md).
 
