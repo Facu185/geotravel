@@ -1696,7 +1696,7 @@ body {
   gap: 6px;
 }
 
-/* Leyenda de la consulta 3: buffer, distancia directa y recorrido por calles. */
+/* Leyenda de la consulta 3: color del recorrido por calles. */
 .leyenda-ruta {
   display: flex;
   flex-direction: column;
@@ -1719,17 +1719,6 @@ body {
   width: 22px;
   height: 12px;
   box-sizing: border-box;
-}
-
-.leyenda-ruta__muestra--buffer {
-  background: rgba(59, 143, 224, 0.25);
-  border: 2px solid #1d6fb8;
-  border-radius: 3px;
-}
-
-.leyenda-ruta__muestra--directa {
-  height: 0;
-  border-top: 3px dashed #6b7280;
 }
 
 .leyenda-ruta__muestra--ruta {

@@ -159,14 +159,13 @@ public class ConsultaResource {
 
     // ---------------------------------------------------- 3. Recursos cercanos a un incidente
     /**
-     * Consulta 3: recursos dentro de un buffer de radioMetros alrededor del incidente, con distancia directa
-     * y, con conRutas=true, la ruta por calles de los más cercanos. Ver AnalisisVial y docs/api/openapi.yaml.
+     * Consulta 3: los recursos más cercanos al incidente (cantidad con limite), con su distancia directa y, con
+     * conRutas=true, la ruta por calles más corta (pgRouting) de los más cercanos. Ver AnalisisVial y docs/api/openapi.yaml.
      */
     @GET
     @Path("/recursos-cercanos/{incidenteId}/analisis-vial")
     @Produces(MediaType.APPLICATION_JSON)
     public Map<String, Object> analisisVial(@PathParam("incidenteId") int incidenteId,
-                                            @QueryParam("radioMetros") String radioMetros,
                                             @QueryParam("limite") String limite,
                                             @QueryParam("soloDisponibles") @DefaultValue("true") boolean soloDisponibles,
                                             @QueryParam("conRutas") @DefaultValue("false") boolean conRutas)
@@ -181,8 +180,7 @@ public class ConsultaResource {
         }
         AnalisisVial.Parametros parametros;
         try {
-            parametros = AnalisisVial.validar(
-                    AnalisisVial.entero("radioMetros", radioMetros), AnalisisVial.entero("limite", limite));
+            parametros = AnalisisVial.validar(AnalisisVial.entero("limite", limite));
         } catch (IllegalArgumentException e) {
             throw peticionInvalida(e.getMessage());
         }

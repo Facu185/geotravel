@@ -95,8 +95,8 @@ que el servicio `red-vial` carga del mismo extracto: 1.353 ciudades, pueblos y b
 ## El recurso más cercano a un incidente, por las calles
 
 Desde el detalle de un incidente (pantalla **Incidentes**), el botón **"Trazar ruta al recurso más cercano"** busca el recurso más
-cercano por las calles y dibuja su recorrido en el mapa. Se elige qué significa "más cercano": **más corto** (menos metros, por
-defecto) o **más rápido** (menos minutos). Lo resuelve `GET /eta/incidentes/{id}/recurso-mas-cercano` (`RecursoMasCercano.java`):
+cercano por las calles y dibuja su recorrido en el mapa. "Más cercano" es el de **menos metros** por calles (la pantalla no deja
+elegir otro criterio; el endpoint acepta `criterio=tiempo` para pedir el más rápido). Lo resuelve `GET /eta/incidentes/{id}/recurso-mas-cercano` (`RecursoMasCercano.java`):
 
 1. **PostGIS** toma los N recursos más cercanos **en línea recta** (por defecto 5, solo los disponibles; operador `<->`, que usa el
    índice espacial). El incidente puede ser un punto, una línea o un polígono: la distancia es a su geometría y el destino de cada ruta

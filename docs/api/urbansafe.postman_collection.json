@@ -940,11 +940,11 @@
           }
         },
         {
-          "name": "C3. Recursos cercanos a un incidente (buffer, distancia directa y, con conRutas, rutas por calles)",
+          "name": "C3. Recursos más cercanos a un incidente (distancia directa y, con conRutas, rutas por calles más cortas)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}/analisis-vial?radioMetros=2000&limite=5&soloDisponibles=true&conRutas=false"
+            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}/analisis-vial?limite=5&soloDisponibles=true&conRutas=false"
           }
         },
         {

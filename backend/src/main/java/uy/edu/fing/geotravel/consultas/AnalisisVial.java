@@ -1,6 +1,7 @@
 package uy.edu.fing.geotravel.consultas;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import uy.edu.fing.geotravel.eta.Criterio;
 import uy.edu.fing.geotravel.eta.Ruta;
 import uy.edu.fing.geotravel.eta.RutaService;
 
@@ -16,20 +17,17 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Consulta 3 ampliada: recursos dentro de un buffer alrededor del incidente, con distancia directa y,
- * a pedido, ruta por calles. Endpoint: GET /consultas/recursos-cercanos/{id}/analisis-vial.
+ * Consulta 3: los recursos operativos mas cercanos a un incidente, con su distancia directa y, a pedido, la ruta
+ * por calles mas corta (pgRouting, criterio distancia). Endpoint: GET /consultas/recursos-cercanos/{id}/analisis-vial.
  *
- * Buffer: ST_Buffer(incidente.geom, radio) en EPSG:32721 (metros). Sirve para Point (circulo),
- * LineString (corredor) y Polygon (area extendida). Los recursos se seleccionan con ST_DWithin (usa el
- * indice GiST), que equivale a "el recurso toca el buffer".
- * Distancia directa: ST_Distance entre el recurso y la geometria del incidente, en metros.
+ * Los N recursos mas cercanos se eligen con PostGIS, ordenando por el operador de vecino mas cercano (<->, usa el
+ * indice GiST), medido hasta la geometria del incidente (Point, LineString o Polygon). No hay radio ni buffer: la
+ * cantidad la elige quien consulta. Distancia directa: ST_Distance en EPSG:32721 (metros).
  * Primero se filtra con PostGIS y recien despues se consulta el motor vial, solo para los
  * RUTAS_MAXIMAS recursos mas cercanos.
  */
 public class AnalisisVial {
 
-    public static final int RADIO_DEFECTO_M = 2000;
-    public static final int RADIO_MAXIMO_M = 10000;
     public static final int LIMITE_DEFECTO = 5;
     public static final int LIMITE_MAXIMO = 10;
     /** Tope de recursos para los que se piden rutas al motor: protege a la base de ráfagas de pedidos. */
@@ -40,21 +38,18 @@ public class AnalisisVial {
 
     private static final String SQL_INCIDENTE =
             "SELECT i.id, i.titulo, i.tipo_incidente, i.estado, " +
-            "       ST_AsGeoJSON(ST_Transform(i.geom, 4326), 6) AS geom, " +
-            "       ST_AsGeoJSON(ST_Transform(ST_Buffer(i.geom, ?), 4326), 6) AS buffer_geom " +
+            "       ST_AsGeoJSON(ST_Transform(i.geom, 4326), 6) AS geom " +
             "FROM incidente i WHERE i.id = ?";
 
     private static final String SQL_RECURSOS =
             "SELECT r.id, r.identificacion, r.tipo, r.estado_operativo, " +
             "       ST_AsGeoJSON(ST_Transform(r.geom, 4326), 6) AS geom, " +
             "       ST_Distance(r.geom, i.geom) AS distancia_directa_m, " +
-            "       ST_AsGeoJSON(ST_Transform(ST_ShortestLine(r.geom, i.geom), 4326), 6) AS linea_directa, " +
             "       ST_X(ST_Transform(r.geom, 4326)) AS origen_lon, " +
             "       ST_Y(ST_Transform(r.geom, 4326)) AS origen_lat, " +
             "       ST_X(ST_Transform(ST_ClosestPoint(i.geom, r.geom), 4326)) AS destino_lon, " +
-            "       ST_Y(ST_Transform(ST_ClosestPoint(i.geom, r.geom), 4326)) AS destino_lat, " +
-            "       count(*) OVER () AS total " +
-            "FROM incidente i JOIN recurso r ON ST_DWithin(r.geom, i.geom, ?) " +
+            "       ST_Y(ST_Transform(ST_ClosestPoint(i.geom, r.geom), 4326)) AS destino_lat " +
+            "FROM incidente i CROSS JOIN recurso r " +
             "WHERE i.id = ? ";
 
     private final RutaService rutas;
@@ -65,11 +60,9 @@ public class AnalisisVial {
 
     /** Parametros ya validados. */
     public static final class Parametros {
-        public final int radioMetros;
         public final int limite;
 
-        Parametros(int radioMetros, int limite) {
-            this.radioMetros = radioMetros;
+        Parametros(int limite) {
             this.limite = limite;
         }
     }
@@ -86,18 +79,13 @@ public class AnalisisVial {
         }
     }
 
-    /** @throws IllegalArgumentException si el radio o el limite estan fuera de rango */
-    public static Parametros validar(Integer radioMetros, Integer limite) {
-        int radio = radioMetros == null ? RADIO_DEFECTO_M : radioMetros;
-        if (radio < 1 || radio > RADIO_MAXIMO_M) {
-            throw new IllegalArgumentException(
-                    "radioMetros tiene que estar entre 1 y " + RADIO_MAXIMO_M + " metros");
-        }
+    /** @throws IllegalArgumentException si el limite esta fuera de rango */
+    public static Parametros validar(Integer limite) {
         int cantidad = limite == null ? LIMITE_DEFECTO : limite;
         if (cantidad < 1 || cantidad > LIMITE_MAXIMO) {
             throw new IllegalArgumentException("limite tiene que estar entre 1 y " + LIMITE_MAXIMO);
         }
-        return new Parametros(radio, cantidad);
+        return new Parametros(cantidad);
     }
 
     /** Recurso encontrado en el buffer, con lo necesario para pedirle su ruta al motor. */
@@ -118,13 +106,11 @@ public class AnalisisVial {
 
         Map<String, Object> respuesta = new LinkedHashMap<>();
         respuesta.put("incidenteId", incidenteId);
-        respuesta.put("radioMetros", p.radioMetros);
         respuesta.put("soloDisponibles", soloDisponibles);
         respuesta.put("conRutas", conRutas);
 
         try (PreparedStatement ps = conexion.prepareStatement(SQL_INCIDENTE)) {
-            ps.setInt(1, p.radioMetros);
-            ps.setInt(2, incidenteId);
+            ps.setInt(1, incidenteId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
                     return null;
@@ -136,29 +122,23 @@ public class AnalisisVial {
                 incidente.put("estado", rs.getString("estado"));
                 incidente.put("geom", rs.getString("geom"));
                 respuesta.put("incidente", incidente);
-                respuesta.put("bufferGeom", JSON.readTree(rs.getString("buffer_geom")));
             }
         }
 
         List<Candidato> candidatos = new ArrayList<>();
-        int total = 0;
         String sql = SQL_RECURSOS
                 + (soloDisponibles ? "AND r.estado_operativo = 'Disponible' " : "")
-                + "ORDER BY ST_Distance(r.geom, i.geom), r.id LIMIT ?";
+                + "ORDER BY r.geom <-> i.geom, r.id LIMIT ?";
         try (PreparedStatement ps = conexion.prepareStatement(sql)) {
-            ps.setInt(1, p.radioMetros);
-            ps.setInt(2, incidenteId);
-            ps.setInt(3, p.limite);
+            ps.setInt(1, incidenteId);
+            ps.setInt(2, p.limite);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    total = rs.getInt("total");
                     candidatos.add(candidatoDe(rs));
                 }
             }
         }
 
-        respuesta.put("totalEnRadio", total);
-        respuesta.put("truncado", total > candidatos.size());
         respuesta.put("rutasMaximas", RUTAS_MAXIMAS);
 
         int calculadas = 0;
@@ -166,7 +146,7 @@ public class AnalisisVial {
             calculadas = calcularRutas(candidatos, System.nanoTime() + PLAZO_RUTAS_NANOS);
         }
         respuesta.put("rutasDisponibles", calculadas);
-        respuesta.put("recursoMasRapidoId", recursoMasRapido(candidatos));
+        respuesta.put("recursoMasCercanoId", recursoMasCercanoPorCalles(candidatos));
 
         List<Map<String, Object>> items = new ArrayList<>();
         for (Candidato c : candidatos) {
@@ -185,7 +165,6 @@ public class AnalisisVial {
         item.put("geom", rs.getString("geom"));
         double directa = rs.getDouble("distancia_directa_m");
         item.put("distanciaDirectaM", Math.round(directa * 10) / 10.0);
-        item.put("lineaDirecta", JSON.readTree(rs.getString("linea_directa")));
         item.put("estadoRuta", "no_calculada");
 
         RutaService.Extremos extremos = new RutaService.Extremos(
@@ -223,7 +202,7 @@ public class AnalisisVial {
             }
 
             RutaService.Resultado r = rutas.intentar(c.extremos,
-                    Math.min(RutaService.TIMEOUT_POR_DEFECTO_MS, restanteMs));
+                    Math.min(RutaService.TIMEOUT_POR_DEFECTO_MS, restanteMs), Criterio.DISTANCIA);
             switch (r.estado) {
                 case DISPONIBLE:
                     completar(c, r.ruta);
@@ -269,14 +248,25 @@ public class AnalisisVial {
         item.put("advertencia", RutaService.advertencia(ruta));
     }
 
-    /** Id del recurso con menor duracion entre los que tienen ruta; null si ninguno la tiene. */
-    static Integer recursoMasRapido(List<Candidato> candidatos) {
+    /**
+     * Id del recurso con menor distancia por calles entre los que tienen ruta (a igual distancia, el de menor duracion;
+     * si tambien empatan, el primero, que es el mas cercano en linea recta); null si ninguno la tiene.
+     */
+    static Integer recursoMasCercanoPorCalles(List<Candidato> candidatos) {
         Integer mejor = null;
-        long menor = Long.MAX_VALUE;
+        long menorDistancia = Long.MAX_VALUE;
+        long menorDuracion = Long.MAX_VALUE;
         for (Candidato c : candidatos) {
+            Object distancia = c.item.get("distanciaViaM");
             Object duracion = c.item.get("duracionS");
-            if (duracion instanceof Long && (Long) duracion < menor) {
-                menor = (Long) duracion;
+            if (!(distancia instanceof Long) || !(duracion instanceof Long)) {
+                continue;
+            }
+            long d = (Long) distancia;
+            long t = (Long) duracion;
+            if (d < menorDistancia || (d == menorDistancia && t < menorDuracion)) {
+                menorDistancia = d;
+                menorDuracion = t;
                 mejor = (Integer) c.item.get("recursoId");
             }
         }

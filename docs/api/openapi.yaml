@@ -580,28 +580,26 @@ paths:
   /consultas/recursos-cercanos/{incidenteId}/analisis-vial:
     get:
       summary: >
-        C3 con buffer. Recursos dentro de un buffer (ST_Buffer/ST_DWithin) alrededor del incidente, con distancia
-        directa y línea directa (ST_Distance/ST_ShortestLine) y, con conRutas=true, el recorrido por calles (pgRouting)
-        de los 5 más cercanos, por el camino de menor duración. Para incidentes LineString/Polygon se usa el punto del
-        incidente más cercano al recurso. Los tiempos no incluyen tráfico en tiempo real.
+        C3. Los recursos más cercanos a un incidente (operador <-> con índice GiST), con su distancia directa
+        (ST_Distance) y, con conRutas=true, el recorrido por calles (pgRouting) de los 5 más cercanos, por el camino de
+        menor distancia. Para incidentes LineString/Polygon se usa el punto del incidente más cercano al recurso. Los
+        tiempos no incluyen tráfico en tiempo real.
       tags: [consultas]
       parameters:
         - { name: incidenteId, in: path, required: true, schema: { type: integer } }
-        - { name: radioMetros, in: query, required: false, schema: { type: number, default: 2000, minimum: 1, maximum: 10000 } }
-        - { name: limite, in: query, required: false, schema: { type: integer, default: 5, minimum: 1, maximum: 10 } }
+        - { name: limite, in: query, required: false, schema: { type: integer, default: 5, minimum: 1, maximum: 10 }, description: Cuántos recursos (los más cercanos) }
         - { name: soloDisponibles, in: query, required: false, schema: { type: boolean, default: true } }
         - { name: conRutas, in: query, required: false, schema: { type: boolean, default: false }, description: "true: calcula la ruta por calles (máx. 5 recursos, plazo total 25 s)" }
       responses:
         "200":
           description: >
-            { incidenteId, radioMetros, soloDisponibles, conRutas, incidente, bufferGeom (GeoJSON Polygon 4326),
-            totalEnRadio, truncado, rutasMaximas,
-            rutasDisponibles, recursoMasRapidoId (el de menor duración entre los que tienen ruta),
+            { incidenteId, soloDisponibles, conRutas, incidente, rutasMaximas,
+            rutasDisponibles, recursoMasCercanoId (el de menor distancia por calles entre los que tienen ruta),
             items[{ recursoId, identificacion, tipo, estadoOperativo, geom, distanciaDirectaM,
-            lineaDirecta (LineString), estadoRuta (no_calculada|disponible|sin_ruta|error|plazo_agotado), mensajeRuta,
+            estadoRuta (no_calculada|disponible|sin_ruta|error|plazo_agotado), mensajeRuta,
             distanciaViaM, duracionS, tiempoEstimadoMinutos, geometriaRuta, ajusteOrigenM, ajusteDestinoM,
             calles, advertencia }] }
-        "400": { description: radioMetros o limite inválidos }
+        "400": { description: limite inválido }
         "404": { description: Incidente inexistente }
         "503": { description: "conRutas=true y falta pgRouting, la red vial o la función de rutas en la base" }
 

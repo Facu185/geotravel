@@ -71,8 +71,8 @@ function VigilarVista({ alCambiar }) {
  * Encuadra el mapa en el resultado de la consulta: como los objetos pueden estar en cualquier
  * parte del país, no alcanza con mirar la zona inicial. Deja libre el lado del panel.
  * Con porSeleccion (se eligió algo de lo que ya se ve) solo se aleja si el resultado no entra en la vista:
- * nunca se acerca, para no mover el mapa debajo de quien está eligiendo. Si el resultado trae un área (el buffer
- * de la consulta 3), sí encuadra en ella aunque haya que acercar. Un panel puede poner `ajuste` para que se
+ * nunca se acerca, para no mover el mapa debajo de quien está eligiendo. Si el resultado trae un área buscada,
+ * sí encuadra en ella aunque haya que acercar. Un panel puede poner `ajuste` para que se
  * reencuadre solo cuando esa clave cambia (y no cada vez que se suma algo, como un camino por calles).
  */
 function AjustarVista({ resultado, punto, porSeleccion }) {
@@ -82,7 +82,6 @@ function AjustarVista({ resultado, punto, porSeleccion }) {
       ...resultado.zonas.map((z) => z.geometria),
       ...resultado.incidentes.map((i) => i.geometria),
       ...resultado.recursos.map((r) => r.geometria),
-      ...(resultado.buffer ? [resultado.buffer] : []),
       ...(resultado.area ? [resultado.area] : []),
       ...resultado.rutas.map((r) => r.geometria),
     ];
@@ -90,7 +89,7 @@ function AjustarVista({ resultado, punto, porSeleccion }) {
     const limites = L.geoJSON({ type: "GeometryCollection", geometries: capas }).getBounds();
     if (punto) limites.extend(punto);
     if (!limites.isValid()) return;
-    const soloAlejar = porSeleccion && !resultado.area && !resultado.buffer;
+    const soloAlejar = porSeleccion && !resultado.area;
     if (soloAlejar && map.getBounds().contains(limites)) return;
     const escritorio = window.matchMedia("(min-width: 800px)").matches;
     map.fitBounds(limites, {
@@ -138,15 +137,6 @@ function CapaResultado({ resultado, punto }) {
 
   return (
     <>
-      {resultado.buffer && (
-        <GeoJSON
-          key={`buffer-${JSON.stringify(resultado.buffer.coordinates[0]?.[0])}-${resultado.buffer.coordinates[0]?.length}`}
-          data={resultado.buffer}
-          interactive={false}
-          style={{ color: "#1d6fb8", weight: 2, fillColor: "#3b8fe0", fillOpacity: 0.12 }}
-        />
-      )}
-
       {resultado.area && (
         <GeoJSON
           key={`area-${JSON.stringify(resultado.area.coordinates[0][0])}-${resultado.area.coordinates[0].length}`}

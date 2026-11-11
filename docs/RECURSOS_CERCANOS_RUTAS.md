@@ -1,4 +1,4 @@
-# Consulta 3: recursos cercanos con buffer y rutas por calles
+# Consulta 3: recursos más cercanos a un incidente y rutas por calles
 
 Endpoint: `GET /consultas/recursos-cercanos/{incidenteId}/analisis-vial`
 (es el único endpoint de la consulta 3; el anterior `/consultas/recursos-cercanos/{id}` se quitó).
@@ -7,29 +7,34 @@ Endpoint: `GET /consultas/recursos-cercanos/{incidenteId}/analisis-vial`
 
 | Parámetro | Defecto | Rango |
 |---|---|---|
-| `radioMetros` | 2000 | 1..10000 (fuera de rango: 400) |
-| `limite` | 5 | 1..10 |
+| `limite` | 5 | 1..10: cuántos recursos (fuera de rango: 400) |
 | `soloDisponibles` | true | |
-| `conRutas` | false | si es true calcula la ruta por calles de los más cercanos |
+| `conRutas` | false | si es true calcula la ruta por calles más corta de los más cercanos |
+
+No hay radio ni buffer: se devuelven los `limite` recursos más cercanos, sea cual sea su distancia.
 
 ## Cómo funciona
 
-1. **Buffer**: `ST_Buffer(incidente.geom, radio)` en EPSG:32721 (metros), devuelto en 4326 como `bufferGeom`.
-2. **Selección**: `ST_DWithin(recurso.geom, incidente.geom, radio)` ordenado por `ST_Distance`.
+1. **Selección**: los recursos se ordenan por cercanía al incidente con el operador de vecino más cercano
+   (`recurso.geom <-> incidente.geom`, apoyado en el índice GiST) y se toman los primeros `limite`.
    Funciona con incidentes Point, LineString y Polygon.
-3. **Distancia directa**: `ST_Distance` y línea `ST_ShortestLine` (`lineaDirecta`).
-4. **Ruta por calles** (`conRutas=true`): servicio compartido `RutaService` (el mismo de ETA) calcula, con pgRouting, la ruta
-   de los 5 más cercanos, de forma secuencial y con un plazo total de 25 s.
+2. **Distancia directa**: `ST_Distance`, en metros (`distanciaDirectaM`). El mapa no dibuja líneas directas.
+3. **Ruta por calles** (`conRutas=true`): servicio compartido `RutaService` (el mismo de ETA) calcula, con pgRouting y
+   **por distancia** (`Criterio.DISTANCIA`), la ruta más corta de los 5 más cercanos, de forma secuencial y con un plazo
+   total de 25 s. `recursoMasCercanoId` es el de menor distancia por calles (a igual distancia, el de menor duración).
+   La pantalla lo marca con la insignia "Más cercano por calles".
    Si un recurso no tiene ruta queda con `estadoRuta` `sin_ruta` o `error` y conserva su distancia directa.
    Cada ruta trae además las calles por las que pasa (`calles`).
-5. Para incidentes lineales o poligonales el destino es el punto del incidente más cercano al recurso.
+4. Para incidentes lineales o poligonales el destino es el punto del incidente más cercano al recurso.
    La ruta se engancha al punto exacto de la calle más cercana y llega hasta el marcador: se informa
    `ajusteOrigenM`/`ajusteDestinoM` y hay `advertencia` si es ≥ 100 m.
 
 ## Un solo camino
 
-Hay una sola ruta: la de **menor duración** (el costo de cada calle es su largo dividido por su velocidad, más una demora por
-esquina), respetando los sentidos de circulación. No hay selector de criterio ni ruta "más corta".
+Hay una sola ruta por recurso: la **más corta en metros** (el costo de cada calle es su largo), respetando los sentidos de
+circulación. Cada ruta informa también su duración estimada. No hay selector de criterio ni en esta consulta ni en el botón "Trazar ruta
+al recurso más cercano" del detalle de un incidente (`/eta/incidentes/{id}/recurso-mas-cercano`): ambos son por distancia. El
+tiempo de llegada (`/eta/recursos/{r}/incidentes/{i}`) usa siempre el camino más rápido.
 
 Cómo se arma la red (OpenStreetMap de todo Uruguay, con sentidos y velocidades), cómo se engancha cada extremo a la calle y
 cuáles son los límites: ver [RED_VIAL.md](RED_VIAL.md). `GET /eta/disponible` informa si se pueden calcular rutas
@@ -53,14 +58,14 @@ red vial real; apuntar `DB_HOST`/`DB_PORT` a la base con la red cargada).
 
 ### Limitaciones
 
-- No se modelan giros prohibidos ni semáforos (solo una demora fija por esquina); la duración usa la velocidad máxima de la calle.
+- No se modelan giros prohibidos ni semáforos (solo una demora fija por esquina en el cálculo por tiempo); la duración usa la velocidad máxima de la calle.
 - Sin tráfico en tiempo real. La calidad depende de OpenStreetMap (sentidos, cierres, velocidades).
 - Los extremos se enganchan a la calle más cercana (ver `advertencia`).
 
 ## Uso en el frontend
 
-Consultas → "Recursos cercanos": elegir incidente, radio y cantidad. Se ve el buffer (azul),
-las líneas directas (gris punteado) y, con "Calcular rutas por calles", los recorridos (verde).
+Consultas → "Recursos cercanos": elegir incidente y cuántos recursos. Se ven los recursos más cercanos y, con
+"Calcular rutas por calles", los recorridos más cortos (verde).
 La pantalla ETA muestra además la distancia directa, las advertencias y las calles del recorrido.
 
 En la pantalla ETA (`/eta`, solo administrador) el incidente y el recurso se eligen **con un clic en el mapa** o en un
