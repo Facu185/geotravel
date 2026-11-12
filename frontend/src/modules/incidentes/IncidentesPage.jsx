@@ -88,7 +88,7 @@ export default function IncidentesPage() {
   const [recarga, setRecarga] = useState(0); // cambiarlo vuelve a pedir la vista (después de guardar, borrar o cambiar de estado)
   const [version, setVersion] = useState(0); // fuerza a <GeoJSON> a redibujarse cuando cambian los datos
   const incidentes = carga.items;
-  const [enfoque, setEnfoque] = useState(null); // incidente elegido en la lista: el mapa va hasta él
+  const [enfoque, setEnfoque] = useState(null); // ruta al recurso más cercano: el mapa se encuadra en ella (elegir un incidente no mueve el mapa)
   const [vista, setVista] = useState("lista"); // "lista" | "detalle" | "form"
   const [seleccionado, setSeleccionado] = useState(null);
   const [historial, setHistorial] = useState([]);
@@ -373,10 +373,7 @@ export default function IncidentesPage() {
                   <button
                     type="button"
                     className="item"
-                    onClick={() => {
-                      seleccionar(i);
-                      setEnfoque({ geom: JSON.parse(i.geom) });
-                    }}
+                    onClick={() => seleccionar(i)}
                   >
                     {tipo === "Point" ? (
                       <IconoIncidente tipo={i.tipoIncidente} estado={i.estado} chico />

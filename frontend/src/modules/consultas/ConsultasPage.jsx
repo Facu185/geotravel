@@ -70,14 +70,14 @@ function VigilarVista({ alCambiar }) {
 /**
  * Encuadra el mapa en el resultado de la consulta: como los objetos pueden estar en cualquier
  * parte del país, no alcanza con mirar la zona inicial. Deja libre el lado del panel.
- * Con porSeleccion (se eligió algo de lo que ya se ve) solo se aleja si el resultado no entra en la vista:
- * nunca se acerca, para no mover el mapa debajo de quien está eligiendo. Si el resultado trae un área buscada,
- * sí encuadra en ella aunque haya que acercar. Un panel puede poner `ajuste` para que se
- * reencuadre solo cuando esa clave cambia (y no cada vez que se suma algo, como un camino por calles).
+ * Con porSeleccion (se eligió un incidente, una zona o un recurso de lo que ya se ve) el mapa NO se mueve: ni se
+ * acerca ni se aleja. Un panel puede poner `ajuste` para que se reencuadre solo cuando esa clave cambia (y no cada
+ * vez que se suma algo, como un camino por calles).
  */
 function AjustarVista({ resultado, punto, porSeleccion }) {
   const map = useMap();
   useEffect(() => {
+    if (porSeleccion) return;
     const capas = [
       ...resultado.zonas.map((z) => z.geometria),
       ...resultado.incidentes.map((i) => i.geometria),
@@ -89,17 +89,15 @@ function AjustarVista({ resultado, punto, porSeleccion }) {
     const limites = L.geoJSON({ type: "GeometryCollection", geometries: capas }).getBounds();
     if (punto) limites.extend(punto);
     if (!limites.isValid()) return;
-    const soloAlejar = porSeleccion && !resultado.area;
-    if (soloAlejar && map.getBounds().contains(limites)) return;
     const escritorio = window.matchMedia("(min-width: 800px)").matches;
     map.fitBounds(limites, {
       paddingTopLeft: [escritorio ? 390 : 24, 40],
       paddingBottomRight: [24, escritorio ? 24 : 260],
-      maxZoom: soloAlejar ? map.getZoom() : 16,
+      maxZoom: 16,
     });
     // Solo cuando cambia el resultado (o su clave de ajuste), no cuando se elige un punto
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resultado.ajuste ?? resultado, map]);
+  }, [resultado.ajuste ?? resultado, map, porSeleccion]);
   return null;
 }
 

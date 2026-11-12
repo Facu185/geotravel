@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Marker, Tooltip, useMapEvents } from "react-leaflet";
 import PaginaMapa from "../../components/PaginaMapa.jsx";
 import CargaPorZona, { AvisoCarga, SIN_CARGAR } from "../../components/CargaPorZona.jsx";
-import Enfocar from "../../components/Enfocar.jsx";
 import CapaAgrupada from "../../components/CapaAgrupada.jsx";
 import { IconoRecurso, iconoRecurso } from "../../components/iconos.jsx";
 import { Aviso, BotonVolver, IconoFlecha, IconoMas, Segmentado } from "../../components/ui.jsx";
@@ -54,7 +53,6 @@ export default function RecursosPage() {
   const [recarga, setRecarga] = useState(0); // cambiarlo vuelve a pedir la vista (después de guardar o borrar)
   const recursos = carga.items;
   const lejos = carga.estado === "lejos";
-  const [enfoque, setEnfoque] = useState(null); // recurso elegido en la lista: el mapa va hasta él
   const [vista, setVista] = useState("lista"); // "lista" | "form"
   const [seleccionado, setSeleccionado] = useState(null);
   const [form, setForm] = useState(FORM_VACIO);
@@ -171,7 +169,6 @@ export default function RecursosPage() {
   const hijosMapa = (
     <>
       <CargaPorZona ruta="/recursos" recarga={recarga} alCambiar={setCarga} />
-      <Enfocar objetivo={enfoque} />
       <ClickEnMapa alClick={(ubicacion) => vista === "form" && setPunto(ubicacion)} />
 
       {/* Los demás recursos, de fondo: la forma del ícono es el tipo y el color es el estado
@@ -234,10 +231,7 @@ export default function RecursosPage() {
                 <button
                   type="button"
                   className="item"
-                  onClick={() => {
-                    seleccionar(r);
-                    setEnfoque({ geom: JSON.parse(r.geom) });
-                  }}
+                  onClick={() => seleccionar(r)}
                 >
                   <IconoRecurso tipo={r.tipo} estado={r.estadoOperativo} chico />
                   <span className="item__texto">
