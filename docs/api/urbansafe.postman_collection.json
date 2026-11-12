@@ -761,7 +761,7 @@
             "url": "{{base}}/incidentes/{{nuevoIncidenteId}}/avanzar",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"estado\": \"En atención\",\n  \"usuario\": \"gonzalo\"\n}",
+              "raw": "{\n  \"estado\": \"En atención\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -827,7 +827,7 @@
             "url": "{{base}}/incidentes/{{nuevoIncidenteId}}/avanzar",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"estado\": \"Resuelto\",\n  \"usuario\": \"gonzalo\"\n}",
+              "raw": "{\n  \"estado\": \"Resuelto\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -940,11 +940,11 @@
           }
         },
         {
-          "name": "C3. Recursos cercanos a un incidente (buffer, distancia directa y, con conRutas, rutas por calles)",
+          "name": "C3. Recursos más cercanos a un incidente (distancia directa y, con conRutas, rutas por calles más cortas)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}/analisis-vial?radioMetros=2000&limite=5&soloDisponibles=true&conRutas=false"
+            "url": "{{base}}/consultas/recursos-cercanos/{{incidenteId}}/analisis-vial?limite=5&soloDisponibles=true&conRutas=false"
           }
         },
         {

@@ -56,7 +56,12 @@ async function consultarObjetos(map, latlng, capas, cql) {
   const respuesta = await fetch(`${GEOSERVER_WMS_URL}?${params}`);
   if (!respuesta.ok) throw new Error(`GeoServer respondió ${respuesta.status}`);
   const datos = await respuesta.json();
-  const objetos = datos.features ?? [];
+  let objetos = datos.features ?? [];
+
+  // Si el clic toca un incidente o un recurso (o un grupo de ellos, con el mapa alejado), solo se muestran esos: la zona o la
+  // calle que hay debajo es el fondo, no lo que se quiso tocar. Zonas y calles se consultan tocando donde no hay puntos.
+  const esPunto = (o) => capaDe(o) === "incidente" || capaDe(o) === "recurso";
+  if (objetos.some((o) => esPunto(o) || !(capaDe(o) in ORDEN))) objetos = objetos.filter(esPunto);
 
   // Una calle está partida en muchos tramos y el clic solo toca uno: se piden todos los tramos
   // con ese nombre (WFS) para resaltarla entera.

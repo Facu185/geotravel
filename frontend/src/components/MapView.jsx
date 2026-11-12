@@ -2,6 +2,7 @@ import { useState } from "react";
 import L from "leaflet";
 import { MapContainer, Pane, TileLayer, WMSTileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
 import { REGION, REGIONES } from "./region.js";
+import CapaWmsImagen from "./CapaWmsImagen.jsx";
 
 export const GEOSERVER_WMS_URL =
   import.meta.env.VITE_GEOSERVER_WMS_URL ?? "http://localhost:8082/geoserver/geotravel/wms";
@@ -33,7 +34,7 @@ const MAPAS_BASE = {
  * Fondo de referencia para guiarse: las calles de GeoServer por jerarquía (a lo lejos solo las rutas y avenidas principales; al
  * acercarse, las secundarias y las de barrio, con sus nombres) y los nombres de ciudades, pueblos y barrios (hasta el zoom 14,
  * cuando toman la posta los nombres de las calles). Salen de la red de rutas (red_vial_arco, estilo calles_referencia) y de
- * lugar_osm (estilo lugares_referencia); ver geoserver/styles. Es una sola imagen por tesela, en un panel propio por encima de las zonas y por debajo de los marcadores.
+ * lugar_osm (estilo lugares_referencia); ver geoserver/styles. Es una sola imagen por tesela, en un panel propio por encima de las zonas y las calles de datos y por debajo de los puntos (incidentes y recursos).
  */
 const REFERENCIA = {
   todo: "geotravel:referencia_todo", // grupo de capas: calles (calles_referencia) y lugares (lugares_referencia)
@@ -46,6 +47,29 @@ const REFERENCIA = {
  * siempre (.../geotravel/wms), se usa tal cual: sigue andando, pero sin caché.
  */
 const GWC_URL = GEOSERVER_WMS_URL.replace(/\/geotravel\/wms$/, "/gwc/service/wms");
+
+/**
+ * Las capas de datos se dividen en dos pedidos para respetar el orden contra la referencia: las zonas y las calles quedan DEBAJO
+ * (los nombres y las calles de referencia se leen sobre ellas) y los puntos (incidentes, recursos, grupos) ENCIMA. Si los puntos
+ * quedaran debajo, el halo blanco de los nombres les comería un pedazo (un círculo de grupo con un tajo).
+ */
+const CAPAS_DEBAJO = new Set(["geotravel:zona_operativa", "geotravel:via", "geotravel:red_vial_arco"]);
+
+/** Parte las capas en [debajo, encima] y reparte su cql_filter (uno por capa, separados con ";") al mismo orden. */
+function dividirCapas(layers, wmsExtra) {
+  const cqls = typeof wmsExtra?.cql_filter === "string" ? wmsExtra.cql_filter.split(";") : null;
+  const porCapa = cqls && cqls.length === layers.length ? cqls : null; // un solo filtro: vale para todas
+  const grupos = [{ capas: [], cql: [] }, { capas: [], cql: [] }];
+  layers.forEach((capa, i) => {
+    const g = grupos[CAPAS_DEBAJO.has(capa) ? 0 : 1];
+    g.capas.push(capa);
+    if (porCapa) g.cql.push(porCapa[i]);
+  });
+  return grupos.map((g) => ({
+    capas: g.capas,
+    extra: { ...wmsExtra, ...(porCapa ? { cql_filter: g.cql.join(";") } : {}) },
+  }));
+}
 
 /**
  * Botones para llevar el mapa a cada región de region.js (el sistema atiende todo el país: hay datos en Salto y en
@@ -165,21 +189,38 @@ export default function MapView({
       {zoomPosition && <ZoomControl position={zoomPosition} />}
       {irARegion && <IrARegion />}
       {mostrarZoom && <IndicadorZoom zoomMinimo={zoomMinimo} />}
-      {/* Todas las capas van en UN solo pedido WMS por tesela: GeoServer las dibuja juntas
-          (menos pedidos, y respeta el orden de la lista: la primera queda abajo). */}
-      {layers.length > 0 && (
-        <WMSTileLayer
-          key={`${layers.join(",")}|${JSON.stringify(wmsExtra ?? {})}`}
-          url={GEOSERVER_WMS_URL}
-          layers={layers.join(",")}
-          format="image/png"
-          transparent
-          // Cada tesela dibuja también 32 px más allá de su borde: así un círculo de grupo (ver
-          // geoserver/agrupamiento_sld.py) que cae justo en el límite entre dos teselas no queda cortado.
-          buffer={32}
-          {...wmsExtra}
-        />
-      )}
+      {/* Las capas de datos van en dos grupos: debajo y encima de la referencia (ver dividirCapas). Lo de abajo (zonas y calles)
+          sale en teselas: un pedido WMS por tesela, con las capas del grupo dibujadas juntas (la primera queda abajo). Lo de arriba
+          (puntos y grupos) sale como UNA imagen de la vista: con teselas, los círculos de grupo del borde quedaban cortados
+          (ver CapaWmsImagen). */}
+      <Pane name="datos-debajo" style={{ zIndex: 300 }} />
+      {(() => {
+        const [debajo, encima] = dividirCapas(layers, wmsExtra);
+        return (
+          <>
+            {debajo.capas.length > 0 && (
+              <WMSTileLayer
+                key={`${debajo.capas.join(",")}|${JSON.stringify(debajo.extra)}`}
+                url={GEOSERVER_WMS_URL}
+                layers={debajo.capas.join(",")}
+                format="image/png"
+                transparent
+                pane="datos-debajo"
+                {...debajo.extra}
+              />
+            )}
+            {encima.capas.length > 0 && (
+              <CapaWmsImagen
+                url={GEOSERVER_WMS_URL}
+                capas={encima.capas.join(",")}
+                extra={encima.extra}
+                pane="datos-encima"
+                zIndex={460}
+              />
+            )}
+          </>
+        );
+      })()}
       {children}
     </MapContainer>
   );

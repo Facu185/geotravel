@@ -138,7 +138,7 @@ El navegador nunca carga todos los objetos. Según el zoom:
   quedaron objetos afuera. En ese caso el front avisa "Mostrando 500 de N: acercá el mapa".
 - Cuando el front dibuja un tipo de objeto, GeoServer deja de dibujar ese tipo (no se ve doble).
 - Las zonas se simplifican 3 m al devolverlas: se dibujan igual y pesan mucho menos.
-- Con cualquiera de los dos dibujando, los incidentes y recursos que quedan juntos se agrupan con un número hasta el zoom 14
+- Con cualquiera de los dos dibujando, los incidentes y recursos que quedan juntos se agrupan con un número hasta el zoom 12
   (GeoServer con `vec:PointStacker`; el front con `leaflet.markercluster`). Ver `docs/ICONOS.md`.
 - Detalle: `docs/CARGA_POR_ZONA.md`.
 

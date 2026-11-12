@@ -22,7 +22,18 @@ public final class Sesiones {
 
     static final Duration DURACION = Duration.ofHours(8);
     private static final SecureRandom ALEATORIO = new SecureRandom();
-    private static final Map<String, Instant> ACTIVAS = new ConcurrentHashMap<>();
+    private static final Map<String, Sesion> ACTIVAS = new ConcurrentHashMap<>();
+
+    /** Una sesión abierta: quién ingresó y cuándo vence. */
+    private static final class Sesion {
+        final String usuario;
+        final Instant vence;
+
+        Sesion(String usuario, Instant vence) {
+            this.usuario = usuario;
+            this.vence = vence;
+        }
+    }
 
     private Sesiones() {
     }
@@ -55,14 +66,19 @@ public final class Sesiones {
         return usuarioOk && claveOk;
     }
 
-    /** Abre una sesión y devuelve su token. */
+    /** Abre una sesión del usuario administrador y devuelve su token. */
     public static String crear() {
+        return crear(usuarioAdmin());
+    }
+
+    /** Abre una sesión de ese usuario y devuelve su token. */
+    static String crear(String usuario) {
         Instant ahora = Instant.now();
-        ACTIVAS.values().removeIf(vence -> vence.isBefore(ahora)); // limpia las vencidas
+        ACTIVAS.values().removeIf(s -> s.vence.isBefore(ahora)); // limpia las vencidas
         byte[] bytes = new byte[32];
         ALEATORIO.nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        ACTIVAS.put(token, ahora.plus(DURACION));
+        ACTIVAS.put(token, new Sesion(usuario, ahora.plus(DURACION)));
         return token;
     }
 
@@ -79,15 +95,20 @@ public final class Sesiones {
         if (token == null || token.isEmpty()) {
             return false;
         }
-        Instant vence = ACTIVAS.get(token);
-        if (vence == null) {
+        Sesion sesion = ACTIVAS.get(token);
+        if (sesion == null) {
             return false;
         }
-        if (vence.isBefore(Instant.now())) {
+        if (sesion.vence.isBefore(Instant.now())) {
             ACTIVAS.remove(token);
             return false;
         }
         return true;
+    }
+
+    /** El usuario dueño de la sesión de ese token; null si no hay sesión válida. */
+    public static String usuarioDe(String token) {
+        return valida(token) ? ACTIVAS.get(token).usuario : null;
     }
 
     public static void cerrar(String token) {
@@ -98,6 +119,7 @@ public final class Sesiones {
 
     /** Solo para pruebas: deja la sesión por vencer o ya vencida. */
     static void vencerAhora(String token) {
-        ACTIVAS.put(token, Instant.now().minusSeconds(1));
+        Sesion actual = ACTIVAS.get(token);
+        ACTIVAS.put(token, new Sesion(actual == null ? null : actual.usuario, Instant.now().minusSeconds(1)));
     }
 }

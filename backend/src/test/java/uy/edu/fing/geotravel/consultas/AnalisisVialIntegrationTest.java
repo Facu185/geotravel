@@ -1,6 +1,5 @@
 package uy.edu.fing.geotravel.consultas;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.After;
 import org.junit.Assume;
 import org.junit.Before;
@@ -18,7 +17,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -96,10 +94,10 @@ public class AnalisisVialIntegrationTest {
 
     private static final String PUNTO = "{\"type\":\"Point\",\"coordinates\":[" + LON + "," + LAT + "]}";
 
-    private Map<String, Object> analizar(int incidenteId, int radio, int limite, boolean soloDisp, boolean rutas)
+    private Map<String, Object> analizar(int incidenteId, int limite, boolean soloDisp, boolean rutas)
             throws Exception {
         try (Connection c = DataSourceProvider.get().getConnection()) {
-            return analisis.analizar(c, incidenteId, AnalisisVial.validar(radio, limite), soloDisp, rutas);
+            return analisis.analizar(c, incidenteId, AnalisisVial.validar(limite), soloDisp, rutas);
         }
     }
 
@@ -118,58 +116,66 @@ public class AnalisisVialIntegrationTest {
     }
 
     @Test
-    public void bufferDePuntoSeleccionaSoloRecursosDentroDelRadio() throws Exception {
+    public void devuelveLosMasCercanosOrdenadosPorDistancia() throws Exception {
         int inc = incidente(PUNTO);
-        recurso("-cerca", "Disponible", 300);
         recurso("-lejos", "Disponible", 3000);
+        recurso("-cerca", "Disponible", 300);
+        recurso("-medio", "Disponible", 1000);
 
-        Map<String, Object> r = analizar(inc, 1000, 10, false, false);
+        Map<String, Object> r = analizar(inc, 10, false, false);
 
         List<Map<String, Object>> propios = propios(r);
-        assertEquals(1, propios.size());
+        assertEquals(3, propios.size()); // sin radio: tambien el de 3 km
         assertEquals(prefijo + "-cerca", propios.get(0).get("identificacion"));
+        assertEquals(prefijo + "-medio", propios.get(1).get("identificacion"));
+        assertEquals(prefijo + "-lejos", propios.get(2).get("identificacion"));
         double directa = ((Number) propios.get(0).get("distanciaDirectaM")).doubleValue();
         assertEquals(300, directa, 1.0);
         assertEquals("no_calculada", propios.get(0).get("estadoRuta"));
-        JsonNode buffer = (JsonNode) r.get("bufferGeom");
-        assertEquals("Polygon", buffer.get("type").asText());
-        assertEquals("LineString", ((JsonNode) propios.get(0).get("lineaDirecta")).get("type").asText());
+        assertNull(r.get("bufferGeom"));
+        assertNull(propios.get(0).get("lineaDirecta"));
     }
 
     @Test
-    public void radioMayorIncorporaMasRecursos() throws Exception {
+    public void respetaLaCantidadPedida() throws Exception {
         int inc = incidente(PUNTO);
-        recurso("-cerca", "Disponible", 300);
-        recurso("-lejos", "Disponible", 3000);
+        recurso("-a", "Disponible", 100);
+        recurso("-b", "Disponible", 200);
+        recurso("-c", "Disponible", 300);
 
-        assertEquals(2, propios(analizar(inc, 5000, 10, false, false)).size());
+        List<Map<String, Object>> items = items(analizar(inc, 2, false, false));
+
+        assertEquals(2, items.size());
+        assertEquals(prefijo + "-a", items.get(0).get("identificacion"));
+        assertEquals(prefijo + "-b", items.get(1).get("identificacion"));
     }
 
     @Test
-    public void bufferDeLineaFormaUnCorredor() throws Exception {
+    public void incidenteLinealMideLaDistanciaHastaLaLinea() throws Exception {
         int inc = incidente("{\"type\":\"LineString\",\"coordinates\":[[" + LON + "," + LAT + "],["
                 + (LON + 0.02) + "," + LAT + "]]}");
         recurso("-junto-a-la-linea", "Disponible", 1000);
 
-        Map<String, Object> r = analizar(inc, 500, 10, false, false);
+        List<Map<String, Object>> propios = propios(analizar(inc, 10, false, false));
 
-        assertEquals(1, propios(r).size());
-        assertEquals("Polygon", ((JsonNode) r.get("bufferGeom")).get("type").asText());
+        assertEquals(1, propios.size());
+        // la recta este-oeste en lon/lat se curva un poco en UTM: unos metros de diferencia, no los 1000 m de la linea
+        assertEquals(0.0, ((Number) propios.get(0).get("distanciaDirectaM")).doubleValue(), 30.0);
     }
 
     @Test
-    public void bufferDePoligonoSeExtiendeMasAllaDelArea() throws Exception {
+    public void incidentePoligonalMideLaDistanciaHastaElArea() throws Exception {
         double d = 0.002;
         int inc = incidente("{\"type\":\"Polygon\",\"coordinates\":[[[" + LON + "," + LAT + "],[" + (LON + d) + ","
                 + LAT + "],[" + (LON + d) + "," + (LAT + d) + "],[" + LON + "," + (LAT + d) + "],[" + LON + "," + LAT
                 + "]]]}");
         recurso("-dentro", "Disponible", 50);
-        recurso("-fuera-del-radio", "Disponible", 4000);
+        recurso("-lejos", "Disponible", 4000);
 
-        Map<String, Object> r = analizar(inc, 500, 10, false, false);
+        List<Map<String, Object>> propios = propios(analizar(inc, 10, false, false));
 
-        List<Map<String, Object>> propios = propios(r);
-        assertEquals(1, propios.size());
+        assertEquals(2, propios.size());
+        assertEquals(prefijo + "-dentro", propios.get(0).get("identificacion"));
         assertEquals(0.0, ((Number) propios.get(0).get("distanciaDirectaM")).doubleValue(), 0.5);
     }
 
@@ -179,8 +185,8 @@ public class AnalisisVialIntegrationTest {
         recurso("-libre", "Disponible", 100);
         recurso("-ocupado", "En servicio", 120);
 
-        assertEquals(1, propios(analizar(inc, 1000, 10, true, false)).size());
-        assertEquals(2, propios(analizar(inc, 1000, 10, false, false)).size());
+        assertEquals(1, propios(analizar(inc, 10, true, false)).size());
+        assertEquals(2, propios(analizar(inc, 10, false, false)).size());
     }
 
     @Test
@@ -188,30 +194,19 @@ public class AnalisisVialIntegrationTest {
         int inc = incidente(PUNTO);
         recurso("-cerca", "Disponible", 300);
 
-        Map<String, Object> r = analizar(inc, 1000, 10, true, true);
+        Map<String, Object> r = analizar(inc, 10, true, true);
 
         Map<String, Object> item = propios(r).get(0);
         assertEquals("disponible", item.get("estadoRuta"));
         assertEquals(1200L, item.get("distanciaViaM"));
         assertEquals(150L, item.get("duracionS"));
-        assertNotNull(r.get("recursoMasRapidoId"));
+        assertEquals(propios(r).get(0).get("recursoId"), r.get("recursoMasCercanoId"));
         assertTrue(((Number) item.get("distanciaViaM")).doubleValue()
                 >= ((Number) item.get("distanciaDirectaM")).doubleValue());
     }
 
     @Test
     public void incidenteInexistenteDevuelveNull() throws Exception {
-        assertNull(analizar(Integer.MAX_VALUE, 1000, 5, true, false));
-    }
-
-    @Test
-    public void incidenteExistenteSinRecursosDevuelveListaVacia() throws Exception {
-        int inc = incidente("{\"type\":\"Point\",\"coordinates\":[-55.0,-33.0]}");
-
-        Map<String, Object> r = analizar(inc, 500, 5, false, false);
-
-        assertNotNull(r);
-        assertEquals(0, items(r).size());
-        assertEquals(0, r.get("totalEnRadio"));
+        assertNull(analizar(Integer.MAX_VALUE, 5, true, false));
     }
 }

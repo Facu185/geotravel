@@ -109,14 +109,16 @@ public class EtaResource {
 
     /**
      * El recurso mas cercano al incidente POR LAS CALLES, con su ruta: de los N recursos mas cercanos en linea recta
-     * (por defecto 5, solo los disponibles) gana el de menor tiempo por calles. Ver RecursoMasCercano.
+     * (por defecto 5, solo los disponibles) gana el de menor distancia por calles (criterio=distancia, por defecto) o el
+     * que llega antes (criterio=tiempo). Ver RecursoMasCercano.
      */
     @GET
     @Path("/incidentes/{incidenteId}/recurso-mas-cercano")
     public Response recursoMasCercano(
             @PathParam("incidenteId") int incidenteId,
             @QueryParam("soloDisponibles") @DefaultValue("true") boolean soloDisponibles,
-            @QueryParam("candidatos") String candidatos)
+            @QueryParam("candidatos") String candidatos,
+            @QueryParam("criterio") String criterio)
             throws SQLException {
 
         if (incidenteId <= 0) {
@@ -128,11 +130,17 @@ public class EtaResource {
         } catch (IllegalArgumentException e) {
             return error(400, e.getMessage());
         }
+        Criterio criterioRuta;
+        try {
+            criterioRuta = Criterio.de(criterio, Criterio.DISTANCIA);
+        } catch (IllegalArgumentException e) {
+            return error(400, e.getMessage());
+        }
         if (!rutas.disponible()) {
             return error(503, "El calculo de rutas no esta disponible: falta pgRouting, la red vial o la funcion de rutas");
         }
         try (Connection conexion = DataSourceProvider.get().getConnection()) {
-            RecursoMasCercano.Respuesta r = new RecursoMasCercano(rutas).buscar(conexion, incidenteId, soloDisponibles, cantidad);
+            RecursoMasCercano.Respuesta r = new RecursoMasCercano(rutas).buscar(conexion, incidenteId, soloDisponibles, cantidad, criterioRuta);
             return Response.status(r.estado).entity(r.cuerpo).build();
         } catch (IOException e) {
             return error(503, "No se pudo consultar el motor de rutas");

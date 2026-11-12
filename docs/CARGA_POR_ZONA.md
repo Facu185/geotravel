@@ -136,8 +136,8 @@ queda marcado aunque se mueva el mapa.
 
 ## Agrupar con un número al alejar el mapa
 
-Con el mapa alejado (zoom 14 o menos) los incidentes y recursos que quedan juntos se agrupan en un círculo con la
-cantidad; del zoom 15 en adelante se ven los íconos. Hay dos mecanismos con la misma regla (celda de 64 px, mismo corte):
+Con el mapa alejado (zoom 12 o menos) los incidentes y recursos que quedan juntos se agrupan en un círculo con la
+cantidad; del zoom 13 en adelante se ven los íconos. Hay dos mecanismos con la misma regla (celda de 64 px, mismo corte):
 
 - **GeoServer** (mapa público y el fondo cuando se está lejos): `vec:PointStacker` en el SLD, ver `docs/ICONOS.md`.
 - **El navegador** (Consultas, Tiempo de llegada y los ABM de Incidentes y Recursos): `CapaAgrupada.jsx`, con

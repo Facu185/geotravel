@@ -88,12 +88,11 @@ export default function IncidentesPage() {
   const [recarga, setRecarga] = useState(0); // cambiarlo vuelve a pedir la vista (después de guardar, borrar o cambiar de estado)
   const [version, setVersion] = useState(0); // fuerza a <GeoJSON> a redibujarse cuando cambian los datos
   const incidentes = carga.items;
-  const [enfoque, setEnfoque] = useState(null); // incidente elegido en la lista: el mapa va hasta él
+  const [enfoque, setEnfoque] = useState(null); // ruta al recurso más cercano: el mapa se encuadra en ella (elegir un incidente no mueve el mapa)
   const [vista, setVista] = useState("lista"); // "lista" | "detalle" | "form"
   const [seleccionado, setSeleccionado] = useState(null);
   const [historial, setHistorial] = useState([]);
   const [estadoDestino, setEstadoDestino] = useState("");
-  const [usuario, setUsuario] = useState("");
   const [rutaRecurso, setRutaRecurso] = useState(null); // la ruta al recurso más cercano del incidente elegido (ver RutaRecursoCercano)
   const [form, setForm] = useState(FORM_VACIO);
   const [forma, setForma] = useState("Point"); // forma elegida en el formulario
@@ -234,7 +233,7 @@ export default function IncidentesPage() {
     if (!estadoDestino) return;
     setError(null);
     try {
-      await api.post(`/incidentes/${seleccionado.id}/avanzar`, { estado: estadoDestino, usuario });
+      await api.post(`/incidentes/${seleccionado.id}/avanzar`, { estado: estadoDestino });
       setMensaje(`Pasó a "${estadoDestino}".`);
       const actualizado = { ...seleccionado, estado: estadoDestino };
       setSeleccionado(actualizado);
@@ -374,10 +373,7 @@ export default function IncidentesPage() {
                   <button
                     type="button"
                     className="item"
-                    onClick={() => {
-                      seleccionar(i);
-                      setEnfoque({ geom: JSON.parse(i.geom) });
-                    }}
+                    onClick={() => seleccionar(i)}
                   >
                     {tipo === "Point" ? (
                       <IconoIncidente tipo={i.tipoIncidente} estado={i.estado} chico />
@@ -452,10 +448,6 @@ export default function IncidentesPage() {
             {opcionesDestino.length > 0 ? (
               <>
                 <Segmentado leyenda="Pasar a" nombre="estadoDestino" opciones={opcionesDestino} valor={estadoDestino} onChange={setEstadoDestino} />
-                <label className="campo">
-                  <span className="campo__etiqueta">Tu usuario (opcional)</span>
-                  <input value={usuario} onChange={(e) => setUsuario(e.target.value)} />
-                </label>
                 <button type="button" className="btn btn--primario" onClick={avanzar} disabled={!estadoDestino}>
                   Confirmar cambio
                 </button>

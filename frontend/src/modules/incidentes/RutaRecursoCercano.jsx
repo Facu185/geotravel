@@ -10,7 +10,8 @@ import useRutasDisponibles from "../../api/useRutasDisponibles.js";
  *
  * El backend (GET /eta/incidentes/{id}/recurso-mas-cercano) toma los recursos más cercanos en línea recta (por defecto
  * solo los disponibles), calcula con pgRouting la ruta de cada uno respetando los sentidos de circulación y se queda con el
- * que llega antes. El trazado se dibuja en el mapa de la página (IncidentesPage); acá está el botón y el resultado.
+ * que tiene el camino más corto por calles (menos metros). No se elige el criterio: "más cercano" es el de menos metros.
+ * El trazado se dibuja en el mapa de la página (IncidentesPage); acá está el botón y el resultado.
  *
  *   incidente    el elegido (para pedir su ruta)
  *   datos        la respuesta del backend (la guarda la página, que dibuja la ruta), o null si no hay ruta trazada
@@ -39,7 +40,7 @@ export default function RutaRecursoCercano({ incidente, datos, alResultado }) {
     setError(null);
     alResultado(null);
     try {
-      const respuesta = await api.get(`/eta/incidentes/${incidente.id}/recurso-mas-cercano?soloDisponibles=${soloDisponibles}`);
+      const respuesta = await api.get(`/eta/incidentes/${incidente.id}/recurso-mas-cercano?soloDisponibles=${soloDisponibles}&criterio=distancia`);
       if (numero === pedido.current) alResultado(respuesta);
     } catch (e) {
       if (numero === pedido.current) setError(e.message);
@@ -63,7 +64,7 @@ export default function RutaRecursoCercano({ incidente, datos, alResultado }) {
     <section className="bloque">
       <h4 className="bloque__titulo">Recurso más cercano</h4>
       <p className="ayuda">
-        Busca entre los recursos más cercanos el que llega antes por las calles (respetando los sentidos de circulación) y traza su ruta en el mapa.
+        Busca el recurso más cercano por las calles, el de menos metros (respetando los sentidos de circulación), y traza su ruta en el mapa.
       </p>
       <label className="casilla">
         <input type="checkbox" checked={soloDisponibles} onChange={(e) => setSoloDisponibles(e.target.checked)} disabled={buscando} />

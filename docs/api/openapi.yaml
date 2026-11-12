@@ -145,8 +145,8 @@ paths:
       description: >
         "Más cercano" por las calles, no en línea recta. PostGIS toma los N recursos más cercanos en línea recta
         (por defecto 5; solo los disponibles) y pgRouting calcula la ruta de cada uno respetando los sentidos de circulación;
-        gana el de menor tiempo (a igual tiempo, el de menor distancia). El incidente puede ser un punto, una línea o un
-        polígono: el destino de cada ruta es el punto del incidente más próximo al recurso. Se devuelven también los otros
+        gana el mejor según el criterio: el de menor distancia por calles (`distancia`, por defecto) o el que llega antes
+        (`tiempo`); en un empate decide el otro dato. El incidente puede ser un punto, una línea o un polígono: el destino de cada ruta es el punto del incidente más próximo al recurso. Se devuelven también los otros
         recursos evaluados, con su tiempo o el motivo por el que no tienen ruta. Exige sesión de administrador.
         Ver docs/RED_VIAL.md.
       tags: [eta]
@@ -162,6 +162,11 @@ paths:
           required: false
           schema: { type: integer, minimum: 1, maximum: 10, default: 5 }
           description: Cuántos recursos (los más cercanos en línea recta) se evalúan por calles
+        - name: criterio
+          in: query
+          required: false
+          schema: { type: string, enum: [distancia, tiempo], default: distancia }
+          description: Qué se minimiza al buscar el camino. distancia = el más corto en metros; tiempo = el más rápido.
       responses:
         "200":
           description: Recurso elegido y su ruta
@@ -468,7 +473,6 @@ paths:
               required: [estado]
               properties:
                 estado: { type: string, enum: [Registrado, "En atención", Derivado, Resuelto, Cancelado] }
-                usuario: { type: string, description: "Quién hace el cambio (sin login real: texto libre, opcional)" }
       responses:
         "200": { description: Estado actualizado }
         "400": { description: Estado destino inválido }
@@ -576,28 +580,26 @@ paths:
   /consultas/recursos-cercanos/{incidenteId}/analisis-vial:
     get:
       summary: >
-        C3 con buffer. Recursos dentro de un buffer (ST_Buffer/ST_DWithin) alrededor del incidente, con distancia
-        directa y línea directa (ST_Distance/ST_ShortestLine) y, con conRutas=true, el recorrido por calles (pgRouting)
-        de los 5 más cercanos, por el camino de menor duración. Para incidentes LineString/Polygon se usa el punto del
-        incidente más cercano al recurso. Los tiempos no incluyen tráfico en tiempo real.
+        C3. Los recursos más cercanos a un incidente (operador <-> con índice GiST), con su distancia directa
+        (ST_Distance) y, con conRutas=true, el recorrido por calles (pgRouting) de los 5 más cercanos, por el camino de
+        menor distancia. Para incidentes LineString/Polygon se usa el punto del incidente más cercano al recurso. Los
+        tiempos no incluyen tráfico en tiempo real.
       tags: [consultas]
       parameters:
         - { name: incidenteId, in: path, required: true, schema: { type: integer } }
-        - { name: radioMetros, in: query, required: false, schema: { type: number, default: 2000, minimum: 1, maximum: 10000 } }
-        - { name: limite, in: query, required: false, schema: { type: integer, default: 5, minimum: 1, maximum: 10 } }
+        - { name: limite, in: query, required: false, schema: { type: integer, default: 5, minimum: 1, maximum: 10 }, description: Cuántos recursos (los más cercanos) }
         - { name: soloDisponibles, in: query, required: false, schema: { type: boolean, default: true } }
         - { name: conRutas, in: query, required: false, schema: { type: boolean, default: false }, description: "true: calcula la ruta por calles (máx. 5 recursos, plazo total 25 s)" }
       responses:
         "200":
           description: >
-            { incidenteId, radioMetros, soloDisponibles, conRutas, incidente, bufferGeom (GeoJSON Polygon 4326),
-            totalEnRadio, truncado, rutasMaximas,
-            rutasDisponibles, recursoMasRapidoId (el de menor duración entre los que tienen ruta),
+            { incidenteId, soloDisponibles, conRutas, incidente, rutasMaximas,
+            rutasDisponibles, recursoMasCercanoId (el de menor distancia por calles entre los que tienen ruta),
             items[{ recursoId, identificacion, tipo, estadoOperativo, geom, distanciaDirectaM,
-            lineaDirecta (LineString), estadoRuta (no_calculada|disponible|sin_ruta|error|plazo_agotado), mensajeRuta,
+            estadoRuta (no_calculada|disponible|sin_ruta|error|plazo_agotado), mensajeRuta,
             distanciaViaM, duracionS, tiempoEstimadoMinutos, geometriaRuta, ajusteOrigenM, ajusteDestinoM,
             calles, advertencia }] }
-        "400": { description: radioMetros o limite inválidos }
+        "400": { description: limite inválido }
         "404": { description: Incidente inexistente }
         "503": { description: "conRutas=true y falta pgRouting, la red vial o la función de rutas en la base" }
 

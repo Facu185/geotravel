@@ -242,7 +242,7 @@ texto (`/consultas/buscar`) que busca en todo el sistema y no obliga a cargar li
 Los conteos de cada capa son los de **lo que se ve**: se piden a GeoServer por WFS con `resultType=hits` y un filtro CQL
 `BBOX(geom, ...)` con el rectángulo visible, y se actualizan al mover el mapa. Al hacer clic se pide el detalle con
 GetFeatureInfo y se resalta el objeto. Con el mapa alejado, los objetos superpuestos se agrupan con un número: GeoServer usa la
-transformación `PointStacker` (celdas de 64 px) y el navegador, `leaflet.markercluster`; del zoom 15 en adelante se ven los
+transformación `PointStacker` (celdas de 64 px) y el navegador, `leaflet.markercluster`; del zoom 13 en adelante se ven los
 íconos. Cada tipo de incidente tiene su ícono y se muestra una leyenda compartida con las pantallas de consultas. El invitado ve
 las consultas 1 a 7; el reporte con filtros es del administrador.
 
@@ -276,7 +276,7 @@ tipo de vía) y su costo en segundos: tiempo de recorrerlo más 3 s por cada esq
 cada arco (`pgr_connectedComponents`) para saber qué tramos están aislados de la red principal. La misma carga deja la tabla
 `lugar_osm` y las 60.261 vías con nombre que usa la capa "Calles" del mapa.
 
-**Cálculo de la ruta.** La función SQL `p2_calcular_ruta(lon_o, lat_o, lon_d, lat_d)` recibe dos puntos y devuelve la
+**Cálculo de la ruta.** La función SQL `p2_calcular_ruta(lon_o, lat_o, lon_d, lat_d, criterio)` recibe dos puntos y un criterio (tiempo o distancia) y devuelve la
 distancia, la duración, la geometría de la ruta, cuánto se movió cada extremo para quedar sobre una calle y la lista de calles
 recorridas. Primero **ajusta cada extremo a la calle más cercana** (hasta 500 m), en el punto exacto de la calle, partiendo
 virtualmente el arco. Después corre `pgr_dijkstra` con un costo negativo en el sentido prohibido de cada arco, lo que
@@ -288,19 +288,20 @@ al comienzo y al final, de modo que la línea toca los dos marcadores.
 caso de uso pide un camino por incidente.
 
 **Integración.** `MotorPgRouting` (backend) llama a la función; `RutaService` aplica un plazo y devuelve un error claro si la
-base no responde, y `GET /eta/disponible` informa si el motor está listo. La consulta 3 (`analisis-vial`) busca los recursos
-dentro de un radio del incidente, calcula la ruta de cada uno por las calles y marca el **recurso más rápido**. En la pantalla
+base no responde, y `GET /eta/disponible` informa si el motor está listo. La consulta 3 (`analisis-vial`) busca los N recursos
+más cercanos al incidente (la cantidad la elige quien consulta), calcula con pgRouting el camino más corto de cada uno por las calles
+y marca el **recurso más cercano por calles**. En la pantalla
 se ve la ruta en el mapa, su distancia y duración, y una lista con las **calles del recorrido**. La red también se publica como
 capa "Red de rutas", con flechas en las calles de mano única (un `GraphicStroke` en SLD).
 
 **Resultados medidos.** En la base de prueba, una ruta de 4,7 km dentro de Salto tarda unos 50 ms; una de 6,1 km en Montevideo,
 unos 300 ms; y una de 489 km entre Salto y Montevideo, 1,1 s. Con la red de todo el país la tabla de arcos ocupa unos 254 MB.
 
-**Pruebas.** `PgRoutingIntegrationTest` (10 pruebas, contra una base real con la red cargada) verifica, entre otras cosas, que
+**Pruebas.** `PgRoutingIntegrationTest` (13 pruebas, contra una base real con la red cargada) verifica, entre otras cosas, que
 la ruta salga y llegue a los puntos pedidos, que informe las calles del recorrido, que funcione en Montevideo (la red cubre todo el
 país), que un punto fuera de cobertura dé "sin ruta", que dos puntos iguales den una ruta nula y que el plazo agotado se traduzca
 en un error claro.
-`BusquedaEnTodoElPaisTest` cubre las direcciones y los cruces. En total, la suite del backend tiene 118 pruebas; 31 de integración
+`BusquedaEnTodoElPaisTest` cubre las direcciones y los cruces. En total, la suite del backend tiene 108 pruebas; 33 de integración
 se activan con una variable de entorno.
 
 ### Autenticación y vistas por rol (P5)
@@ -337,14 +338,16 @@ pedir cuando el mapa deja de moverse; con teselas, un pueblo con tres incidentes
 ### Recurso más cercano a un incidente (P3)
 
 Desde el detalle de un incidente, el botón "Trazar ruta al recurso más cercano" dibuja en el mapa la ruta por calles del recurso
-que llega antes. El endpoint `GET /eta/incidentes/{id}/recurso-mas-cercano` (`RecursoMasCercano.java`) trabaja en dos pasos: PostGIS
+más cercano, el de menos metros por calles. El endpoint `GET /eta/incidentes/{id}/recurso-mas-cercano` (`RecursoMasCercano.java`) trabaja en dos pasos: PostGIS
 toma los N recursos más cercanos en línea recta (operador `<->`, apoyado en el índice espacial; por defecto 5 y solo los
-disponibles) y pgRouting calcula la ruta de cada uno con la misma función que el tiempo de llegada; gana el de menor tiempo y, a
-igual tiempo, el de menor distancia. El primer paso solo acota el trabajo: el más cercano en línea recta no siempre es el que llega
-antes (una mano única, un arroyo o una avenida sin cruce pueden alargar el camino), por eso se compara el tiempo real. Si el incidente
+disponibles) y pgRouting calcula la ruta de cada uno con la misma función que el tiempo de llegada, minimizando la distancia
+(el endpoint acepta también `criterio=tiempo`, que la pantalla no usa); gana el de menos metros y, en un empate, el más rápido. El primer paso solo acota el trabajo: el
+más cercano en línea recta no siempre es el más cercano por las calles (una mano única, un arroyo o una avenida sin cruce pueden
+alargar el camino), por eso se compara la ruta real. Los dos criterios pueden elegir caminos distintos: en una prueba con 40 pares
+de Salto difirieron en 24. Si el incidente
 es una línea o un polígono, el destino es el punto del incidente más próximo al recurso. La respuesta incluye los demás recursos
 evaluados con su tiempo o el motivo por el que no tienen ruta. Las rutas se piden de a una con un plazo total de 25 s, y si el motor
-no responde no se insiste con el resto. `RecursoMasCercanoTest` (8 pruebas, con un motor falso) cubre la elección, los empates, la
+no responde no se insiste con el resto. `RecursoMasCercanoTest` (15 pruebas, con un motor falso) cubre la elección, los empates, la
 ausencia de ruta, la caída del motor y el plazo.
 
 ### Productos y herramientas

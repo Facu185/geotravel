@@ -157,6 +157,97 @@ public class RecursoMasCercanoTest {
         assertEquals("plazo_agotado", de(ev, 0, "estadoRuta"));
     }
 
+    // ---------------------------------------------------------------- criterio: distancia o tiempo
+
+    /** Las mismas tres rutas para los dos criterios: el 1 es corto y lento, el 3 es largo y rápido, el 2 queda en el medio. */
+    private static Ruta rutaDe(int n) {
+        return n == 1 ? new Ruta(500, 600) : n == 2 ? new Ruta(700, 400) : new Ruta(900, 200);
+    }
+
+    @Test
+    public void conCriterioDistanciaGanaElMasCortoAunqueTardeMas() {
+        RecursoMasCercano.Evaluacion ev =
+                RecursoMasCercano.evaluar(candidatos(3), servicio(RecursoMasCercanoTest::rutaDe), PLAZO, Criterio.DISTANCIA);
+
+        assertEquals(1, ev.elegido.id);
+        assertEquals(500.0, ev.ruta.distanciaMetros, 0.001);
+    }
+
+    @Test
+    public void conCriterioTiempoGanaElMasRapidoAunqueSeaMasLargo() {
+        RecursoMasCercano.Evaluacion ev =
+                RecursoMasCercano.evaluar(candidatos(3), servicio(RecursoMasCercanoTest::rutaDe), PLAZO, Criterio.TIEMPO);
+
+        assertEquals(3, ev.elegido.id);
+        assertEquals(200.0, ev.ruta.duracionSegundos, 0.001);
+    }
+
+    @Test
+    public void sinIndicarCriterioSigueGanandoElDeMenorTiempo() {
+        RecursoMasCercano.Evaluacion ev = RecursoMasCercano.evaluar(candidatos(3), servicio(RecursoMasCercanoTest::rutaDe), PLAZO);
+
+        assertEquals(3, ev.elegido.id);
+    }
+
+    @Test
+    public void conCriterioDistanciaYMismaDistanciaGanaElMasRapido() {
+        RutaService s = servicio(n -> n == 1 ? new Ruta(800, 500) : new Ruta(800, 300));
+
+        RecursoMasCercano.Evaluacion ev = RecursoMasCercano.evaluar(candidatos(2), s, PLAZO, Criterio.DISTANCIA);
+
+        assertEquals(2, ev.elegido.id);
+    }
+
+    @Test
+    public void conCriterioDistanciaYEmpateTotalGanaElMasCercanoEnLineaRecta() {
+        RutaService s = servicio(n -> new Ruta(800, 300));
+
+        RecursoMasCercano.Evaluacion ev = RecursoMasCercano.evaluar(candidatos(3), s, PLAZO, Criterio.DISTANCIA);
+
+        assertEquals(1, ev.elegido.id);
+    }
+
+    @Test
+    public void elCriterioLlegaAlMotorYCadaUnoTieneSuPropiaRutaEnLaCache() throws Exception {
+        List<Criterio> pedidos = new ArrayList<>();
+        RutaService.MotorRutas motor = new RutaService.MotorRutas() {
+            @Override
+            public Ruta calcular(double oLon, double oLat, double dLon, double dLat) {
+                return new Ruta(1, 1);
+            }
+
+            @Override
+            public Ruta calcular(double oLon, double oLat, double dLon, double dLat, long timeoutMs, Criterio criterio) {
+                pedidos.add(criterio);
+                return criterio == Criterio.DISTANCIA ? new Ruta(100, 90) : new Ruta(150, 60);
+            }
+        };
+        RutaService s = new RutaService(motor);
+        RutaService.Extremos e = new RutaService.Extremos(-57.0, -31.0, -57.1, -31.1, 50);
+
+        Ruta corta = s.consultar(e, 1000, Criterio.DISTANCIA);
+        Ruta rapida = s.consultar(e, 1000, Criterio.TIEMPO);
+        s.consultar(e, 1000, Criterio.DISTANCIA); // sale de la cache: no vuelve a llamar al motor
+
+        assertEquals(100.0, corta.distanciaMetros, 0.001);
+        assertEquals(150.0, rapida.distanciaMetros, 0.001);
+        assertEquals(java.util.Arrays.asList(Criterio.DISTANCIA, Criterio.TIEMPO), pedidos);
+    }
+
+    @Test
+    public void elCriterioSeValida() {
+        assertEquals(Criterio.DISTANCIA, Criterio.de(null, Criterio.DISTANCIA));
+        assertEquals(Criterio.TIEMPO, Criterio.de("  ", Criterio.TIEMPO));
+        assertEquals(Criterio.TIEMPO, Criterio.de("tiempo", Criterio.DISTANCIA));
+        assertEquals(Criterio.DISTANCIA, Criterio.de(" Distancia ", Criterio.TIEMPO));
+        try {
+            Criterio.de("barato", Criterio.TIEMPO);
+            fail("deberia rechazar un criterio desconocido");
+        } catch (IllegalArgumentException esperado) {
+            assertNotNull(esperado.getMessage());
+        }
+    }
+
     @Test
     public void laCantidadDeCandidatosSeValida() {
         assertEquals(RecursoMasCercano.CANDIDATOS_DEFECTO, RecursoMasCercano.candidatos(null));

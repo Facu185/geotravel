@@ -54,7 +54,6 @@ export default function EtaPage() {
   const [calculando, setCalculando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState(null);
-  const [foco, setFoco] = useState(null); // lo último que se eligió buscando: el mapa va hasta ahí
   const { aviso: avisoRutas } = useRutasDisponibles();
   const solicitudActual = useRef(0);
 
@@ -86,12 +85,6 @@ export default function EtaPage() {
     },
     [limpiarResultado],
   );
-  // Lo buscado puede estar lejos de la vista: además de elegirlo, el mapa va hasta él.
-  const elegirBuscado = (elegir) => (objeto) => {
-    elegir(objeto);
-    setFoco({ geom: objeto.geometria });
-  };
-
   async function calcular() {
     if (!incidente || !recurso || avisoRutas) return;
 
@@ -110,9 +103,9 @@ export default function EtaPage() {
     }
   }
 
-  // Con los dos elegidos, el mapa se encuadra en ambos (y en la ruta, cuando llega). Elegir solo uno no mueve el mapa.
+  // Elegir el incidente o el recurso no mueve el mapa; cuando llega la ruta, se encuadra en los dos y en el recorrido.
   const objetivoMapa = useMemo(() => {
-    if (!incidente || !recurso) return null;
+    if (!incidente || !recurso || !resultado?.geometriaRuta) return null;
     const geometrias = [incidente.geometria, recurso.geometria, resultado?.geometriaRuta].filter(Boolean);
     return { geom: { type: "GeometryCollection", geometries: geometrias } };
   }, [incidente, recurso, resultado]);
@@ -145,7 +138,7 @@ export default function EtaPage() {
       {resultado?.geometriaRuta && (
         <GeoJSON key={`ruta-${recurso?.id}-${incidente?.id}`} data={resultado.geometriaRuta} interactive={false} style={{ color: "#0f766e", weight: 6, opacity: 0.9 }} />
       )}
-      {objetivoMapa ? <Enfocar objetivo={objetivoMapa} /> : foco && <Enfocar objetivo={foco} />}
+      {objetivoMapa && <Enfocar objetivo={objetivoMapa} />}
     </>
   );
 
@@ -184,7 +177,7 @@ export default function EtaPage() {
               etiqueta="Incidente"
               tipo="incidente"
               placeholder="Hacé clic para elegir o escribí para buscar"
-              onElegir={elegirBuscado(elegirIncidente)}
+              onElegir={elegirIncidente}
               filtrar={(i) => !ESTADOS_FINALES.includes(i.estado)}
             />
           )}
@@ -204,7 +197,7 @@ export default function EtaPage() {
               etiqueta="Recurso"
               tipo="recurso"
               placeholder="Hacé clic para elegir o escribí para buscar"
-              onElegir={elegirBuscado(elegirRecurso)}
+              onElegir={elegirRecurso}
             />
           )}
         </section>

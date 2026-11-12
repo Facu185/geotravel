@@ -5,11 +5,11 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import { useMap } from "react-leaflet";
 
 /**
- * Del zoom 15 en adelante se ven los íconos de cada objeto; más lejos (zoom 14 o menos) los objetos que quedan juntos se
+ * Del zoom 13 en adelante se ven los íconos de cada objeto; más lejos (zoom 12 o menos) los objetos que quedan juntos se
  * agrupan en un círculo con la cantidad, como en Airbnb. Es el mismo corte que usan los estilos de GeoServer cuando
  * dibuja él (geoserver/agrupamiento_sld.py), para que el agrupamiento no cambie al pasar de una imagen a objetos.
  */
-export const ZOOM_ICONOS = 15;
+export const ZOOM_ICONOS = 13;
 const RADIO_PX = 64; // como la celda de GeoServer
 
 const tamanoDe = (cantidad) => (cantidad < 10 ? 28 : cantidad < 100 ? 34 : 40);

@@ -2,13 +2,17 @@
 """
 El agrupamiento de incidentes y recursos cuando el mapa está alejado (varios objetos juntos = un círculo con la cantidad),
 para los estilos SLD de GeoServer. Es la misma idea que hace el frontend con los objetos que dibuja él
-(frontend/src/components/CapaAgrupada.jsx): hasta el zoom 14 se agrupa; del 15 en adelante se ven los íconos.
+(frontend/src/components/CapaAgrupada.jsx): hasta el zoom 12 se agrupa; del 13 en adelante se ven los íconos.
 
-Cómo funciona: la transformación de renderizado `vec:PointStacker` de GeoServer divide la imagen en celdas de 64 px (un
-cuarto de la tesela de 256 px: así una celda nunca queda cortada entre dos teselas) y devuelve un punto por celda con el
-atributo `count`. Un incidente que es una línea o un polígono entra por su centroide, igual que en el frontend. El círculo de un grupo se
-dibuja en el centro de su celda (weightClusterPosition=false): como la grilla coincide con las teselas, un círculo de hasta
-40 px nunca cruza el borde entre dos teselas y no queda cortado. Un objeto solo conserva su lugar (preserveLocation).
+Cómo funciona: la transformación de renderizado `vec:PointStacker` de GeoServer divide la imagen en celdas de 64 px y
+devuelve un punto por celda con el atributo `count`. Un incidente que es una línea o un polígono entra por su centroide, igual
+que en el frontend. Un objeto solo conserva su lugar (preserveLocation).
+
+Ojo con los bordes de la imagen: GeoServer agrupa cada pedido por separado y el círculo de un grupo queda en la posición
+media de sus objetos (no en el centro de la celda), así que puede caer cerca del borde. Si el mapa pide teselas de 256 px, ese
+círculo sale cortado y sin su número (la tesela vecina no lo conoce; el parámetro `buffer` no lo arregla). Por eso el
+frontend pide las capas de puntos como UNA imagen de lo que se ve (frontend/src/components/CapaWmsImagen.jsx), alineada a
+una grilla de 64 px (CELDA tiene que coincidir con la de CapaWmsImagen.jsx).
 
 Este módulo no se corre solo para los incidentes (lo usa generar_sld_incidentes.py). Para los recursos, cuyo estilo está
 escrito a mano, sirve para reescribir el bloque entre los marcadores AGRUPAMIENTO de recursos_tipo.sld:
@@ -18,7 +22,7 @@ escrito a mano, sirve para reescribir el bloque entre los marcadores AGRUPAMIENT
 import os
 import re
 
-ESCALA_ICONOS = 20000   # con el mapa más cerca que esto (zoom 15 o más) se dibujan los íconos
+ESCALA_ICONOS = 80000   # con el mapa más cerca que esto (zoom 13 o más, 1:68000) se dibujan los íconos
 ESCALA_MAXIMA = 1200000  # y con el mapa más lejos que esto (más que el departamento de Salto entero, zoom 9) no se dibuja nada
 CELDA = 64              # píxeles; tiene que dividir a 256
 COLOR_INCIDENTES = "#13202c"

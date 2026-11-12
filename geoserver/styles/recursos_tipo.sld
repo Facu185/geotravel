@@ -15,7 +15,7 @@
         <Rule>
           <Name>ambulancia_disponible</Name>
           <Title>Ambulancia - Disponible</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -51,7 +51,7 @@
         <Rule>
           <Name>ambulancia_en_servicio</Name>
           <Title>Ambulancia - En servicio</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -87,7 +87,7 @@
         <Rule>
           <Name>ambulancia_fuera_servicio</Name>
           <Title>Ambulancia - Fuera de servicio</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -123,7 +123,7 @@
         <Rule>
           <Name>bomberos_disponible</Name>
           <Title>Bomberos - Disponible</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -159,7 +159,7 @@
         <Rule>
           <Name>bomberos_en_servicio</Name>
           <Title>Bomberos - En servicio</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -195,7 +195,7 @@
         <Rule>
           <Name>bomberos_fuera_servicio</Name>
           <Title>Bomberos - Fuera de servicio</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -231,7 +231,7 @@
         <Rule>
           <Name>patrulla_disponible</Name>
           <Title>Patrulla - Disponible</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -267,7 +267,7 @@
         <Rule>
           <Name>patrulla_en_servicio</Name>
           <Title>Patrulla - En servicio</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -303,7 +303,7 @@
         <Rule>
           <Name>patrulla_fuera_servicio</Name>
           <Title>Patrulla - Fuera de servicio</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -339,7 +339,7 @@
         <Rule>
           <Name>centro_atencion_disponible</Name>
           <Title>Centro de atención - Disponible</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -375,7 +375,7 @@
         <Rule>
           <Name>centro_atencion_en_servicio</Name>
           <Title>Centro de atención - En servicio</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -411,7 +411,7 @@
         <Rule>
           <Name>centro_atencion_fuera_servicio</Name>
           <Title>Centro de atención - Fuera de servicio</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -447,7 +447,7 @@
         <Rule>
           <Name>otro_disponible</Name>
           <Title>Otro - Disponible</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -483,7 +483,7 @@
         <Rule>
           <Name>otro_en_servicio</Name>
           <Title>Otro - En servicio</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -519,7 +519,7 @@
         <Rule>
           <Name>otro_fuera_servicio</Name>
           <Title>Otro - Fuera de servicio</Title>
-          <MaxScaleDenominator>20000</MaxScaleDenominator>
+          <MaxScaleDenominator>80000</MaxScaleDenominator>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsEqualTo>
@@ -568,7 +568,7 @@
         <Rule>
           <Name>agrupado_uno</Name>
           <Title>Uno solo</Title>
-          <MinScaleDenominator>20000</MinScaleDenominator>
+          <MinScaleDenominator>80000</MinScaleDenominator>
           <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter><ogc:PropertyIsEqualTo><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>1</ogc:Literal></ogc:PropertyIsEqualTo></ogc:Filter>
           <PointSymbolizer>
@@ -589,7 +589,7 @@
         <Rule>
           <Name>agrupado_2_a_9</Name>
           <Title>De 2 a 9</Title>
-          <MinScaleDenominator>20000</MinScaleDenominator>
+          <MinScaleDenominator>80000</MinScaleDenominator>
           <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter><ogc:And><ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>2</ogc:Literal></ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyIsLessThan><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>10</ogc:Literal></ogc:PropertyIsLessThan></ogc:And></ogc:Filter>
           <PointSymbolizer>
@@ -626,7 +626,7 @@
         <Rule>
           <Name>agrupado_10_a_99</Name>
           <Title>De 10 a 99</Title>
-          <MinScaleDenominator>20000</MinScaleDenominator>
+          <MinScaleDenominator>80000</MinScaleDenominator>
           <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter><ogc:And><ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>10</ogc:Literal></ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyIsLessThan><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>100</ogc:Literal></ogc:PropertyIsLessThan></ogc:And></ogc:Filter>
           <PointSymbolizer>
@@ -663,7 +663,7 @@
         <Rule>
           <Name>agrupado_100_o_mas</Name>
           <Title>100 o más</Title>
-          <MinScaleDenominator>20000</MinScaleDenominator>
+          <MinScaleDenominator>80000</MinScaleDenominator>
           <MaxScaleDenominator>1200000</MaxScaleDenominator>
           <ogc:Filter><ogc:And><ogc:PropertyIsGreaterThanOrEqualTo><ogc:PropertyName>count</ogc:PropertyName><ogc:Literal>100</ogc:Literal></ogc:PropertyIsGreaterThanOrEqualTo></ogc:And></ogc:Filter>
           <PointSymbolizer>

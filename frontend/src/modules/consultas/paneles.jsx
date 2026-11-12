@@ -28,8 +28,7 @@ export const RESULTADO_VACIO = {
   zonas: [], // [{ id, nombre, nivelPrioridad, geometria, intensidad entre 0 y 1 }]
   incidentes: [], // [{ id, titulo, estado, geometria, pos }]
   recursos: [], // [{ id, identificacion, estadoOperativo, geometria, pos }]
-  lineas: [], // [{ desde: [lat, lng], hasta: [lat, lng], texto, color?, elegida? }]: la línea directa (punteada)
-  buffer: null, // geometría GeoJSON (lon/lat) del área de búsqueda alrededor del incidente (consulta 3)
+  lineas: [], // [{ desde: [lat, lng], hasta: [lat, lng], texto, color?, elegida? }]: una línea directa (punteada)
   rutas: [], // [{ id, geometria (LineString GeoJSON), texto, elegida }]: recorridos por calles (consulta 3)
   area: null, // GeoJSON (lon/lat) de un área buscada genérica (se dibuja punteada)
   ajuste: null, // si se pone, el mapa se vuelve a encuadrar solo cuando esta clave cambia (no con cada cambio del resultado)
@@ -375,29 +374,16 @@ const PanelRecursosZona = (props) => <PanelPorZona {...props} tipo="recursos" />
 
 // ------------------------------------------------------ 3: recursos cercanos a un incidente
 
-const RADIOS_M = [500, 1000, 2000, 5000, 10000];
-const RADIO_INICIAL_M = 2000;
 const CANTIDADES = [1, 2, 3, 5, 10];
-const textoRadio = (m) => (m >= 1000 ? `${m / 1000} km` : `${m} m`);
 
-/** Leyenda de los colores del mapa de esta consulta (los mismos que dibuja CapaResultado). */
-function LeyendaRutas({ conRutas }) {
+/** Leyenda del color del recorrido en el mapa (el que dibuja CapaResultado). */
+function LeyendaRutas() {
   return (
     <ul className="leyenda-ruta" aria-label="Leyenda del mapa">
       <li>
-        <span className="leyenda-ruta__muestra leyenda-ruta__muestra--buffer" aria-hidden="true" />
-        Azul: buffer de búsqueda
+        <span className="leyenda-ruta__muestra leyenda-ruta__muestra--ruta" aria-hidden="true" />
+        Verde: recorrido por calles
       </li>
-      <li>
-        <span className="leyenda-ruta__muestra leyenda-ruta__muestra--directa" aria-hidden="true" />
-        Gris punteado: distancia directa
-      </li>
-      {conRutas && (
-        <li>
-          <span className="leyenda-ruta__muestra leyenda-ruta__muestra--ruta" aria-hidden="true" />
-          Verde continuo: recorrido transitable
-        </li>
-      )}
     </ul>
   );
 }
@@ -424,7 +410,7 @@ function FilaRecursoCercano({ it, elegido, mejor, onElegir }) {
           {sinRuta && <span className="item__detalle">Ruta no disponible</span>}
           {hayRuta && it.advertencia && <span className="item__detalle">⚠ {it.advertencia}</span>}
         </span>
-        {mejor && <Insignia color="#16a34a">Más rápido</Insignia>}
+        {mejor && <Insignia color="#16a34a">Más cercano por calles</Insignia>}
       </button>
     </li>
   );
@@ -432,7 +418,6 @@ function FilaRecursoCercano({ it, elegido, mejor, onElegir }) {
 
 function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   const [incidente, setIncidente] = useState(null);
-  const [radio, setRadio] = useState(RADIO_INICIAL_M);
   const [limite, setLimite] = useState(5);
   const [soloDisponibles, setSoloDisponibles] = useState(true);
   const { aviso: avisoRutas } = useRutasDisponibles();
@@ -446,8 +431,8 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
   }, []);
   useElegibles(setElegibles, "incidente", incidentes, incidente, elegirIncidente);
 
-  // Buscar recursos en el buffer solo usa PostGIS; las rutas por calles se piden recién con el botón.
-  const base = incidente ? `/consultas/recursos-cercanos/${incidente.id}/analisis-vial${query({ radioMetros: radio, limite, soloDisponibles })}` : null;
+  // Buscar los recursos más cercanos solo usa PostGIS; las rutas por calles se piden recién con el botón.
+  const base = incidente ? `/consultas/recursos-cercanos/${incidente.id}/analisis-vial${query({ limite, soloDisponibles })}` : null;
   const { fase, datos: previo, error } = useRuta(base);
 
   const calculoVigente = calculo && calculo.base === base ? calculo : null;
@@ -475,16 +460,6 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
       elegido: it.recursoId === elegidoId,
       alElegir: () => setElegidoId(it.recursoId),
     }));
-    const lineas = datos.items.map((it) => {
-      const [desde, hasta] = it.lineaDirecta.coordinates;
-      return {
-        desde: [desde[1], desde[0]],
-        hasta: [hasta[1], hasta[0]],
-        texto: `${it.identificacion}: ${metros(it.distanciaDirectaM)} en línea recta`,
-        elegida: it.recursoId === elegidoId,
-        color: "#6b7280",
-      };
-    });
     const rutas = datos.items
       .filter((it) => it.estadoRuta === "disponible")
       .map((it) => ({
@@ -497,29 +472,17 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
       ...RESULTADO_VACIO,
       incidentes: [incidente],
       recursos,
-      lineas,
       rutas,
-      buffer: datos.bufferGeom,
-      ajuste: `${incidente.id}|${radio}|${limite}|${soloDisponibles}`, // elegir un recurso o ver sus rutas no mueve el mapa
+      ajuste: `${incidente.id}|${limite}|${soloDisponibles}`, // elegir un recurso o ver sus rutas no mueve el mapa
     });
-  }, [datos, incidente, elegidoId, radio, limite, soloDisponibles, setResultado]);
+  }, [datos, incidente, elegidoId, limite, soloDisponibles, setResultado]);
 
   const items = datos?.items ?? [];
 
   return (
     <>
       <label className="campo">
-        <span className="campo__etiqueta">Radio de búsqueda</span>
-        <select value={radio} onChange={(e) => setRadio(Number(e.target.value))}>
-          {RADIOS_M.map((m) => (
-            <option key={m} value={m}>
-              {textoRadio(m)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="campo">
-        <span className="campo__etiqueta">Cuántos recursos (los más cercanos)</span>
+        <span className="campo__etiqueta">Cuántos recursos</span>
         <select value={limite} onChange={(e) => setLimite(Number(e.target.value))}>
           {CANTIDADES.map((n) => (
             <option key={n} value={n}>
@@ -550,16 +513,15 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
       {incidente && (
         <section className="bloque">
           <h4 className="resultado__grupo">{incidente.titulo}</h4>
-          {fase === "cargando" && <p className="ayuda">Buscando recursos en {textoRadio(radio)} a la redonda…</p>}
+          {fase === "cargando" && <p className="ayuda">Buscando los recursos más cercanos…</p>}
           {fase === "error" && <Aviso tipo="error">{error}</Aviso>}
           {datos && items.length === 0 && (
-            <p className="ayuda">No hay recursos {soloDisponibles ? "disponibles " : ""}a menos de {textoRadio(radio)} del incidente. Probá con un radio mayor.</p>
+            <p className="ayuda">No hay recursos {soloDisponibles ? "disponibles " : ""}para mostrar. Probá quitar el filtro de disponibles.</p>
           )}
           {datos && items.length > 0 && (
             <>
               <p className="ayuda">
-                {datos.totalEnRadio} {datos.totalEnRadio === 1 ? "recurso" : "recursos"} dentro del buffer de {textoRadio(radio)}
-                {datos.truncado ? `; se muestran los ${items.length} más cercanos` : ""}. Elegí uno para resaltarlo en el mapa.
+                {items.length === 1 ? "El recurso más cercano" : `Los ${items.length} recursos más cercanos`} al incidente, de menor a mayor distancia directa. Elegí uno para resaltarlo en el mapa.
               </p>
               <ul className="items">
                 {items.map((it) => (
@@ -567,7 +529,7 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
                     key={it.recursoId}
                     it={it}
                     elegido={it.recursoId === elegidoId}
-                    mejor={conRutas && it.recursoId === datos.recursoMasRapidoId}
+                    mejor={conRutas && it.recursoId === datos.recursoMasCercanoId}
                     onElegir={() => setElegidoId(it.recursoId === elegidoId ? null : it.recursoId)}
                   />
                 ))}
@@ -580,10 +542,10 @@ function PanelRecursosCercanos({ setResultado, setElegibles, carga }) {
               )}
               {conRutas && (
                 <p className="ayuda">
-                  Los recorridos son el <strong>camino de menor tiempo</strong> por calles, respetando los sentidos de circulación. Tiempo estimado sin tráfico en tiempo real.
+                  Los recorridos son el <strong>camino más corto</strong> (menos metros) por calles, respetando los sentidos de circulación. Tiempo estimado sin tráfico en tiempo real.
                 </p>
               )}
-              <LeyendaRutas conRutas={conRutas && datos.rutasDisponibles > 0} />
+              {conRutas && datos.rutasDisponibles > 0 && <LeyendaRutas />}
             </>
           )}
           <button type="button" className="btn btn--secundario" onClick={() => elegirIncidente(null)}>
@@ -1028,11 +990,18 @@ function PanelRankings({ setResultado, setElegibles, vista }) {
 
 // ------------------------------------------ reporte de incidentes por zona (filtros)
 
-function PanelReporte({ setResultado }) {
-  const [filtros, setFiltros] = useState({ zonaId: "", tipo: "", prioridad: "", estado: "", desde: "", hasta: "" });
+/**
+ * Listado de incidentes filtrable. La zona (opcional) se elige con un clic en el mapa, como en la consulta 1, o
+ * escribiendo su nombre; sin zona se muestran todas.
+ */
+function PanelReporte({ setResultado, setElegibles, carga }) {
+  const [filtros, setFiltros] = useState({ tipo: "", prioridad: "", estado: "", desde: "", hasta: "" });
   const cambiar = (clave) => (valor) => setFiltros((f) => ({ ...f, [clave]: valor }));
+  const [zona, setZona] = useState(null);
+  const zonas = useObjetosDeLaVista(carga);
+  useElegibles(setElegibles, "zona", zonas, zona, setZona);
 
-  const ruta = `/consultas/reportes/incidentes-por-zona${query({ ...filtros, hasta: diaSiguiente(filtros.hasta) })}`;
+  const ruta = `/consultas/reportes/incidentes-por-zona${query({ ...filtros, zonaId: zona ? zona.id : "", hasta: diaSiguiente(filtros.hasta) })}`;
   const { fase, datos: r, error } = useRuta(ruta);
   const filas = r?.items;
   const { datos: tiposIncidente } = useRuta("/consultas/tipos-incidente");
@@ -1047,25 +1016,37 @@ function PanelReporte({ setResultado }) {
   }, [filas]);
 
   useEffect(() => {
+    const zonasElegidas = zona ? [comoZona(zona)] : [];
     if (!filas) {
-      setResultado(RESULTADO_VACIO);
+      setResultado({ ...RESULTADO_VACIO, zonas: zonasElegidas });
       return;
     }
     // Un incidente que cruza dos zonas aparece en las dos filas del reporte: se dibuja una sola vez.
     const unicos = new Map(filas.map((f) => [f.id, f]));
-    setResultado({ ...RESULTADO_VACIO, incidentes: [...unicos.values()].map(conGeometria) });
-  }, [filas, setResultado]);
+    setResultado({ ...RESULTADO_VACIO, zonas: zonasElegidas, incidentes: [...unicos.values()].map(conGeometria) });
+  }, [filas, zona, setResultado]);
 
   const tipos = (tiposIncidente ?? []).map((t) => ({ valor: t, texto: t }));
 
   return (
     <>
-      <BuscadorObjeto
-        etiqueta="Zona"
-        tipo="zona"
-        onChange={(zona) => cambiar("zonaId")(zona ? zona.id : "")}
-        placeholder="Todas (escribí para elegir una)"
-      />
+      {zona ? (
+        <section className="bloque">
+          <h4 className="resultado__grupo">Zona: {zona.nombre}</h4>
+          <button type="button" className="btn btn--secundario" onClick={() => setZona(null)}>
+            Quitar la zona (ver todas)
+          </button>
+        </section>
+      ) : (
+        <>
+          <BuscadorObjeto etiqueta="Zona" tipo="zona" onChange={(z) => z && setZona(z)} placeholder="Todas (escribí para elegir una)" />
+          <p className="ayuda">
+            {carga.estado === "lejos"
+              ? "Acercá el mapa para elegir una zona con un clic, o escribí su nombre."
+              : "Elegí una zona con un clic en el mapa o escribí su nombre; sin zona se muestran todas."}
+          </p>
+        </>
+      )}
       <Selector etiqueta="Tipo" valor={filtros.tipo} onChange={cambiar("tipo")} opciones={tipos} vacio="Todos" />
       <div className="campos-2">
         <Selector
@@ -1150,8 +1131,8 @@ export const CONSULTAS = [
     id: "recursos-cercanos",
     fondo: "incidente", // lo que GeoServer dibuja de fondo
     titulo: "3. Recursos cercanos a un incidente",
-    descripcion: "Se ven los incidentes de esta parte del mapa. Elegí uno, definí el radio del buffer y se muestran los recursos que están dentro, con la distancia directa. Con \"Calcular rutas por calles\" se agrega el recorrido transitable de los más cercanos.",
-    postgis: "ST_Buffer y ST_DWithin (recursos dentro del radio), ST_Distance y ST_ShortestLine (distancia directa); recorrido por calles con pgRouting",
+    descripcion: "Se ven los incidentes de esta parte del mapa. Elegí uno y cuántos recursos querés: se muestran los más cercanos, con la distancia directa. Con \"Calcular rutas por calles\" se agrega el recorrido más corto por las calles de los más cercanos.",
+    postgis: "Operador <-> (vecino más cercano con índice GiST) y ST_Distance (distancia directa); camino más corto por calles con pgRouting",
     objetos: "/incidentes",
     Panel: PanelRecursosCercanos,
   },
@@ -1196,8 +1177,9 @@ export const CONSULTAS = [
     soloAdmin: true, // el invitado no lo ve ni puede pedirlo (la API lo exige, ver AuthFilter)
     fondo: "zona", // lo que GeoServer dibuja de fondo
     titulo: "Reporte de incidentes por zona",
-    descripcion: "Listado filtrable por zona, tipo, prioridad, estado y fechas, agrupado por zona.",
+    descripcion: "Listado filtrable por zona, tipo, prioridad, estado y fechas, agrupado por zona. La zona se elige con un clic en el mapa (o escribiendo su nombre); sin zona se muestran todas.",
     postgis: "ST_Contains(zona, incidente) con filtros",
+    objetos: "/zonas",
     Panel: PanelReporte,
   },
 ];

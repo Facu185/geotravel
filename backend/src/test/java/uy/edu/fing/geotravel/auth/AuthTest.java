@@ -35,6 +35,24 @@ public class AuthTest {
     }
 
     @Test
+    public void laSesionSabeDeQuienEs() {
+        String token = Sesiones.crear("operador1");
+        assertEquals("operador1", Sesiones.usuarioDe(token));
+        assertEquals(Sesiones.usuarioAdmin(), Sesiones.usuarioDe(Sesiones.crear()));
+    }
+
+    @Test
+    public void sinSesionValidaNoHayUsuario() {
+        assertNull(Sesiones.usuarioDe(null));
+        assertNull(Sesiones.usuarioDe("inventado"));
+        String token = Sesiones.crear("operador1");
+        Sesiones.vencerAhora(token);
+        assertNull(Sesiones.usuarioDe(token));
+        Sesiones.cerrar(token);
+        assertNull(Sesiones.usuarioDe(token));
+    }
+
+    @Test
     public void extraeElTokenDelEncabezado() {
         assertEquals("abc", Sesiones.tokenDe("Bearer abc"));
         assertEquals("abc", Sesiones.tokenDe("bearer  abc "));

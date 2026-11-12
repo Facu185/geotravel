@@ -22,8 +22,9 @@ import java.util.concurrent.TimeUnit;
  *   1. PostGIS elige los N recursos más cercanos en línea recta (operador <->, que usa el índice espacial; por defecto
  *      solo los que están disponibles). El incidente puede ser un punto, una línea o un polígono: la distancia es a su
  *      geometría y el destino de la ruta es el punto del incidente más próximo a cada recurso (ST_ClosestPoint).
- *   2. pgRouting calcula la ruta de cada uno (el mismo RutaService que el tiempo de llegada y la consulta 3) y gana el
- *      de menor tiempo; si empatan, el de menor distancia. Se informan también los otros, con su tiempo.
+ *   2. pgRouting calcula la ruta de cada uno (el mismo RutaService que el tiempo de llegada y la consulta 3), minimizando
+ *      el criterio pedido, y gana el mejor: con "distancia" (por defecto) el de menor distancia por calles, con "tiempo" el
+ *      que llega antes. En un empate decide el otro dato. Se informan también los otros, con su tiempo y su distancia.
  *
  * Los N recursos se evalúan de a uno y con un plazo total: si el motor no responde no se insiste con el resto.
  */
@@ -114,6 +115,11 @@ public class RecursoMasCercano {
 
     public Respuesta buscar(Connection conexion, int incidenteId, boolean soloDisponibles, int cantidad)
             throws SQLException, IOException {
+        return buscar(conexion, incidenteId, soloDisponibles, cantidad, Criterio.DISTANCIA);
+    }
+
+    public Respuesta buscar(Connection conexion, int incidenteId, boolean soloDisponibles, int cantidad, Criterio criterio)
+            throws SQLException, IOException {
 
         Map<String, Object> incidente = new LinkedHashMap<>();
         try (PreparedStatement ps = conexion.prepareStatement(SQL_INCIDENTE)) {
@@ -158,7 +164,7 @@ public class RecursoMasCercano {
                     : "No hay recursos cargados");
         }
 
-        Evaluacion ev = evaluar(candidatos, rutas, PLAZO_TOTAL_NANOS);
+        Evaluacion ev = evaluar(candidatos, rutas, PLAZO_TOTAL_NANOS, criterio);
         if (ev.elegido == null) {
             Respuesta r;
             if (ev.motorCaido) {
@@ -189,8 +195,10 @@ public class RecursoMasCercano {
         cuerpo.put("incidente", incidente);
         cuerpo.put("recurso", ev.elegido.datos);
         cuerpo.put("ruta", rutaJson);
-        cuerpo.put("criterio", "Menor tiempo por calles entre los " + candidatos.size() + " recursos"
-                + (soloDisponibles ? " disponibles" : "") + " mas cercanos en linea recta");
+        cuerpo.put("criterioRuta", criterio.codigo);
+        cuerpo.put("criterio", (criterio == Criterio.DISTANCIA ? "Menor distancia por calles" : "Menor tiempo por calles")
+                + " entre los " + candidatos.size() + " recursos" + (soloDisponibles ? " disponibles" : "")
+                + " mas cercanos en linea recta");
         cuerpo.put("soloDisponibles", soloDisponibles);
         cuerpo.put("candidatosEvaluados", candidatos.size());
         cuerpo.put("alternativas", ev.evaluados);
@@ -199,11 +207,17 @@ public class RecursoMasCercano {
         return new Respuesta(200, cuerpo);
     }
 
-    /**
-     * Pide la ruta de cada candidato, de a uno y dentro de un plazo total, y elige la de menor tiempo (a igual tiempo, la de
-     * menor distancia; a igual distancia, el más cercano en línea recta). No toca la base: sirve para probar con un motor falso.
-     */
+    /** Igual, minimizando el tiempo (el comportamiento original). */
     static Evaluacion evaluar(List<Candidato> candidatos, RutaService servicio, long plazoNanos) {
+        return evaluar(candidatos, servicio, plazoNanos, Criterio.TIEMPO);
+    }
+
+    /**
+     * Pide la ruta de cada candidato, de a uno y dentro de un plazo total, y elige la mejor según el criterio: la de menor
+     * tiempo (a igual tiempo, la de menor distancia) o la de menor distancia (a igual distancia, la de menor tiempo). Con
+     * empate total gana el más cercano en línea recta. No toca la base: sirve para probar con un motor falso.
+     */
+    static Evaluacion evaluar(List<Candidato> candidatos, RutaService servicio, long plazoNanos, Criterio criterio) {
         Evaluacion ev = new Evaluacion();
         long inicio = System.nanoTime();
         Ruta mejor = null;
@@ -228,13 +242,13 @@ public class RecursoMasCercano {
                 continue;
             }
 
-            RutaService.Resultado r = servicio.intentar(c.extremos, Math.min(RutaService.TIMEOUT_POR_DEFECTO_MS, restanteMs));
+            RutaService.Resultado r = servicio.intentar(c.extremos, Math.min(RutaService.TIMEOUT_POR_DEFECTO_MS, restanteMs), criterio);
             fila.put("estadoRuta", r.estado.codigo);
             if (r.estado == RutaService.Estado.DISPONIBLE) {
                 fila.put("distanciaMetros", Math.round(r.ruta.distanciaMetros));
                 fila.put("duracionSegundos", Math.round(r.ruta.duracionSegundos));
                 fila.put("tiempoEstimadoMinutos", r.ruta.minutosRedondeados());
-                if (mejor == null || gana(r.ruta, mejor)) {
+                if (mejor == null || gana(r.ruta, mejor, criterio)) {
                     mejor = r.ruta;
                     ev.elegido = c;
                     ev.ruta = r.ruta;
@@ -256,8 +270,14 @@ public class RecursoMasCercano {
         return ev;
     }
 
-    /** Menor duración; a igual duración, menor distancia. Con empate total gana el que ya estaba (el más cercano en línea recta). */
-    private static boolean gana(Ruta nueva, Ruta actual) {
+    /** Mejor según el criterio; a igual valor decide el otro dato. Con empate total gana el que ya estaba (el más cercano en línea recta). */
+    private static boolean gana(Ruta nueva, Ruta actual, Criterio criterio) {
+        if (criterio == Criterio.DISTANCIA) {
+            if (nueva.distanciaMetros != actual.distanciaMetros) {
+                return nueva.distanciaMetros < actual.distanciaMetros;
+            }
+            return nueva.duracionSegundos < actual.duracionSegundos;
+        }
         if (nueva.duracionSegundos != actual.duracionSegundos) {
             return nueva.duracionSegundos < actual.duracionSegundos;
         }

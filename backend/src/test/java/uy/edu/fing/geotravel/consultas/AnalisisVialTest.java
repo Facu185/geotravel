@@ -1,6 +1,7 @@
 package uy.edu.fing.geotravel.consultas;
 
 import org.junit.Test;
+import uy.edu.fing.geotravel.eta.Criterio;
 import uy.edu.fing.geotravel.eta.PlazoAgotadoException;
 import uy.edu.fing.geotravel.eta.Ruta;
 import uy.edu.fing.geotravel.eta.SinRutaException;
@@ -41,51 +42,39 @@ public class AnalisisVialTest {
 
     @Test
     public void usaValoresPorDefecto() {
-        AnalisisVial.Parametros p = AnalisisVial.validar(null, null);
-        assertEquals(2000, p.radioMetros);
-        assertEquals(5, p.limite);
+        assertEquals(5, AnalisisVial.validar(null).limite);
     }
 
     @Test(expected = IllegalArgumentException.class)
-    public void unRadioNoNumericoEsInvalido() {
-        AnalisisVial.entero("radioMetros", "abc");
+    public void unLimiteNoNumericoEsInvalido() {
+        AnalisisVial.entero("limite", "abc");
     }
 
     @Test
     public void enteroTomaVacioComoAusente() {
         assertNull(AnalisisVial.entero("limite", null));
         assertNull(AnalisisVial.entero("limite", " "));
-        assertEquals(Integer.valueOf(250), AnalisisVial.entero("radioMetros", " 250 "));
+        assertEquals(Integer.valueOf(7), AnalisisVial.entero("limite", " 7 "));
     }
 
     @Test
-    public void aceptaElRadioMaximo() {
-        assertEquals(AnalisisVial.RADIO_MAXIMO_M, AnalisisVial.validar(AnalisisVial.RADIO_MAXIMO_M, 1).radioMetros);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void rechazaRadioMayorAlMaximo() {
-        AnalisisVial.validar(AnalisisVial.RADIO_MAXIMO_M + 1, null);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void rechazaRadioCero() {
-        AnalisisVial.validar(0, null);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void rechazaRadioNegativo() {
-        AnalisisVial.validar(-500, null);
+    public void aceptaElLimiteMaximo() {
+        assertEquals(AnalisisVial.LIMITE_MAXIMO, AnalisisVial.validar(AnalisisVial.LIMITE_MAXIMO).limite);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void rechazaLimiteMayorAlMaximo() {
-        AnalisisVial.validar(1000, AnalisisVial.LIMITE_MAXIMO + 1);
+        AnalisisVial.validar(AnalisisVial.LIMITE_MAXIMO + 1);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void rechazaLimiteCero() {
-        AnalisisVial.validar(1000, 0);
+        AnalisisVial.validar(0);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rechazaLimiteNegativo() {
+        AnalisisVial.validar(-3);
     }
 
     // ------------------------------------------------------------------ rutas
@@ -185,18 +174,51 @@ public class AnalisisVialTest {
     }
 
     @Test
-    public void elRecursoMasRapidoEsElDeMenorDuracion() {
+    public void elRecursoMasCercanoPorCallesEsElDeMenorDistancia() {
+        // el recurso 3 (el mas lejano en linea recta) tiene el camino mas corto, aunque tarde mas
         AnalisisVial analisis = new AnalisisVial(new RutaService((a, b, c, d) ->
-                new Ruta(1000, a < -57.9625 ? 50 : 300)));
+                a < -57.9625 ? new Ruta(800, 300) : new Ruta(1000, 50)));
         List<AnalisisVial.Candidato> lista = candidatos(3);
 
         analisis.calcularRutas(lista, SIN_PLAZO);
 
-        assertEquals(Integer.valueOf(3), AnalisisVial.recursoMasRapido(lista));
+        assertEquals(Integer.valueOf(3), AnalisisVial.recursoMasCercanoPorCalles(lista));
     }
 
     @Test
-    public void sinRutasNoHayRecursoMasRapido() {
-        assertNull(AnalisisVial.recursoMasRapido(candidatos(2)));
+    public void aIgualDistanciaPorCallesGanaElMasRapido() {
+        AnalisisVial analisis = new AnalisisVial(new RutaService((a, b, c, d) ->
+                new Ruta(900, a < -57.9625 ? 100 : 300)));
+        List<AnalisisVial.Candidato> lista = candidatos(3);
+
+        analisis.calcularRutas(lista, SIN_PLAZO);
+
+        assertEquals(Integer.valueOf(3), AnalisisVial.recursoMasCercanoPorCalles(lista));
+    }
+
+    @Test
+    public void sinRutasNoHayRecursoMasCercanoPorCalles() {
+        assertNull(AnalisisVial.recursoMasCercanoPorCalles(candidatos(2)));
+    }
+
+    @Test
+    public void lasRutasSePidenPorDistancia() {
+        List<Criterio> pedidos = new ArrayList<>();
+        AnalisisVial analisis = new AnalisisVial(new RutaService(new RutaService.MotorRutas() {
+            public Ruta calcular(double a, double b, double c, double d) {
+                return new Ruta(1000, 100);
+            }
+            public Ruta calcular(double a, double b, double c, double d, long t, Criterio criterio) {
+                pedidos.add(criterio);
+                return new Ruta(1000, 100);
+            }
+        }));
+
+        analisis.calcularRutas(candidatos(3), SIN_PLAZO);
+
+        assertEquals(3, pedidos.size());
+        for (Criterio criterio : pedidos) {
+            assertEquals(Criterio.DISTANCIA, criterio);
+        }
     }
 }

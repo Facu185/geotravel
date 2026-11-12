@@ -29,6 +29,8 @@ public class PgRoutingIntegrationTest {
     private static final double[] LARGO = {-57.9606, -31.3857, -56.1949, -34.9063};
     private static final double[] MONTEVIDEO = {-56.19, -34.90, -56.1685, -34.9158};
     private static final double[] MAR = {-55.0, -35.8, -54.9, -35.85};
+    /** Sale de una avenida de dos calzadas de mano unica (Av. Wilson Ferreira Aldunate, Salto): hay que dar la vuelta. */
+    private static final double[] CALZADA_UNICA = {-57.94953, -31.40363, -57.953308, -31.405874};
 
     private final MotorPgRouting motor = new MotorPgRouting();
 
@@ -64,6 +66,47 @@ public class PgRoutingIntegrationTest {
         assertTrue("latitud en Salto", primera.path(1).asDouble() < -31.3 && primera.path(1).asDouble() > -31.5);
         assertNotNull("informa el ajuste del origen", ruta.ajusteOrigenMetros);
         assertNotNull("informa el ajuste del destino", ruta.ajusteDestinoMetros);
+    }
+
+    @Test
+    public void laRutaNoRecorreDosVecesElMismoTramo() throws Exception {
+        for (double[] par : new double[][] {CALZADA_UNICA, DEMO, MONTEVIDEO}) {
+            for (Criterio criterio : Criterio.values()) {
+                Ruta ruta = motor.calcular(par[0], par[1], par[2], par[3], 20_000, criterio);
+                JsonNode puntos = ruta.geometriaRuta.path("coordinates");
+                java.util.Set<String> tramos = new java.util.HashSet<>();
+                for (int i = 1; i < puntos.size(); i++) {
+                    String a = puntos.path(i - 1).toString();
+                    String b = puntos.path(i).toString();
+                    if (a.equals(b)) continue;
+                    String clave = a.compareTo(b) < 0 ? a + "|" + b : b + "|" + a;
+                    assertTrue("tramo repetido " + clave + " (" + criterio + ")", tramos.add(clave));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void elCriterioDistanciaDaRutaIgualOMasCortaYElDeTiempoIgualOMasRapida() throws Exception {
+        for (double[] par : new double[][] {DEMO, LARGO, MONTEVIDEO}) {
+            Ruta rapida = motor.calcular(par[0], par[1], par[2], par[3], 20_000, Criterio.TIEMPO);
+            Ruta corta = motor.calcular(par[0], par[1], par[2], par[3], 20_000, Criterio.DISTANCIA);
+
+            assertTrue("la ruta por distancia no es mas larga que la de tiempo",
+                    corta.distanciaMetros <= rapida.distanciaMetros + 0.5);
+            assertTrue("la ruta por tiempo no es mas lenta que la de distancia",
+                    rapida.duracionSegundos <= corta.duracionSegundos + 0.5);
+            assertTrue(corta.duracionSegundos > 0 && rapida.distanciaMetros > 0);
+        }
+    }
+
+    @Test
+    public void sinCriterioSeUsaElTiempo() throws Exception {
+        Ruta sinCriterio = motor.calcular(DEMO[0], DEMO[1], DEMO[2], DEMO[3]);
+        Ruta conTiempo = motor.calcular(DEMO[0], DEMO[1], DEMO[2], DEMO[3], 20_000, Criterio.TIEMPO);
+
+        assertEquals(conTiempo.distanciaMetros, sinCriterio.distanciaMetros, 0.001);
+        assertEquals(conTiempo.duracionSegundos, sinCriterio.duracionSegundos, 0.001);
     }
 
     @Test
