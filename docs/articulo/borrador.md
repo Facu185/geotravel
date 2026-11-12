@@ -242,7 +242,7 @@ texto (`/consultas/buscar`) que busca en todo el sistema y no obliga a cargar li
 Los conteos de cada capa son los de **lo que se ve**: se piden a GeoServer por WFS con `resultType=hits` y un filtro CQL
 `BBOX(geom, ...)` con el rectángulo visible, y se actualizan al mover el mapa. Al hacer clic se pide el detalle con
 GetFeatureInfo y se resalta el objeto. Con el mapa alejado, los objetos superpuestos se agrupan con un número: GeoServer usa la
-transformación `PointStacker` (celdas de 64 px) y el navegador, `leaflet.markercluster`; del zoom 15 en adelante se ven los
+transformación `PointStacker` (celdas de 64 px) y el navegador, `leaflet.markercluster`; del zoom 13 en adelante se ven los
 íconos. Cada tipo de incidente tiene su ícono y se muestra una leyenda compartida con las pantallas de consultas. El invitado ve
 las consultas 1 a 7; el reporte con filtros es del administrador.
 

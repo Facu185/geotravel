@@ -16,7 +16,7 @@ Convención (docs/ICONOS.md, la misma que frontend/src/components/iconos.jsx):
   - una LÍNEA (calle cortada) y un POLÍGONO (área afectada) se dibujan con su forma y el color del estado.
 Un tipo que no esté en la lista se dibuja como "otro".
 
-Con el mapa alejado (zoom 14 o menos, ver agrupamiento_sld.py) los incidentes se agrupan: un círculo con la cantidad,
+Con el mapa alejado (zoom 12 o menos, ver agrupamiento_sld.py) los incidentes se agrupan: un círculo con la cantidad,
 contando también las líneas y los polígonos (por su centroide). Las líneas y los polígonos se dibujan igual de todos modos.
 """
 import os

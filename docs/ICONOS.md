@@ -70,8 +70,8 @@ Resuelto `#1f7a5c` · Cancelado `#a8392b`.
 
 ## Agrupar con un número (mapa alejado)
 
-Con el mapa alejado (zoom 14 o menos) los incidentes y recursos que quedan juntos se agrupan en un **círculo con la
-cantidad**, como en Airbnb: oscuro para incidentes, verde azulado para recursos. Del zoom 15 en adelante se ven los íconos.
+Con el mapa alejado (zoom 12 o menos) los incidentes y recursos que quedan juntos se agrupan en un **círculo con la
+cantidad**, como en Airbnb: oscuro para incidentes, verde azulado para recursos. Del zoom 13 en adelante se ven los íconos.
 GeoServer dibuja las capas hasta 1:1.200.000 (zoom 9, el departamento de Salto entero); más lejos no se dibuja nada.
 Las líneas y los polígonos de incidentes cuentan en el grupo por su centro (y su forma se dibuja igual).
 
@@ -84,7 +84,7 @@ Las líneas y los polígonos de incidentes cuentan en el grupo por su centro (y 
   (con `leaflet.markercluster`), con el mismo radio y el mismo corte de zoom, y ahí cada objeto suelto conserva su ícono.
   El que se está eligiendo nunca se agrupa. Un clic en un grupo acerca el mapa.
 - Si se cambia el zoom de corte, cambiarlo en los dos lados: `ZOOM_ICONOS` en `CapaAgrupada.jsx` y `ESCALA_ICONOS` en
-  `agrupamiento_sld.py` (zoom 15 ≈ escala 1:17000).
+  `agrupamiento_sld.py` (zoom 13 ≈ escala 1:68000; se usa 1:80000, a mitad de camino entre el zoom 12 y el 13).
 
 ## Ojo con los SVG en GeoServer
 
