@@ -121,5 +121,4 @@ elimina los volumenes de la base y GeoServer.
   equipo distinto, configurar `VITE_API_URL`, `VITE_GEOSERVER_WMS_URL` y
   la direccion de escucha de Vite segun la red. `localhost` corresponde
   a la computadora donde se abre el navegador.
-- La ruta ETA es un solo camino: el de menor tiempo por calles. Ver [RECURSOS_CERCANOS_RUTAS.md](RECURSOS_CERCANOS_RUTAS.md).
-- Los cambios aqui descritos **no modifican `main`** ni crean un Pull Request.
+- La ruta ETA es un solo camino: el de menor tiempo por calles. El recurso más cercano y la consulta 3 usan el más corto en metros. Ver [RECURSOS_CERCANOS_RUTAS.md](RECURSOS_CERCANOS_RUTAS.md).

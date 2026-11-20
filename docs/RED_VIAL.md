@@ -45,7 +45,7 @@ red_vial_vertice (150 mil esquinas)  y  red_vial_arco (216 mil arcos, 40 mil de 
   para "prohibido"). Las rotondas y las autopistas son de mano única aunque no lo diga la etiqueta.
 - **Costos:** metros = largo del arco. Segundos = largo / velocidad + 3 s por esquina. Velocidad: la `maxspeed` de OpenStreetMap
   y, si falta, un valor por tipo de vía (autopista y ruta nacional 90 km/h, avenida principal 70, secundaria 55, calle 40, calle
-  de servicio 20; está en `db/sql/red_vial_generar.sql`). Los metros (`cost_m`) quedan en la tabla pero la ruta no los usa.
+  de servicio 20; está en `db/sql/red_vial_generar.sql`). Los dos costos se usan: `cost_m` para el criterio `distancia` (recurso más cercano, consulta 3) y `cost_s` para el criterio `tiempo` (tiempo de llegada).
 - **Redes conectadas:** se marcan con `pgr_connectedComponents` y solo las de 50 arcos o más (`componente_grande`) reciben
   los extremos de una ruta, para no enganchar un punto a una calle aislada a la que no llega nadie.
 - **Tablas:** `red_vial_vertice`, `red_vial_arco` (migraciones `V5` y `V6`). Se publican con el contrato de pgRouting
@@ -59,7 +59,8 @@ red_vial_vertice (150 mil esquinas)  y  red_vial_arco (216 mil arcos, 40 mil de 
    marcador y la calle, que cuenta en la distancia y el tiempo (a 20 km/h). Si un extremo queda a más de 500 m de cualquier calle,
    no hay ruta. El ajuste se informa (`ajusteOrigenM`, `ajusteDestinoM`) y, si es de 100 m o más, hay una advertencia.
 2. **Sentidos.** Dijkstra dirigido (`pgr_dijkstra`): no se circula contra una mano única.
-3. **Un solo camino.** Se minimiza el tiempo (`cost_s`). La distancia informada es la suma de los largos de ese camino.
+3. **Un solo camino, según el criterio.** `tiempo` (por defecto) minimiza los segundos (`cost_s`); `distancia` minimiza los metros
+   (`cost_m`). Sea cual sea, se informan la distancia (suma de los largos) y la duración del camino elegido.
 4. **Escala.** Para no armar el grafo de todo el país en cada pedido, solo se usan los arcos dentro de una caja alrededor de los
    dos puntos (con índice GiST), que se agranda si no aparece camino. Con la red de Uruguay, una ruta en la ciudad tarda unos
    25 ms y Salto–Montevideo (490 km) un par de segundos.
@@ -127,7 +128,7 @@ total de 25 s; si el motor no responde, no se insiste con las demás. Con `soloD
 
 ## Pruebas
 
-`backend/src/test/java/.../eta/PgRoutingIntegrationTest.java` (12 pruebas): la ruta sale y llega a los puntos pedidos, informa
+`backend/src/test/java/.../eta/PgRoutingIntegrationTest.java` (13 pruebas): la ruta sale y llega a los puntos pedidos, informa
 las calles, funciona en Montevideo y entre ciudades, un par en el mar no tiene
 ruta y el plazo agotado se traduce. Se activan con `URBANSAFE_PGROUTING_TESTS=true` y la base apuntada por `DB_HOST`/`DB_PORT`
 (con la red vial ya cargada). Medido sobre 400 pares recurso–incidente (300 de Salto y 100 de otras zonas, `setseed(0.42)`): 99 % con

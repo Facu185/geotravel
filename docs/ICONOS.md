@@ -33,14 +33,11 @@ import { IconoRecurso, iconoRecurso } from "../../components/iconos.jsx";
 
 ## Para GeoServer (P1)
 
-`geoserver/styles/recursos_tipo.sld` hoy dibuja cuadrados de colores por tipo. Para que coincida con
-el resto: un `PointSymbolizer` con `ExternalGraphic` (el SVG del tipo) sobre un círculo con el color del
-estado. GeoServer solo ve las capas WMS cuando el mapa está alejado (ver `docs/CARGA_POR_ZONA.md`),
-así que si no coinciden se nota al hacer zoom.
-
-Pasos sugeridos: subir los SVG a GeoServer (por REST, en `geoserver-init.sh`, o copiándolos al
-directorio de estilos) y referenciarlos con `<OnlineResource xlink:href="recurso-ambulancia.svg"/>`.
-Con un `ogc:Filter` por `tipo` y otro por `estado_operativo` se arman las combinaciones.
+`geoserver/styles/recursos_tipo.sld` ya usa la misma convención: un círculo con el color del estado y encima un
+`ExternalGraphic` con el SVG del tipo, con un `ogc:Filter` por `tipo` y otro por `estado_operativo`. Los SVG viven en
+`geoserver/styles/` y `geoserver-init.sh` los copia al directorio de estilos de GeoServer junto con los SLD. GeoServer solo ve
+las capas WMS cuando el mapa está alejado (ver `docs/CARGA_POR_ZONA.md`), así que si el dibujo no coincidiera con el del
+frontend se notaría al hacer zoom.
 
 ## Incidentes
 

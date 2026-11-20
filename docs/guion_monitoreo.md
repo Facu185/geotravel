@@ -1,6 +1,7 @@
 # Guion del monitoreo — UrbanSafe
 
-Duración estimada: 10–12 minutos de demo + preguntas. Lo que pidió el tutor: una app con mapa y conexión a
+Duración estimada: ~20 minutos con todo (los minutos de cada sección suman eso). Si hay menos tiempo, saltear 3b, 6b y 7 y
+mostrar pgRouting solo en la app (sección 5, "Recurso más cercano" y "Tiempo de llegada"). Lo que pidió el tutor: una app con mapa y conexión a
 GeoServer, datos geográficos persistidos, explicar el código, ABM, consultas, y cómo se dibujan y guardan
 líneas y polígonos. Del monitoreo anterior quedaron además tres pedidos: la **defensa es en Salto** (con datos
 en otros lugares del país), el sistema tiene que **aguantar miles de objetos** (el navegador no puede cargarlos
@@ -90,6 +91,8 @@ todos) y hace falta un **login básico** que separe vistas.
 - **Alejar el mapa:** los incidentes y recursos que quedan juntos se **agrupan con un número** (como en Airbnb); al acercar
   (zoom 13) se ven los íconos. Cuenta también las líneas y polígonos de incidentes. Lo agrupa GeoServer
   (`vec:PointStacker` en el SLD); en las pantallas donde dibuja el navegador, `leaflet.markercluster` (ver `docs/ICONOS.md`).
+- **Mapa de calor de incidentes (opcional de la letra):** activar la capa "Mapa de calor de incidentes". Es otro estilo SLD de la misma capa
+  `incidente` (`incidentes_calor.sld`): lo dibuja GeoServer, no el navegador.
 - Usar "Ir a Montevideo" para mostrar que hay datos allá también.
 
 ## 5. ABM y cómo se dibuja y guarda (3 minutos)
@@ -217,7 +220,7 @@ la geometría (GeoJSON) y las calles del recorrido. Por dentro, en 5 pasos:
 1. **En la app:** Incidentes → un incidente → "Trazar ruta al recurso más cercano": se ve el recorrido, los minutos, los metros por calles y los metros
    en línea recta, "Los otros recursos evaluados" y "Calles del recorrido".
 2. **En la base (DBeaver o `docker compose exec db psql -U geotravel -d geotravel`):** la misma ruta con los dos criterios. Con el recurso
-   `CEN-S001` y el incidente 60 dio, en la prueba de hoy:
+   `CEN-S001` y el incidente 60 dio, en una prueba con los datos del seed:
 
    | Criterio | Metros | Minutos |
    |---|---|---|
@@ -241,7 +244,7 @@ del costo. Con el criterio de tiempo las rutas ganan solas porque a 90 km/h tard
 - **13 pruebas de integración de PgRouting** (`PgRoutingIntegrationTest`), entre ellas la de las vueltas de más, y las del recurso más cercano y la
   consulta 3. La suite completa del backend tiene 108 pruebas.
 - **396 de 396 rutas** entre recursos e incidentes dieron resultado.
-- Una ruta de ~6 km tarda décimas de segundo (en la prueba de hoy, dos rutas en 0,5 s en total).
+- Una ruta de ~6 km tarda décimas de segundo (en una prueba, dos rutas en 0,5 s en total).
 
 ### Límites (decirlos nosotros)
 
