@@ -7,38 +7,47 @@ flowchart LR
         Admin[Administrador]
     end
 
-    subgraph Frontend[React + Leaflet/OpenLayers]
+    subgraph Frontend[React + Leaflet]
         Mapa[Mapa]
         ABM[Pantallas ABM]
     end
 
     subgraph Backend[JEE / Tomcat]
         API[REST API<br/>Jersey]
+        Auth[Login por sesión<br/>administrador / invitado]
         Reglas[Reglas de negocio<br/>validacion de tipos y geometrias,<br/>maquina de estados de incidentes]
+        Rutas[Rutas y tiempo de llegada<br/>recurso más cercano]
     end
 
     subgraph GeoServer
         WMS[WMS]
         WFS[WFS]
         SLD[Estilos SLD]
+        GWC[GeoWebCache<br/>caché de la referencia]
     end
 
     DB[(PostgreSQL + PostGIS + pgRouting<br/>zonas, recursos, incidentes<br/>y red vial de Uruguay)]
     RedVial[Servicio red-vial<br/>carga la red de OpenStreetMap]
+    IDE[IDE de Uruguay<br/>direcciones fuera de Salto]
 
     Invitado --> Mapa
     Admin --> Mapa
     Admin --> ABM
 
-    Mapa -->|WMS: fondo, imágenes de las capas| WMS
+    Mapa -->|WMS: imágenes de las capas| WMS
+    Mapa -->|teselas de la referencia| GWC
     Mapa -->|WFS hits y GetFeatureInfo: conteos y detalle| WFS
     Mapa -->|REST: objetos de la vista, bbox y limit| API
     ABM -->|REST: ABM y acciones| API
 
+    API --> Auth
     API --> Reglas --> DB
+    API --> Rutas -->|p2_calcular_ruta, pgRouting| DB
+    API -.geocodifica.-> IDE
     RedVial -->|una sola vez| DB
     WMS --> DB
     WFS --> DB
+    GWC --> WMS
     SLD -.estiliza.-> WMS
 ```
 
@@ -95,7 +104,6 @@ erDiagram
 `recurso` -- la pertenencia a una zona siempre se calcula espacialmente, no se
 guarda: con `ST_Contains` para los recursos (son puntos) y con `ST_Intersects` para
 los incidentes (pueden ser líneas o polígonos que cruzan el borde de una zona).
-Es la misma decisión que en GeoTravel (zonas turísticas / recorridos).
 
 `incidente.geom` es de tipo `Geometry`: un incidente puede ser un **punto** (un lugar),
 una **línea** (una calle cortada) o un **polígono** (un área afectada).

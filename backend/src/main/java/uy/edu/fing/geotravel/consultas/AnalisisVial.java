@@ -88,7 +88,7 @@ public class AnalisisVial {
         return new Parametros(cantidad);
     }
 
-    /** Recurso encontrado en el buffer, con lo necesario para pedirle su ruta al motor. */
+    /** Recurso entre los más cercanos en línea recta, con lo necesario para pedirle su ruta al motor. */
     static final class Candidato {
         final Map<String, Object> item;
         final RutaService.Extremos extremos;

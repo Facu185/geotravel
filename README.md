@@ -137,7 +137,7 @@ recursos y 114 incidentes; Montevideo, 33 zonas, 271 recursos y 83 incidentes). 
 todo el departamento.
 
 - **Zonas (ninguna es un rectángulo):** las **seccionales policiales** con sus límites oficiales (Ministerio del Interior /
-  UNASEV: 16 en Salto y 25 en Montevideo), que no se superponen; y encima, superpuestas, los 8 municipios de Montevideo (Intendencia
+  UNASEV: 16 en Salto y 25 en Montevideo); y encima, superpuestas, los 8 municipios de Montevideo (Intendencia
   de Montevideo) y las localidades de Salto y Termas del Daymán (OpenStreetMap). La prioridad de cada seccional sale de su
   densidad de población (1 = la más densa), con los habitantes que informa UNASEV. Los polígonos están simplificados (25 m en
   Montevideo y 60 m en Salto) para que el archivo sea liviano.

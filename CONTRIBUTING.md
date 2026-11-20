@@ -27,7 +27,7 @@
 No es obligatorio un formato estricto, pero ayuda mucho para el artículo final (sección "desarrollo del proyecto") que el mensaje diga **qué** y **para qué módulo**:
 
 ```
-zonas: agrega validación de solapamiento al guardar
+zonas: agrega validación de la geometría al guardar
 incidentes: endpoint para avanzar estado
 docs: agrega diagrama de arquitectura
 ```

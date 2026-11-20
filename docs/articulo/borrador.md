@@ -11,7 +11,7 @@ Las empresas que atienden emergencias urbanas necesitan ver sobre un mapa dónde
 (ambulancias, bomberos, patrullas) tienen cerca y en cuánto tiempo pueden llegar. Este trabajo presenta **UrbanSafe**, un
 sistema web de gestión geográfica de emergencias construido con PostgreSQL/PostGIS, GeoServer, un backend JEE (Jersey) sobre
 Tomcat y un cliente React con Leaflet. El sistema ofrece el alta, la modificación y la baja de zonas operativas, recursos e
-incidentes, ocho consultas geográficas, una vista pública para invitados, la búsqueda por dirección o cruce de calles y el
+incidentes, siete consultas geográficas, una vista pública para invitados, la búsqueda por dirección o cruce de calles y el
 cálculo del tiempo de llegada por las calles, con sus sentidos de circulación, en todo Uruguay. El resultado es un sistema que
 se levanta con un solo comando, se defiende sobre Salto y atiende todo el país con miles de objetos, apoyándose en la
 carga a demanda y en una red vial de OpenStreetMap procesada dentro de la propia base.
@@ -75,9 +75,9 @@ Hay dos roles. El **administrador** da de alta, modifica y elimina las tres enti
 historial y los reportes. El **invitado** solo consulta incidentes (filtrados por tipo, estado, prioridad y fecha), recursos
 disponibles y zonas.
 
-Las consultas geográficas pedidas son ocho: incidentes por zona, zonas con más incidentes en un período, recursos cercanos a
-un incidente, incidente más cercano a una dirección o cruce de calles, zona de una dirección, recursos por zona, incidentes por
-recurso y concentración de incidentes. Como opcionales, el control de superposición de zonas, el tiempo estimado de llegada,
+Las consultas geográficas pedidas son siete: incidentes por zona, zonas con más incidentes en un período, recursos cercanos a
+un incidente, incidente más cercano a una dirección o cruce de calles, zona de una dirección, recursos por zona e incidentes por
+recurso. Como opcionales, el control de superposición de zonas, el tiempo estimado de llegada,
 el recurso más cercano a un incidente y el mapa de calor. La aplicación debe ser responsive.
 
 Por último, se debe implementar un prototipo sobre una base geográfica con datos de prueba, con un servidor de mapas
@@ -225,7 +225,7 @@ prioridad, y los polígonos no se simplifican según el zoom.
 
 ### Consultas geográficas y mapa público (P5)
 
-Las ocho consultas de la letra están en `ConsultaResource` y en la pantalla Consultas, numeradas como en el enunciado. Todas se
+Las siete consultas de la letra están en `ConsultaResource` y en la pantalla Consultas, numeradas como en el enunciado. Todas se
 resuelven en SQL con PostGIS. Las que cruzan un incidente con una zona usan `ST_Intersects` y no `ST_Contains`, porque un
 incidente puede ser una línea (una calle cortada) o un polígono (un área inundada) que cruza el borde de una zona sin estar
 completamente adentro. Las zonas que concentran más incidentes en un período (consultas 2 y 8) se calculan con un conteo

@@ -56,7 +56,7 @@ INSERT INTO historial_estado (incidente_id, estado, fecha_hora, usuario) VALUES
 
 -- =====================================================================================================
 -- Datos de prueba para recorrer el sistema, en cantidad moderada y repartidos como en la realidad:
---   * Salto: 18 zonas operativas reales (16 seccionales policiales, que no se superponen, y encima las localidades de Salto
+--   * Salto: 18 zonas operativas reales (16 seccionales policiales y, superpuestas, las localidades de Salto
 --     y de Termas del Daymán), 21 recursos reales (hospital, centros médicos y mutualista, policlínicas del interior, estación
 --     de bomberos, jefatura y seccionales de policía, ambulancias) más 31 unidades móviles (10 ambulancias, 16 patrullas y 2 camiones
 --     de bomberos en la ciudad, y 3 ambulancias en el interior), y 114 incidentes. La ciudad tiene la
