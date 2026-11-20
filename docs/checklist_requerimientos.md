@@ -8,7 +8,7 @@ Leyenda: ✅ hecho · 🚫 no va (decisión tomada) · ⚠️ dudas para el tuto
 ## Resumen
 
 - **43 de 44 hechos.** El que no va es el 33, el control de superposición entre zonas (opcional): las zonas se pueden superponer.
-- Hay tres dudas para el tutor (zonas superpuestas por escrito, estados finales, histórico por zona), al final del documento.
+- Hay dos dudas para el tutor (estados finales, histórico por zona), al final del documento.
 
 ## ABM Zonas operativas
 
@@ -76,7 +76,7 @@ Leyenda: ✅ hecho · 🚫 no va (decisión tomada) · ⚠️ dudas para el tuto
 
 | # | Requerimiento | Estado | Dónde |
 |---|---|---|---|
-| 33 | Control de superposición entre zonas operativas | 🚫 | no va: las zonas se pueden superponer (ver duda 1) |
+| 33 | Control de superposición entre zonas operativas | 🚫 | no va: las zonas se pueden superponer (decisión del tutor) |
 | 34 | Tiempo estimado de llegada de un recurso | ✅ | `EtaResource.java`, `p2_calcular_ruta` (pgRouting) |
 | 35 | Recurso operativo más cercano a un incidente | ✅ | `GET /eta/incidentes/{id}/recurso-mas-cercano` (`RecursoMasCercano.java`): el de menos metros por calles, trazando el camino; botón en el detalle del incidente |
 | 36 | Mapa de calor de concentración de incidentes | ✅ | `CapaCalor.jsx` + `incidentes_calor.sld` (`vec:Heatmap`), en el mapa público |
@@ -101,11 +101,7 @@ Leyenda: ✅ hecho · 🚫 no va (decisión tomada) · ⚠️ dudas para el tuto
 
 ## Para llevar al tutor
 
-1. **Zonas superpuestas (punto 33).** La letra dice que las zonas "no deben superponerse" y deja el control como opcional. El tutor dijo que
-   **sí pueden superponerse** y así está hecho: el guardado solo valida que el polígono sea válido, y la consulta 5 devuelve todas las zonas que
-   contienen un punto. Conviene tenerlo por escrito, porque contra la letra figura como incumplimiento. Si pide lo contrario, el control está
-   pensado (trigger comentado en `V1__init.sql`, `ST_Overlaps` más una comprobación de zona idéntica o contenida).
-2. **Estados finales (punto 17).** Resuelto y Cancelado no tienen salida: es un supuesto nuestro (`IncidenteResource.java`). Un apunte de otra
+1. **Estados finales (punto 17).** Resuelto y Cancelado no tienen salida: es un supuesto nuestro (`IncidenteResource.java`). Un apunte de otra
    reunión dice «cambios de estados en cualquier sentido»; si es así, hay que abrir las salidas.
-3. **Histórico por zona (punto 18).** La letra pide el historial de cada incidente y está hecho. Unos apuntes hablan de verlo filtrado por estado y fechas
+2. **Histórico por zona (punto 18).** La letra pide el historial de cada incidente y está hecho. Unos apuntes hablan de verlo filtrado por estado y fechas
    y agrupado por zona; eso no existe. Confirmar si se espera.

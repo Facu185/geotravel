@@ -1,6 +1,6 @@
 # Modelo entidad-relación (MER)
 
-Sale de las migraciones de `db/migrations` (V1 a V4). Las geometrías están en SRID 32721 (UTM 21 Sur, metros).
+Sale de las migraciones de `db/migrations` (V1 a V7). Las geometrías están en SRID 32721 (UTM 21 Sur, metros).
 
 ```mermaid
 erDiagram
