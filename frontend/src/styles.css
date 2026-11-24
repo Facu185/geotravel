@@ -84,6 +84,8 @@ body {
 }
 
 .cabecera {
+  position: relative;
+  z-index: 1200; /* el menú desplegable queda por encima del mapa y sus paneles (hasta 1150) */
   flex: none;
   background: var(--marino);
   color: #fff;
@@ -173,6 +175,93 @@ body {
 .cabecera a:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ menú hamburguesa
+   Con espacio, las secciones y la sesión van en la barra (".cabecera__contenido" no genera caja). Cuando no entran
+   en una fila se esconden detrás de un botón y se despliegan como una lista sobre el mapa. */
+.cabecera__menu {
+  display: none;
+}
+
+.cabecera__contenido {
+  display: contents;
+}
+
+@media (max-width: 1299px) {
+  .marca__lema {
+    display: none;
+  }
+}
+
+@media (max-width: 1099px) {
+  .cabecera__barra {
+    flex-wrap: nowrap;
+  }
+
+  .cabecera__menu {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 8px;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+
+  .cabecera__menu:hover,
+  .cabecera__menu[aria-expanded="true"] {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .cabecera__menu:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+
+  .cabecera__contenido {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    flex-direction: column;
+    gap: 12px;
+    max-height: calc(100dvh - 70px);
+    padding: 8px 14px 16px;
+    overflow-y: auto;
+    background: var(--marino);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 16px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .cabecera__contenido--abierto {
+    display: flex;
+  }
+
+  .cabecera__contenido .navegacion {
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    overflow: visible;
+  }
+
+  .cabecera__contenido .navegacion a {
+    padding: 12px 14px;
+    font-size: 1rem;
+  }
+
+  .cabecera__contenido .cabecera__sesion {
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+  }
 }
 
 /* Los 5 colores de prioridad de las zonas operativas, de máxima a mínima. */
@@ -1482,10 +1571,6 @@ body {
 
   .marca__lema {
     display: none;
-  }
-
-  .navegacion {
-    width: 100%;
   }
 
   /* ":not" para no pisar el padding 0 de las páginas con mapa, que ocupan toda la pantalla. */
