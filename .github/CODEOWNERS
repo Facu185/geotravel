@@ -1,4 +1,4 @@
-# P1 Nahuel, P2 Nicolas (charlynbc), P3 Facundo, P5 Gonzalo. Falta el usuario de GitHub de P4 (Bruno): reemplazar @P4-incidentes.
+# P1 Nahuel, P2 Nicolas (charlynbc), P3 Facundo, P5 Gonzalo. El módulo de incidentes lo comparten Gonzalo y Facundo.
 # GitHub va a sugerir automáticamente al dueño como revisor de cada PR que toque su carpeta.
 
 /db/                                   @Nahuellx7
@@ -17,11 +17,11 @@
 /frontend/src/modules/zonas/           @Facu185
 /frontend/src/modules/recursos/        @Facu185
 
-/backend/src/main/java/**/incidentes/  @P4-incidentes
-/frontend/src/modules/incidentes/      @P4-incidentes
+/backend/src/main/java/**/incidentes/  @GonzaBolso @Facu185
+/frontend/src/modules/incidentes/      @GonzaBolso @Facu185
 
 /backend/src/main/java/**/consultas/   @GonzaBolso
 /frontend/src/modules/consultas/       @GonzaBolso
 /frontend/src/modules/invitado/        @GonzaBolso
 
-/docs/                                 @Nahuellx7 @charlynbc @Facu185 @P4-incidentes @GonzaBolso
+/docs/                                 @Nahuellx7 @charlynbc @Facu185 @GonzaBolso
