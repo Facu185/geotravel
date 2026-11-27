@@ -39,7 +39,5 @@ docs: agrega diagrama de arquitectura
 | `db/`, `geoserver/` | Datos & GeoServer | P1 · Nahuel |
 | `backend/.../health`, `backend/.../db` | Backend base & reglas | P2 · Nicolas |
 | `backend/.../zonas`, `.../recursos`, `frontend/.../zonas`, `.../recursos` | Zonas Operativas + Recursos | P3 · Facundo |
-| `backend/.../incidentes`, `frontend/.../incidentes` | Incidentes | P4 · Bruno |
+| `backend/.../incidentes`, `frontend/.../incidentes` | Incidentes | Compartido: Gonzalo y Facundo |
 | `backend/.../consultas`, `frontend/.../consultas`, `.../invitado` | Consultas, reportes, vista invitado | P5 · Gonzalo |
-
-Falta reflejar los usuarios de GitHub de cada uno en `.github/CODEOWNERS`.

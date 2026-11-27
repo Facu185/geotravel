@@ -44,7 +44,7 @@ VALUES (1, 'En atención', now() + interval '1 minute', 'ana.rios');
 -- Incidente 3: Registrado -> Derivado
 UPDATE incidente SET estado = 'Derivado' WHERE id = 3;
 INSERT INTO historial_estado (incidente_id, estado, fecha_hora, usuario)
-VALUES (3, 'Derivado', now() + interval '1 minute', 'bruno.silva');
+VALUES (3, 'Derivado', now() + interval '1 minute', 'luis.gomez');
 
 -- Incidente 4: Registrado -> En atención -> Resuelto
 -- Timestamps explícitos: dos filas en el mismo INSERT comparten el now() de la
