@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Route, Routes, Navigate, useLocation, useNavigate } from "react-router-dom";
 import ZonasPage from "./modules/zonas/ZonasPage.jsx";
 import RecursosPage from "./modules/recursos/RecursosPage.jsx";
@@ -40,6 +41,31 @@ function Aplicacion() {
   const { esAdmin, sesion, salir } = useAuth();
   const navegar = useNavigate();
 
+  // En pantallas angostas las secciones y la sesión van en un menú hamburguesa (ver "menú hamburguesa" en styles.css).
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const cabeceraRef = useRef(null);
+
+  // El menú se cierra al cambiar de pantalla (también con "atrás"), con Escape y al tocar fuera de la cabecera.
+  useEffect(() => {
+    setMenuAbierto(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuAbierto) return undefined;
+    const alTocarFuera = (e) => {
+      if (cabeceraRef.current && !cabeceraRef.current.contains(e.target)) setMenuAbierto(false);
+    };
+    const alTeclear = (e) => {
+      if (e.key === "Escape") setMenuAbierto(false);
+    };
+    document.addEventListener("pointerdown", alTocarFuera);
+    document.addEventListener("keydown", alTeclear);
+    return () => {
+      document.removeEventListener("pointerdown", alTocarFuera);
+      document.removeEventListener("keydown", alTeclear);
+    };
+  }, [menuAbierto]);
+
   const alSalir = async () => {
     await salir();
     navegar("/invitado");
@@ -47,7 +73,7 @@ function Aplicacion() {
 
   return (
     <div className={esMapa ? "app app--mapa" : "app"}>
-      <header className="cabecera">
+      <header className="cabecera" ref={cabeceraRef}>
         <div className="cabecera__barra">
           <h1 className="marca">
             <NavLink to="/invitado">
@@ -56,26 +82,51 @@ function Aplicacion() {
               <span className="marca__lema">Emergencias urbanas</span>
             </NavLink>
           </h1>
-          <nav className="navegacion" aria-label="Secciones">
-            {NAV.filter((item) => !item.admin || esAdmin).map((item) => (
-              <NavLink key={item.to} to={item.to}>
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="cabecera__sesion">
-            {esAdmin ? (
-              <>
-                <span className="cabecera__usuario">{sesion.usuario}</span>
-                <button type="button" className="cabecera__salir" onClick={alSalir}>
-                  Salir
-                </button>
-              </>
-            ) : (
-              <NavLink to="/login" className="cabecera__ingresar">
-                Ingresar
-              </NavLink>
-            )}
+          <button
+            type="button"
+            className="cabecera__menu"
+            aria-label={menuAbierto ? "Cerrar el menú" : "Abrir el menú"}
+            aria-expanded={menuAbierto}
+            aria-controls="menu-principal"
+            onClick={() => setMenuAbierto((abierto) => !abierto)}
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+              <path
+                d={menuAbierto ? "M6 6l12 12M18 6L6 18" : "M4 7h16M4 12h16M4 17h16"}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+          {/* Con espacio, el contenido se acomoda en la barra; en pantallas angostas es el menú desplegable. Un toque en un enlace o botón lo cierra. */}
+          <div
+            id="menu-principal"
+            className={menuAbierto ? "cabecera__contenido cabecera__contenido--abierto" : "cabecera__contenido"}
+            onClick={(e) => e.target.closest("a, button") && setMenuAbierto(false)}
+          >
+            <nav className="navegacion" aria-label="Secciones">
+              {NAV.filter((item) => !item.admin || esAdmin).map((item) => (
+                <NavLink key={item.to} to={item.to}>
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+            <div className="cabecera__sesion">
+              {esAdmin ? (
+                <>
+                  <span className="cabecera__usuario">{sesion.usuario}</span>
+                  <button type="button" className="cabecera__salir" onClick={alSalir}>
+                    Salir
+                  </button>
+                </>
+              ) : (
+                <NavLink to="/login" className="cabecera__ingresar">
+                  Ingresar
+                </NavLink>
+              )}
+            </div>
           </div>
         </div>
         {/* Los 5 colores de prioridad de las zonas operativas (ver geoserver/styles). */}
