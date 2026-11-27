@@ -15,14 +15,14 @@ param(
     [string]$GeoServerUrl = "http://localhost:8082/geoserver",
     [string]$User         = "admin",
     [string]$Password     = "geoserver",
-    [string]$Workspace    = "geotravel",
+    [string]$Workspace    = "urbansafe",
     # Datos de conexión que usa GeoServer PARA LLEGAR a la base. Dentro de docker compose el
     # servicio se llama "db"; si GeoServer corre fuera de Docker, usar "localhost".
     [string]$DbHost       = "db",
     [string]$DbPort       = "5432",
-    [string]$DbName       = "geotravel",
-    [string]$DbUser       = "geotravel",
-    [string]$DbPassword   = "geotravel"
+    [string]$DbName       = "urbansafe",
+    [string]$DbUser       = "urbansafe",
+    [string]$DbPassword   = "urbansafe"
 )
 
 $ErrorActionPreference = "Stop"

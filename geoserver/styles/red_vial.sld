@@ -11,7 +11,7 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://www.opengis.net/sld http://schemas.opengis.net/sld/1.0.0/StyledLayerDescriptor.xsd">
   <NamedLayer>
-    <Name>geotravel:red_vial_arco</Name>
+    <Name>urbansafe:red_vial_arco</Name>
     <UserStyle>
       <Name>red_vial</Name>
       <Title>Red vial de rutas por tipo de vía y sentido</Title>

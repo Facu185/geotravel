@@ -42,7 +42,7 @@ const lejos = carga.estado === "lejos";
 // carga.items son los objetos visibles
 
 // en PaginaMapa:
-mapaProps={{ layers: lejos ? ["geotravel:incidente"] : [], wmsExtra: { actualizado: recarga } }}
+mapaProps={{ layers: lejos ? ["urbansafe:incidente"] : [], wmsExtra: { actualizado: recarga } }}
 aviso={<AvisoCarga carga={carga} nombre="incidentes" />}
 ```
 
@@ -53,7 +53,7 @@ reemplaza los objetos (no acumula lo que salió de la vista).
 
 `/incidentes` ya usa la carga a demanda (`?bbox=&limit=`, mismo contrato) y la pantalla Incidentes
 (`modules/incidentes/IncidentesPage.jsx`) la consume con `CargaPorZona`; alejado se ve la capa WMS
-`geotravel:incidente`.
+`urbansafe:incidente`.
 
 La ubicación de un incidente es un **punto** (un lugar), una **línea** (un tramo: una calle cortada) o un **polígono**
 (un área afectada). Se elige la forma en el formulario y se dibuja en el mapa, o se usa la barra de dibujo del mapa
@@ -89,7 +89,7 @@ datos nuevos hay que recalcularla (por capa):
 ```bash
 curl -u admin:geoserver -X PUT -H "Content-Type: application/json" \
   -d '{"featureType":{"name":"recurso","enabled":true}}' \
-  "http://localhost:8082/geoserver/rest/workspaces/geotravel/datastores/geotravel/featuretypes/recurso?recalculate=nativebbox,latlonbbox"
+  "http://localhost:8082/geoserver/rest/workspaces/urbansafe/datastores/urbansafe/featuretypes/recurso?recalculate=nativebbox,latlonbbox"
 ```
 
 La solución definitiva es que `infra/init/geoserver-init.sh` declare para todas las capas una

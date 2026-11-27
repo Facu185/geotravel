@@ -4,8 +4,8 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>uy.edu.fing.geotravel</groupId>
-  <artifactId>geotravel-backend</artifactId>
+  <groupId>uy.edu.fing.urbansafe</groupId>
+  <artifactId>urbansafe-backend</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <packaging>war</packaging>
 
@@ -72,7 +72,7 @@
   </dependencies>
 
   <build>
-    <finalName>geotravel</finalName>
+    <finalName>urbansafe</finalName>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

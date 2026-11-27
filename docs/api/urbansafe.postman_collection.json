@@ -17,11 +17,11 @@
   "variable": [
     {
       "key": "base",
-      "value": "http://localhost:8080/geotravel/api"
+      "value": "http://localhost:8080/urbansafe/api"
     },
     {
       "key": "geoserver",
-      "value": "http://localhost:8082/geoserver/geotravel"
+      "value": "http://localhost:8082/geoserver/urbansafe"
     },
     {
       "key": "zonaId",
@@ -1215,7 +1215,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{geoserver}}/wms?service=WMS&version=1.1.1&request=GetMap&layers=geotravel:zona_operativa,geotravel:recurso,geotravel:incidente&styles=&srs=EPSG:32721&bbox=565000,6133000,580000,6140000&width=800&height=373&format=image/png&transparent=true"
+            "url": "{{geoserver}}/wms?service=WMS&version=1.1.1&request=GetMap&layers=urbansafe:zona_operativa,urbansafe:recurso,urbansafe:incidente&styles=&srs=EPSG:32721&bbox=565000,6133000,580000,6140000&width=800&height=373&format=image/png&transparent=true"
           }
         },
         {
@@ -1223,7 +1223,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=geotravel:incidente&outputFormat=application/json&srsName=EPSG:4326"
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=urbansafe:incidente&outputFormat=application/json&srsName=EPSG:4326"
           }
         },
         {
@@ -1231,7 +1231,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=geotravel:incidente&outputFormat=application/json&cql_filter=estado%3D%27Registrado%27"
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=urbansafe:incidente&outputFormat=application/json&cql_filter=estado%3D%27Registrado%27"
           }
         },
         {
@@ -1239,7 +1239,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=geotravel:zona_operativa&resultType=hits"
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=urbansafe:zona_operativa&resultType=hits"
           }
         },
         {
@@ -1247,7 +1247,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=DescribeFeatureType&typeNames=geotravel:zona_operativa"
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=DescribeFeatureType&typeNames=urbansafe:zona_operativa"
           }
         },
         {
@@ -1255,7 +1255,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=geotravel:via&resultType=hits"
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=urbansafe:via&resultType=hits"
           }
         },
         {
@@ -1263,7 +1263,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=geotravel:acceso&resultType=hits"
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=urbansafe:acceso&resultType=hits"
           }
         },
         {
@@ -1271,7 +1271,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=geotravel:acceso&outputFormat=application/json&cql_filter=nom_calle%3D%27CNO%20CARRASCO%27%20AND%20num_puerta%3D4680"
+            "url": "{{geoserver}}/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=urbansafe:acceso&outputFormat=application/json&cql_filter=nom_calle%3D%27CNO%20CARRASCO%27%20AND%20num_puerta%3D4680"
           }
         },
         {
@@ -1279,7 +1279,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{geoserver}}/wms?service=WMS&version=1.1.1&request=GetMap&layers=geotravel:via,geotravel:acceso&styles=&srs=EPSG:4326&bbox=-56.1960,-34.9070,-56.1938,-34.9055&width=900&height=600&format=image/png"
+            "url": "{{geoserver}}/wms?service=WMS&version=1.1.1&request=GetMap&layers=urbansafe:via,urbansafe:acceso&styles=&srs=EPSG:4326&bbox=-56.1960,-34.9070,-56.1938,-34.9055&width=900&height=600&format=image/png"
           }
         }
       ]

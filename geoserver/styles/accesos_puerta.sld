@@ -9,7 +9,7 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://www.opengis.net/sld http://schemas.opengis.net/sld/1.0.0/StyledLayerDescriptor.xsd">
   <NamedLayer>
-    <Name>geotravel:acceso</Name>
+    <Name>urbansafe:acceso</Name>
     <UserStyle>
       <Name>accesos_puerta</Name>
       <Title>Números de puerta</Title>

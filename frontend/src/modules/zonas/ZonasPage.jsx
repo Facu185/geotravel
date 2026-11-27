@@ -212,7 +212,7 @@ export default function ZonasPage() {
       etiquetaBoton="Zonas"
       hijosMapa={hijosMapa}
       // Alejado, las zonas se ven igual: las dibuja GeoServer (imagen, no objetos en memoria).
-      mapaProps={{ layers: lejos ? ["geotravel:zona_operativa"] : [], wmsExtra: { actualizado: recarga } }}
+      mapaProps={{ layers: lejos ? ["urbansafe:zona_operativa"] : [], wmsExtra: { actualizado: recarga } }}
       aviso={<AvisoCarga carga={carga} nombre="zonas" />}
     >
       {vista === "lista" ? (

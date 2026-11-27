@@ -4,16 +4,15 @@ info:
   version: "0.2.0"
   description: >
     Contrato REST del backend. Actualizar este archivo en el mismo PR que agregue
-    o cambie un endpoint (ver CONTRIBUTING.md). Base path real: /geotravel/api
-    (definido en backend/src/main/webapp/WEB-INF/web.xml; el nombre del artefacto
-    quedó como "geotravel" por continuidad con el repo, no tiene que ver con el
-    dominio del proyecto).
+    o cambie un endpoint (ver CONTRIBUTING.md). Base path real: /urbansafe/api
+    (el .war se llama urbansafe y el servlet se define en
+    backend/src/main/webapp/WEB-INF/web.xml).
 
     Convención de coordenadas: los cuerpos de alta/edición (geomGeoJson) van en
     GeoJSON lon/lat (EPSG:4326) -- es lo que produce Leaflet. Los parámetros x/y de
     las consultas geográficas van en EPSG:32721 (metros), el SRID de la base.
 servers:
-  - url: http://localhost:8080/geotravel/api
+  - url: http://localhost:8080/urbansafe/api
 
 # Seguridad: toda la API exige una sesión de administrador (encabezado Authorization: Bearer <token>) salvo
 # /health, /auth/login, /auth/logout, GET /fotos/... y la lectura que usan las Consultas del invitado:

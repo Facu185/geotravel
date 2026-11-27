@@ -37,7 +37,7 @@ todos) y hace falta un **login básico** que separe vistas.
 
 ## 2. Datos geográficos persistidos (1 minuto)
 
-- Mostrar la base (DBeaver o `docker compose exec db psql -U geotravel -d geotravel`):
+- Mostrar la base (DBeaver o `docker compose exec db psql -U urbansafe -d urbansafe`):
   `SELECT id, nombre, ST_AsText(geom) FROM zona_operativa LIMIT 3;`
 - Decir: las geometrías están en **SRID 32721 (UTM 21S, en metros)**, así distancias y áreas salen en metros.
   Cada columna tiene un **índice GiST**. La API habla en lon/lat (4326) y el backend convierte con `ST_Transform`.
@@ -53,7 +53,7 @@ todos) y hace falta un **login básico** que separe vistas.
 
 ## 3. GeoServer y la carga a demanda (3 minutos)
 
-- En el panel: workspace `geotravel`, store PostGIS, capas `zona_operativa`, `recurso`, `incidente`, `via`, `acceso` y `red_vial_arco` (la red de rutas: se ve en el mapa público como "Red de rutas", con flechas en las calles de mano única).
+- En el panel: workspace `urbansafe`, store PostGIS, capas `zona_operativa`, `recurso`, `incidente`, `via`, `acceso` y `red_vial_arco` (la red de rutas: se ve en el mapa público como "Red de rutas", con flechas en las calles de mano única).
 - **Layer Preview** de una capa. Mostrar el estilo SLD (`incidentes_estado.sld`): color por estado, y cada regla
   trae los tres simbolizadores (punto, línea, polígono) para dibujar cualquier forma.
 - Mostrar un pedido WMS (GetMap) y uno WFS (`resultType=hits` cuenta sin descargar).
@@ -219,7 +219,7 @@ la geometría (GeoJSON) y las calles del recorrido. Por dentro, en 5 pasos:
 
 1. **En la app:** Incidentes → un incidente → "Trazar ruta al recurso más cercano": se ve el recorrido, los minutos, los metros por calles y los metros
    en línea recta, "Los otros recursos evaluados" y "Calles del recorrido".
-2. **En la base (DBeaver o `docker compose exec db psql -U geotravel -d geotravel`):** la misma ruta con los dos criterios. Con el recurso
+2. **En la base (DBeaver o `docker compose exec db psql -U urbansafe -d urbansafe`):** la misma ruta con los dos criterios. Con el recurso
    `CEN-S001` y el incidente 60 dio, en una prueba con los datos del seed:
 
    | Criterio | Metros | Minutos |

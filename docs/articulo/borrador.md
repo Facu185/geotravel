@@ -326,7 +326,7 @@ Cancelado; Resuelto y Cancelado son terminales. Es un supuesto a confirmar con e
 El mapa público tiene una capa "Mapa de calor de incidentes", apagada por defecto, que muestra dónde se concentran los
 incidentes, de azul (pocos) a rojo (muchos). La calcula **GeoServer** con la transformación de renderizado `vec:Heatmap`
 (`geoserver/styles/incidentes_calor.sld`): cada incidente suma una "campana" de 45 píxeles y donde se juntan varios la intensidad
-sube. Es la misma capa `geotravel:incidente` con otro estilo, así que no se traen los incidentes al navegador y el cálculo se
+sube. Es la misma capa `urbansafe:incidente` con otro estilo, así que no se traen los incidentes al navegador y el cálculo se
 hace donde están los datos. Un incidente que es una línea o un polígono entra por su centroide. La capa respeta el mismo
 `CQL_FILTER` que los demás pedidos, de modo que el calor sigue los filtros de Incidentes (tipo, estado, prioridad y fechas): al elegir
 "Incendio", queda el calor de los incendios.

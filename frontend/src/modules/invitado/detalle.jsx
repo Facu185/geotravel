@@ -90,7 +90,7 @@ async function tramosDeCalle(nombre, tocados) {
     service: "WFS",
     version: "2.0.0",
     request: "GetFeature",
-    typeNames: "geotravel:via",
+    typeNames: "urbansafe:via",
     outputFormat: "application/json",
     srsName: "EPSG:3857",
     cql_filter: `nom_calle='${nombre.replace(/'/g, "''")}'${cerca}`,

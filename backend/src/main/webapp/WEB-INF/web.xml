@@ -4,15 +4,15 @@
          xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_4_0.xsd"
          version="4.0">
 
-  <display-name>geotravel-backend</display-name>
+  <display-name>urbansafe-backend</display-name>
 
   <servlet>
-    <servlet-name>geotravel-api</servlet-name>
+    <servlet-name>urbansafe-api</servlet-name>
     <servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
     <init-param>
       <!-- Escanea automáticamente las clases @Path bajo este paquete y sus subpaquetes -->
       <param-name>jersey.config.server.provider.packages</param-name>
-      <param-value>uy.edu.fing.geotravel</param-value>
+      <param-value>uy.edu.fing.urbansafe</param-value>
     </init-param>
     <init-param>
       <param-name>jersey.config.server.provider.classnames</param-name>
@@ -22,7 +22,7 @@
   </servlet>
 
   <servlet-mapping>
-    <servlet-name>geotravel-api</servlet-name>
+    <servlet-name>urbansafe-api</servlet-name>
     <url-pattern>/api/*</url-pattern>
   </servlet-mapping>
 

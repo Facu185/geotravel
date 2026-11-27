@@ -7,7 +7,7 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://www.opengis.net/sld http://schemas.opengis.net/sld/1.0.0/StyledLayerDescriptor.xsd">
   <NamedLayer>
-    <Name>geotravel:incidente</Name>
+    <Name>urbansafe:incidente</Name>
     <UserStyle>
       <Name>incidentes_estado</Name>
       <Title>Incidentes por estado y tipo</Title>

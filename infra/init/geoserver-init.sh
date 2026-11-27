@@ -6,7 +6,7 @@ set -eu
 
 G="http://geoserver:8080/geoserver/rest"
 A="-u ${GEOSERVER_ADMIN_USER}:${GEOSERVER_ADMIN_PASSWORD}"
-WS=geotravel
+WS=urbansafe
 JSON="Content-Type: application/json"
 
 existe() { [ "$(curl -s -o /dev/null -w '%{http_code}' $A "$1")" = "200" ]; }

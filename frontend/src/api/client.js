@@ -1,6 +1,6 @@
 import { obtenerToken, sesionVencida } from "../auth/sesion.js";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080/geotravel/api";
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080/urbansafe/api";
 
 /** Encabezado con el token de la sesión del administrador, si hay una. */
 const autorizacion = () => {

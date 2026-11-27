@@ -192,7 +192,7 @@ export default function RecursosPage() {
       etiquetaBoton="Recursos"
       hijosMapa={hijosMapa}
       // Alejado, los recursos se ven igual: los dibuja GeoServer (imagen, no objetos en memoria).
-      mapaProps={{ layers: lejos ? ["geotravel:recurso"] : [], wmsExtra: { actualizado: recarga } }}
+      mapaProps={{ layers: lejos ? ["urbansafe:recurso"] : [], wmsExtra: { actualizado: recarga } }}
       aviso={<AvisoCarga carga={carga} nombre="recursos" />}
     >
       {vista === "lista" ? (

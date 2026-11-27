@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Genera geoserver/styles/incidentes_estado.sld (el estilo de la capa geotravel:incidente).
+Genera geoserver/styles/incidentes_estado.sld (el estilo de la capa urbansafe:incidente).
 
 Por qué un script: el estilo tiene una regla por estado, por tipo de incidente y por forma (punto, línea o polígono),
 y escribirlas a mano da más de 30 reglas casi iguales. Con el script, agregar un tipo o cambiar un color es tocar
@@ -47,7 +47,7 @@ CABECERA = """<?xml version="1.0" encoding="UTF-8"?>
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://www.opengis.net/sld http://schemas.opengis.net/sld/1.0.0/StyledLayerDescriptor.xsd">
   <NamedLayer>
-    <Name>geotravel:incidente</Name>
+    <Name>urbansafe:incidente</Name>
     <UserStyle>
       <Name>incidentes_estado</Name>
       <Title>Incidentes por estado y tipo</Title>
