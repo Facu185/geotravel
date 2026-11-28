@@ -4,7 +4,7 @@
 -- con el prefijo "PRUEBA-CARGA-" para poder borrarlos después con carga-masiva-borrar.sql.
 --
 -- Uso (desde infra/):
---   docker compose exec -T db psql -U geotravel -d geotravel < ../db/pruebas/carga-masiva.sql
+--   docker compose exec -T db psql -U urbansafe -d urbansafe < ../db/pruebas/carga-masiva.sql
 --
 -- Qué mirar después en Zonas y Recursos:
 --   - con Salto entero a la vista: "Mostrando 500 de N ... acercá el mapa"

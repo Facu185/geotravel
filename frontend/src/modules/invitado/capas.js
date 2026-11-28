@@ -16,7 +16,7 @@
 export const CAPAS = [
   {
     id: "calles",
-    capa: "geotravel:via",
+    capa: "urbansafe:via",
     nombre: "Calles",
     descripcion: "Las calles con nombre de todo el país, como referencia",
     forma: "linea",
@@ -29,7 +29,7 @@ export const CAPAS = [
   },
   {
     id: "redvial",
-    capa: "geotravel:red_vial_arco",
+    capa: "urbansafe:red_vial_arco",
     nombre: "Red de rutas",
     descripcion: "Las calles por las que se calculan las rutas, de todo el país; las flechas marcan la mano única",
     forma: "linea",
@@ -44,7 +44,7 @@ export const CAPAS = [
   },
   {
     id: "zonas",
-    capa: "geotravel:zona_operativa",
+    capa: "urbansafe:zona_operativa",
     nombre: "Zonas operativas",
     descripcion: "Áreas de atención, según su prioridad",
     forma: "zona",
@@ -58,7 +58,7 @@ export const CAPAS = [
   },
   {
     id: "calor",
-    capa: "geotravel:incidente",
+    capa: "urbansafe:incidente",
     estilo: "incidentes_calor", // otro estilo de la misma capa (ver geoserver/styles/incidentes_calor.sld)
     imagen: true, // no va con las demás en el pedido por teselas: es una sola imagen de lo visible (ver CapaCalor.jsx)
     nombre: "Mapa de calor de incidentes",
@@ -74,7 +74,7 @@ export const CAPAS = [
   },
   {
     id: "incidentes",
-    capa: "geotravel:incidente",
+    capa: "urbansafe:incidente",
     nombre: "Incidentes",
     descripcion: "La forma del ícono es el tipo; el color, el estado",
     forma: "circulo",
@@ -95,7 +95,7 @@ export const CAPAS = [
   },
   {
     id: "recursos",
-    capa: "geotravel:recurso",
+    capa: "urbansafe:recurso",
     nombre: "Recursos",
     descripcion: "La forma del ícono es el tipo; el color, el estado operativo",
     forma: "cuadrado",

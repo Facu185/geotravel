@@ -5,7 +5,7 @@ import { REGION, REGIONES } from "./region.js";
 import CapaWmsImagen from "./CapaWmsImagen.jsx";
 
 export const GEOSERVER_WMS_URL =
-  import.meta.env.VITE_GEOSERVER_WMS_URL ?? "http://localhost:8082/geoserver/geotravel/wms";
+  import.meta.env.VITE_GEOSERVER_WMS_URL ?? "http://localhost:8082/geoserver/urbansafe/wms";
 
 // Centro y encuadre iniciales: dependen de la región configurada (ver region.js, VITE_REGION).
 // El encuadre lo usan las páginas que ocupan todo el mapa.
@@ -37,23 +37,23 @@ const MAPAS_BASE = {
  * lugar_osm (estilo lugares_referencia); ver geoserver/styles. Es una sola imagen por tesela, en un panel propio por encima de las zonas y las calles de datos y por debajo de los puntos (incidentes y recursos).
  */
 const REFERENCIA = {
-  todo: "geotravel:referencia_todo", // grupo de capas: calles (calles_referencia) y lugares (lugares_referencia)
-  barrios: "geotravel:referencia_barrios", // grupo de capas: solo los lugares
+  todo: "urbansafe:referencia_todo", // grupo de capas: calles (calles_referencia) y lugares (lugares_referencia)
+  barrios: "urbansafe:referencia_barrios", // grupo de capas: solo los lugares
 };
 
 /**
  * La referencia no cambia, así que se pide por GeoWebCache (el caché de teselas de GeoServer): la primera vez dibuja y guarda
  * el bloque de 4x4 teselas, y después responde del caché sin tocar la base. Si la URL de GeoServer no tiene el formato de
- * siempre (.../geotravel/wms), se usa tal cual: sigue andando, pero sin caché.
+ * siempre (.../urbansafe/wms), se usa tal cual: sigue andando, pero sin caché.
  */
-const GWC_URL = GEOSERVER_WMS_URL.replace(/\/geotravel\/wms$/, "/gwc/service/wms");
+const GWC_URL = GEOSERVER_WMS_URL.replace(/\/urbansafe\/wms$/, "/gwc/service/wms");
 
 /**
  * Las capas de datos se dividen en dos pedidos para respetar el orden contra la referencia: las zonas y las calles quedan DEBAJO
  * (los nombres y las calles de referencia se leen sobre ellas) y los puntos (incidentes, recursos, grupos) ENCIMA. Si los puntos
  * quedaran debajo, el halo blanco de los nombres les comería un pedazo (un círculo de grupo con un tajo).
  */
-const CAPAS_DEBAJO = new Set(["geotravel:zona_operativa", "geotravel:via", "geotravel:red_vial_arco"]);
+const CAPAS_DEBAJO = new Set(["urbansafe:zona_operativa", "urbansafe:via", "urbansafe:red_vial_arco"]);
 
 /** Parte las capas en [debajo, encima] y reparte su cql_filter (uno por capa, separados con ";") al mismo orden. */
 function dividirCapas(layers, wmsExtra) {
@@ -122,7 +122,7 @@ function IndicadorZoom({ zoomMinimo }) {
  * agregar overlays propios (markers, popups) como children.
  *
  * Ejemplo:
- *   <MapView layers={["geotravel:zona_operativa", "geotravel:recurso"]} />
+ *   <MapView layers={["urbansafe:zona_operativa", "urbansafe:recurso"]} />
  *
  * Props opcionales (todas conservan el comportamiento anterior si se omiten):
  *   base          "osm" (default) | "claro"

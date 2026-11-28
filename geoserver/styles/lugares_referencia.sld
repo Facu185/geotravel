@@ -11,7 +11,7 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://www.opengis.net/sld http://schemas.opengis.net/sld/1.0.0/StyledLayerDescriptor.xsd">
   <NamedLayer>
-    <Name>geotravel:lugar_osm</Name>
+    <Name>urbansafe:lugar_osm</Name>
     <UserStyle>
       <Name>lugares_referencia</Name>
       <Title>Ciudades, pueblos y barrios</Title>

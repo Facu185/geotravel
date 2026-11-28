@@ -344,7 +344,7 @@ export default function IncidentesPage() {
       etiquetaBoton="Incidentes"
       hijosMapa={hijosMapa}
       // Alejado, los incidentes se ven igual: los dibuja GeoServer (imagen, no objetos en memoria).
-      mapaProps={{ layers: lejos ? ["geotravel:incidente"] : [], wmsExtra: { actualizado: recarga }, mostrarZoom: true, zoomMinimo: CARGA_POR_ZONA.zoomMinimo }}
+      mapaProps={{ layers: lejos ? ["urbansafe:incidente"] : [], wmsExtra: { actualizado: recarga }, mostrarZoom: true, zoomMinimo: CARGA_POR_ZONA.zoomMinimo }}
       aviso={<AvisoCarga carga={carga} nombre="incidentes" />}
     >
       {vista === "lista" && (

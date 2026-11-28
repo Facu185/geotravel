@@ -1,4 +1,4 @@
-name: geotravel
+name: urbansafe
 
 services:
   db:
@@ -6,15 +6,15 @@ services:
       context: .
       dockerfile: Dockerfile.db
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-geotravel}
-      POSTGRES_USER: ${POSTGRES_USER:-geotravel}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      POSTGRES_DB: ${POSTGRES_DB:-urbansafe}
+      POSTGRES_USER: ${POSTGRES_USER:-urbansafe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-urbansafe}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-geotravel}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-urbansafe}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -31,9 +31,9 @@ services:
     # La conexión va por variables de entorno (no por 'command'), porque
     # "docker compose run flyway migrate" reemplaza el command completo.
     environment:
-      FLYWAY_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-geotravel}
-      FLYWAY_USER: ${POSTGRES_USER:-geotravel}
-      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      FLYWAY_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-urbansafe}
+      FLYWAY_USER: ${POSTGRES_USER:-urbansafe}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:-urbansafe}
       FLYWAY_CONNECT_RETRIES: "10"
       FLYWAY_LOCATIONS: filesystem:/flyway/migrations
     command: migrate
@@ -46,9 +46,9 @@ services:
       flyway:
         condition: service_completed_successfully
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-geotravel}
-      POSTGRES_USER: ${POSTGRES_USER:-geotravel}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      POSTGRES_DB: ${POSTGRES_DB:-urbansafe}
+      POSTGRES_USER: ${POSTGRES_USER:-urbansafe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-urbansafe}
     volumes:
       - ./init/seed.sh:/init/seed.sh:ro
       - ../db/seed:/seed:ro
@@ -65,9 +65,9 @@ services:
       flyway:
         condition: service_completed_successfully
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-geotravel}
-      POSTGRES_USER: ${POSTGRES_USER:-geotravel}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      POSTGRES_DB: ${POSTGRES_DB:-urbansafe}
+      POSTGRES_USER: ${POSTGRES_USER:-urbansafe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-urbansafe}
       RED_VIAL_REGENERAR: ${RED_VIAL_REGENERAR:-}
     volumes:
       - ./red-vial/data:/data
@@ -88,9 +88,9 @@ services:
     environment:
       GEOSERVER_ADMIN_USER: ${GEOSERVER_ADMIN_USER:-admin}
       GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD:-geoserver}
-      POSTGRES_DB: ${POSTGRES_DB:-geotravel}
-      POSTGRES_USER: ${POSTGRES_USER:-geotravel}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      POSTGRES_DB: ${POSTGRES_DB:-urbansafe}
+      POSTGRES_USER: ${POSTGRES_USER:-urbansafe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-urbansafe}
     volumes:
       - ./init/geoserver-init.sh:/init/geoserver-init.sh:ro
       - ../geoserver/styles:/custom_styles:ro
@@ -123,9 +123,9 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: "5432"
-      DB_NAME: ${POSTGRES_DB:-geotravel}
-      DB_USER: ${POSTGRES_USER:-geotravel}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-geotravel}
+      DB_NAME: ${POSTGRES_DB:-urbansafe}
+      DB_USER: ${POSTGRES_USER:-urbansafe}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-urbansafe}
       DB_STATEMENT_TIMEOUT_MS: ${DB_STATEMENT_TIMEOUT_MS:-15000}
       IDE_DEPARTAMENTO: ${IDE_DEPARTAMENTO:-salto}
       IDE_LOCALIDAD: ${IDE_LOCALIDAD:-salto}

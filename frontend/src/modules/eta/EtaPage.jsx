@@ -144,8 +144,8 @@ export default function EtaPage() {
 
   // De fondo, GeoServer dibuja el tipo que el front todavía no dibuja (con el mapa muy alejado).
   const capasFondo = [
-    ...(elegiblesIncidentes?.items.length ? [] : ["geotravel:incidente"]),
-    ...(elegiblesRecursos?.items.length ? [] : ["geotravel:recurso"]),
+    ...(elegiblesIncidentes?.items.length ? [] : ["urbansafe:incidente"]),
+    ...(elegiblesRecursos?.items.length ? [] : ["urbansafe:recurso"]),
   ];
 
   return (

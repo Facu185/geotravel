@@ -7,4 +7,4 @@ RUN --mount=type=cache,target=/root/.m2 mvn -B -DskipTests clean package
 
 # Etapa 2: Tomcat 9 (javax.*, el namespace que usa el backend) con el .war ya desplegado.
 FROM tomcat:9.0-jdk17-temurin
-COPY --from=build /app/target/geotravel.war /usr/local/tomcat/webapps/geotravel.war
+COPY --from=build /app/target/urbansafe.war /usr/local/tomcat/webapps/urbansafe.war

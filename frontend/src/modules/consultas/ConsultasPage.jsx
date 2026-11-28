@@ -32,7 +32,7 @@ import { CONSULTAS, RESULTADO_VACIO } from "./paneles.jsx";
  * Capas que GeoServer dibuja de fondo (imágenes, sin cargar nada en el navegador). Cada consulta pide solo el tipo
  * de objeto con el que trabaja (campo "fondo" de paneles.jsx): no se dibuja todo lo que existe.
  */
-const CAPA_DE = { zona: "geotravel:zona_operativa", incidente: "geotravel:incidente", recurso: "geotravel:recurso" };
+const CAPA_DE = { zona: "urbansafe:zona_operativa", incidente: "urbansafe:incidente", recurso: "urbansafe:recurso" };
 
 function ClickEnMapa({ alClick }) {
   useMapEvents({ click: (e) => alClick([e.latlng.lat, e.latlng.lng]) });

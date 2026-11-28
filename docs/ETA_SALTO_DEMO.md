@@ -33,7 +33,7 @@ minutos. El backend aguarda a que el seed concluya.
 Probar el backend:
 
 ```powershell
-curl.exe -i http://localhost:8080/geotravel/api/health
+curl.exe -i http://localhost:8080/urbansafe/api/health
 ```
 
 En **otra terminal**, desde la carpeta raiz del clon:
@@ -70,7 +70,7 @@ eliminas los registros de prueba, no los recrea automaticamente.
 PowerShell, con Docker ya levantado:
 
 ```powershell
-$api = "http://localhost:8080/geotravel/api"
+$api = "http://localhost:8080/urbansafe/api"
 $bbox = "-57.995,-31.405,-57.925,-31.365"
 Invoke-RestMethod "$api/recursos?bbox=$bbox&limit=500"
 

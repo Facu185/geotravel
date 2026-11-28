@@ -2,7 +2,7 @@
 <!--
   Mapa de calor de incidentes (opcional de la letra: "Mapa de calor de concentración de incidentes").
 
-  No es el estilo por defecto de la capa geotravel:incidente (ese dibuja los íconos): se pide con styles=incidentes_calor.
+  No es el estilo por defecto de la capa urbansafe:incidente (ese dibuja los íconos): se pide con styles=incidentes_calor.
   Lo calcula GeoServer con la transformación de renderizado vec:Heatmap, sin traer los incidentes al navegador: cada punto
   suma una "campana" de radiusPixels píxeles y donde se juntan varios el valor sube. Un incidente que es una línea o un
   polígono entra por su centroide. Respeta el CQL_FILTER del pedido, así que el calor sigue los filtros de la capa Incidentes
@@ -17,7 +17,7 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://www.opengis.net/sld http://schemas.opengis.net/sld/1.0.0/StyledLayerDescriptor.xsd">
   <NamedLayer>
-    <Name>geotravel:incidente</Name>
+    <Name>urbansafe:incidente</Name>
     <UserStyle>
       <Name>incidentes_calor</Name>
       <Title>Mapa de calor de incidentes</Title>

@@ -8,7 +8,9 @@ Tecnólogo Informático, Facultad de Ingeniería (UdelaR).
 > reestructuró para "UrbanSafe" al cambiar la letra del proyecto. La
 > arquitectura (PostGIS + GeoServer + Jersey + React/Leaflet, patrón de
 > módulos, CI, validaciones) se mantuvo — lo que cambió es el dominio. El
-> historial de Git conserva el trabajo de GeoTravel como referencia.
+> historial de Git conserva el trabajo de GeoTravel como referencia. El repositorio de
+> GitHub sigue llamándose `geotravel`; adentro (paquete Java, base, GeoServer, API) todo
+> se llama `urbansafe`.
 
 Zonas operativas, recursos de emergencia (ambulancias, bomberos, patrullas) e
 incidentes urbanos sobre un mapa, con ABM para un administrador y una vista
@@ -105,8 +107,8 @@ GeoServer queda en `http://localhost:8082/geoserver` (admin / geoserver, o lo
 que hayas puesto en `.env`). `geoserver-init` hace por la API REST lo que se haría a mano
 (el mismo flujo de workspace/store/capas/SLD del Práctico 3):
 
-1. Workspace `geotravel` (nombre heredado del repo; es solo un identificador).
-2. Store PostGIS `geotravel` apuntando a la base (host `db`, puerto `5432`).
+1. Workspace `urbansafe`.
+2. Store PostGIS `urbansafe` apuntando a la base (host `db`, puerto `5432`).
 3. Capas: `zona_operativa`, `recurso`, `incidente`, `via` (calles), `acceso` (números de puerta), `red_vial_arco` (la red de rutas, con las manos únicas) y `lugar_osm` (nombres de ciudades, pueblos y barrios).
 
 **Calles y barrios de referencia.** Las pantallas de Zonas, Recursos, Incidentes, Consultas y Tiempo de llegada dibujan de fondo, en gris, las calles de `red_vial_arco` por jerarquía (estilo `calles_referencia`: a lo lejos solo las rutas y avenidas principales; al acercar, las secundarias, las de barrio y las de servicio, con su nombre desde el zoom 14 al 15) y los nombres de ciudades, pueblos y barrios de `lugar_osm` (estilo `lugares_referencia`; los de barrio se ven del zoom 12 al 14, y más cerca toman la posta los de las calles). Es el prop `referencia` de `MapView`; el mapa público solo trae los barrios, porque ahí las calles se prenden y apagan a mano. Como no cambian, se piden por GeoWebCache (`/geoserver/gwc/service/wms`, grupos de capas `referencia_todo` y `referencia_barrios` que crea `geoserver-init`): la primera vez GeoServer dibuja y guarda, después responde del caché sin tocar la base. `geoserver-init` vacía ese caché cada vez que corre, para que un cambio en un `.sld` se aplique (los navegadores guardan cada tesela 1 hora: Ctrl+F5).
@@ -165,13 +167,13 @@ La carga masiva (`db/pruebas/carga-masiva.sql`) reparte sus 3.000 recursos sobre
 `red-vial` las pasa a todo el país). Desde `infra/`:
 
 ```bash
-docker compose exec db psql -U geotravel -d geotravel -c "TRUNCATE via RESTART IDENTITY"
+docker compose exec db psql -U urbansafe -d urbansafe -c "TRUNCATE via RESTART IDENTITY"
 docker compose run --rm seed
 docker compose run --rm -e RED_VIAL_REGENERAR=1 red-vial   # vuelve a dejar las calles de todo el país
 # GeoServer guarda la extensión de cada capa al publicarla: se recalcula (geoserver-init también lo hace)
 curl -u admin:geoserver -X PUT -H "Content-Type: application/json" \
   -d '{"featureType":{"name":"via","enabled":true}}' \
-  "http://localhost:8082/geoserver/rest/workspaces/geotravel/datastores/geotravel/featuretypes/via?recalculate=nativebbox,latlonbbox"
+  "http://localhost:8082/geoserver/rest/workspaces/urbansafe/datastores/urbansafe/featuretypes/via?recalculate=nativebbox,latlonbbox"
 ```
 
 ### 2. Backend
@@ -179,7 +181,7 @@ curl -u admin:geoserver -X PUT -H "Content-Type: application/json" \
 ```bash
 cd backend
 mvn clean package
-# desplegar target/geotravel.war en Tomcat (o mvn tomcat7:run si agregan el plugin)
+# desplegar target/urbansafe.war en Tomcat (o mvn tomcat7:run si agregan el plugin)
 ```
 
 Si no tenés Maven instalado, el servicio `backend` de Docker lo compila y lo despliega solo:
@@ -193,9 +195,9 @@ docker compose up -d --build backend
 
 Variables de entorno que lee (ver `backend/src/main/java/.../db/DataSourceProvider.java`):
 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` (default: `localhost`,
-`5432`, `geotravel`, `geotravel`, `geotravel`).
+`5432`, `urbansafe`, `urbansafe`, `urbansafe`).
 
-Probar: `http://localhost:8080/geotravel/api/health` → `{"status":"ok",...}`.
+Probar: `http://localhost:8080/urbansafe/api/health` → `{"status":"ok",...}`.
 
 ### 3. Frontend
 
@@ -219,7 +221,7 @@ Hay dos vistas, separadas por un login básico:
 
 - **Mapa de calor de incidentes** (opcional de la letra): en el mapa público, la capa "Mapa de calor de incidentes" (apagada por
   defecto) muestra dónde se concentran los incidentes, de azul (pocos) a rojo (muchos). Lo calcula GeoServer con la
-  transformación `vec:Heatmap` (`geoserver/styles/incidentes_calor.sld`, el mismo layer `geotravel:incidente` con otro estilo), sin traer
+  transformación `vec:Heatmap` (`geoserver/styles/incidentes_calor.sld`, el mismo layer `urbansafe:incidente` con otro estilo), sin traer
   los incidentes al navegador, y sigue los filtros de Incidentes (tipo, estado, prioridad y fechas). Se pide como una sola imagen de
   lo que se ve (`CapaCalor.jsx`), no en teselas: GeoServer escala la intensidad de cada imagen según su propio máximo, y con teselas un
   pueblo con pocos incidentes se vería tan rojo como la ciudad. Por eso la intensidad es relativa a lo visible.

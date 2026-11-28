@@ -1,6 +1,6 @@
 -- V1__init.sql — Sistema de Gestión Geográfica de Emergencias Urbanas (UrbanSafe).
 -- Ver docs/diagramas/arquitectura.md para el modelo completo.
--- Aplicar con Flyway, o a mano: psql -d geotravel -f V1__init.sql
+-- Aplicar con Flyway, o a mano: psql -d urbansafe -f V1__init.sql
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 

@@ -14,7 +14,7 @@ import { GEOSERVER_WMS_URL } from "./MapView.jsx";
  * La imagen cubre un poco más que la vista (así se puede arrastrar sin ver el borde) y se pide de nuevo cuando el mapa
  * deja de moverse. La anterior se queda hasta que llega la nueva, para que no parpadee. Va dentro del mapa.
  *
- *   capa     capa de GeoServer ("geotravel:incidente")
+ *   capa     capa de GeoServer ("urbansafe:incidente")
  *   estilo   estilo de calor ("incidentes_calor")
  *   cql      filtro CQL ("INCLUDE" o "" = sin filtro)
  *   version  cambiarlo fuerza a pedir de nuevo (botón "Actualizar")
